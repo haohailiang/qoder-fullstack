@@ -40,10 +40,16 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User updateUser(Long id, User user) {
-        if (!userRepository.existsById(id)) {
-            throw new BusinessException(404, "用户不存在: id=" + id);
-        }
+        User existing = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(404, "用户不存在: id=" + id));
         user.setId(id);
+        // 管理页编辑表单不包含 username/password，缺失时保留原值，避免登录后被清空
+        if (user.getUsername() == null || user.getUsername().isBlank()) {
+            user.setUsername(existing.getUsername());
+        }
+        if (user.getPassword() == null || user.getPassword().isBlank()) {
+            user.setPassword(existing.getPassword());
+        }
         return userRepository.save(user);
     }
 

@@ -15,3 +15,8 @@ spring:
       additional-paths: src/main/java,src/main/resources
     livereload:
       enabled: true
+
+# JWT 配置：secret 用于 HS256 签名，长度必须 >= 32 字节；expiration-minutes 为 Token 有效期（分钟）
+jwt:
+  secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
+  expiration-minutes: 120

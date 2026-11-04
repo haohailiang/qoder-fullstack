@@ -20,7 +20,7 @@ const form = reactive({
 })
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] },
@@ -127,7 +127,14 @@ onMounted(loadUsers)
 
       <el-table v-loading="loading" :data="filteredUsers" border stripe>
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="用户名" min-width="120" />
+        <el-table-column label="账号" min-width="120">
+          <template #default="{ row }">
+            <!-- 注册产生的账号才有 username，旧 CRUD 数据为空时显示占位符 -->
+            <span v-if="row.username">{{ row.username }}</span>
+            <el-text v-else type="info">-</el-text>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="姓名" min-width="120" />
         <el-table-column prop="email" label="邮箱" min-width="200" />
         <el-table-column prop="age" label="年龄" width="100" />
         <el-table-column label="操作" width="160" fixed="right">
@@ -145,8 +152,8 @@ onMounted(loadUsers)
       width="460px"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="用户名" prop="name">
-          <el-input v-model="form.name" placeholder="请输入用户名" />
+        <el-form-item label="姓名" prop="name">
+          <el-input v-model="form.name" placeholder="请输入姓名" />
         </el-form-item>
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="form.email" placeholder="请输入邮箱" />

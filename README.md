@@ -11,17 +11,24 @@
 demo-fullstack/
 ├── backend/                              # Spring Boot 后端
 │   ├── pom.xml                           # Maven 配置（Spring Boot 3.3.x，Java 17）
-│   └── src/main/
-│       ├── java/com/example/demo/
-│       │   ├── DemoApplication.java      # 启动入口
-│       │   ├── common/                   # 统一响应 Result / 业务异常 / 全局异常处理
-│       │   ├── config/                   # CORS 跨域配置
-│       │   ├── controller/               # 控制层（REST API）
-│       │   ├── entity/                   # 实体类
-│       │   ├── repository/               # 仓储层（ConcurrentHashMap 内存实现）
-│       │   └── service/                  # 服务层（接口 + 实现）
-│       └── resources/
-│           └── application.yml           # 端口 8081，上下文路径 /api
+│   ├── src/main/
+│   │   ├── java/com/example/demo/
+│   │   │   ├── DemoApplication.java      # 启动入口
+│   │   │   ├── common/                   # 统一响应 Result / 业务异常 / 全局异常处理
+│   │   │   ├── config/                   # CORS 跨域配置
+│   │   │   ├── controller/               # 控制层（REST API）
+│   │   │   ├── entity/                   # 实体类
+│   │   │   ├── repository/               # 仓储层（ConcurrentHashMap 内存实现）
+│   │   │   └── service/                  # 服务层（接口 + 实现）
+│   │   └── resources/
+│   │       └── application.yml           # 端口 8081，上下文路径 /api
+│   └── src/test/                         # 异常处理相关测试用例
+│       └── java/com/example/demo/
+│           ├── common/
+│           │   └── GlobalExceptionHandlerTest.java   # 全局异常处理器单元测试
+│           └── controller/
+│               ├── AuthControllerExceptionTest.java  # 注册/登录接口异常集成测试
+│               └── SecurityExceptionTest.java        # 认证/JWT/授权安全链路测试
 └── frontend/                             # Vue 3 前端
     ├── package.json
     ├── vite.config.ts                    # Vite 配置（含 /api 代理到后端）
@@ -95,6 +102,40 @@ npm run dev
   "message": "success",
   "data": {}
 }
+```
+
+## 异常处理与测试
+
+后端通过 `common/GlobalExceptionHandler`（`@RestControllerAdvice`）将各类异常统一包装为前述 `Result` 结构返回。测试用例位于 `backend/src/test/`，基于 JUnit 5 + Spring Boot Test + MockMvc + Mockito（由已有的 `spring-boot-starter-test` 提供，无需额外依赖），共 24 个用例，覆盖以下异常类型：
+
+| 异常类型 | 触发场景 | 处理器 | `Result.code` | HTTP 状态 |
+| -------- | -------- | ------ | ------------- | --------- |
+| 业务异常 `BusinessException` | 认证标识已存在（409）、确认密码不一致（400）、用户不存在（404）等 | `GlobalExceptionHandler` | 400 / 404 / 409 | 200 |
+| 参数校验异常 `MethodArgumentNotValidException` | `@Valid` 触发的字段校验失败（username 为空、密码长度不合法、邮箱格式错误、年龄 < 0、姓名/确认密码缺失等） | `GlobalExceptionHandler` | 400 | 200 |
+| 认证异常 | 登录凭证错误（认证标识不存在 / 密码不正确） | `GlobalExceptionHandler`（`BusinessException` 分支） | 401 | 200 |
+| 认证异常 | 已抛出到控制器层的 `AuthenticationException` | `GlobalExceptionHandler` | 401 | 200 |
+| 授权异常 `AccessDeniedException` | 已登录但权限不足 | `GlobalExceptionHandler` | 403 | 200 |
+| JWT 异常 | Token 过期 `ExpiredJwtException`、签名/格式非法 `JwtException` | `GlobalExceptionHandler` | 401 | 200 |
+| 未认证 / 无效 Token（过滤器层） | 无 Token、Token 无效、Token 过期访问受保护接口 | `SecurityConfig` 入口点 / `JwtAuthenticationFilter` | 401 | 401 |
+| 兜底异常 `Exception` | 不可预期的运行时异常 | `GlobalExceptionHandler` | 500 | 200 |
+
+> 说明：`GlobalExceptionHandler` 未标注 `@ResponseStatus`，因此**经由它处理的异常 HTTP 状态恒为 200**，真正的错误码体现在响应体的 `code` 字段；而「未认证 / 无效 Token」的 401 由 Spring Security 入口点与 JWT 过滤器**直接写出真实 HTTP 401**，二者路径不同，测试断言也据此区分。
+
+测试类职责：
+
+- `GlobalExceptionHandlerTest`：单元测试，直接构造各类异常调用处理器方法，稳定覆盖全部 handler 分支（含 403 授权、JWT 过期/无效、500 兜底）。
+- `AuthControllerExceptionTest`：MockMvc 集成测试，走真实 `/auth/register`、`/auth/login` 接口，验证业务异常、参数校验与登录凭证错误。
+- `SecurityExceptionTest`：MockMvc 集成测试，走安全过滤链，验证无 Token / 无效 Token / 过期 Token 的 401，以及有效 Token 查询不存在用户的 404。
+
+### 本地运行测试
+
+```bash
+cd backend
+# 运行全部测试
+mvn test
+# 仅运行指定测试类
+mvn test -Dtest=GlobalExceptionHandlerTest
+mvn test -Dtest=AuthControllerExceptionTest,SecurityExceptionTest
 ```
 
 ## CORS 说明

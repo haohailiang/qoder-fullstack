@@ -1,8 +1,10 @@
 import request from './request'
 
-/** 用户实体（与后端 entity.User 对应） */
+/** 用户实体（与后端 entity.User 对应；password 由后端 @JsonIgnore 永远不会返回） */
 export interface User {
   id?: number
+  /** 登录认证标识，仅注册/登录后有值，旧 CRUD 数据可能为空 */
+  username?: string
   name: string
   email: string
   age: number

@@ -1,8 +1,11 @@
 package com.example.demo.common;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.validation.FieldError;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,9 +30,37 @@ public class GlobalExceptionHandler {
     public Result<Void> handleValidationException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .findFirst()
-                .map(FieldError::getDefaultMessage)
+                .map(fieldError -> fieldError.getDefaultMessage())
                 .orElse("参数校验失败");
         return Result.error(400, message);
+    }
+
+    /** 认证异常（如登录凭证错误被抛出到控制器层时兜底） */
+    @ExceptionHandler(AuthenticationException.class)
+    public Result<Void> handleAuthenticationException(AuthenticationException e) {
+        log.warn("认证异常: {}", e.getMessage());
+        return Result.error(401, "用户名或密码错误");
+    }
+
+    /** 授权异常（已登录但无权访问） */
+    @ExceptionHandler(AccessDeniedException.class)
+    public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
+        log.warn("授权异常: {}", e.getMessage());
+        return Result.error(403, "未授权访问：权限不足");
+    }
+
+    /** Token 过期 */
+    @ExceptionHandler(ExpiredJwtException.class)
+    public Result<Void> handleExpiredJwtException(ExpiredJwtException e) {
+        log.warn("Token 已过期: {}", e.getMessage());
+        return Result.error(401, "Token 已过期，请重新登录");
+    }
+
+    /** Token 无效（签名错误、格式非法等） */
+    @ExceptionHandler(JwtException.class)
+    public Result<Void> handleJwtException(JwtException e) {
+        log.warn("Token 无效: {}", e.getMessage());
+        return Result.error(401, "Token 无效");
     }
 
     /** 兜底异常 */

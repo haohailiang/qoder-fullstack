@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -13,7 +14,14 @@ public class User {
 
     private Long id;
 
-    @NotBlank(message = "用户名不能为空")
+    /** 登录认证标识（用户名），注册时必填，旧 CRUD 接口不强制 */
+    private String username;
+
+    /** BCrypt 加密后的密码；@JsonIgnore 保证任何接口响应都不返回密码 */
+    @JsonIgnore
+    private String password;
+
+    @NotBlank(message = "姓名不能为空")
     private String name;
 
     @NotBlank(message = "邮箱不能为空")
