@@ -1,0 +1,17 @@
+server:
+  # 服务端口（本机 8080 被 Windows 系统进程占用，默认使用 8081；如需更换端口，请同步修改 frontend/vite.config.ts 的代理 target）
+  port: 8081
+  servlet:
+    # 上下文路径：所有接口统一以 /api 开头，与前端代理配置保持一致
+    context-path: /api
+
+spring:
+  application:
+    name: demo-backend
+  devtools:
+    restart:
+      enabled: true
+      # 监控 classpath 变更自动重启
+      additional-paths: src/main/java,src/main/resources
+    livereload:
+      enabled: true
