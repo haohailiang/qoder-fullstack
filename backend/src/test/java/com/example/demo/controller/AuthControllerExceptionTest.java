@@ -1,6 +1,8 @@
 package com.example.demo.controller;
 
+import com.example.demo.common.BusinessException;
 import com.example.demo.service.CaptchaService;
+import com.example.demo.service.SmsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,10 +44,14 @@ class AuthControllerExceptionTest {
     @org.springframework.boot.test.mock.mockito.MockBean
     private CaptchaService captchaService;
 
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private SmsService smsService;
+
     @BeforeEach
     void setUp() {
-        // 关闭验证码校验，聚焦注册 / 登录参数校验与业务异常本身
+        // 关闭验证码 / 短信验证码校验，聚焦注册 / 登录参数校验与业务异常本身
         doNothing().when(captchaService).validate(any(), any());
+        doNothing().when(smsService).validateCode(any(), any());
     }
 
     /**
@@ -56,18 +63,20 @@ class AuthControllerExceptionTest {
         String body = String.format(
                 "{\"username\":\"%s\",\"password\":\"%s\",\"confirmPassword\":\"%s\","
                         + "\"name\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\",\"age\":%s,"
-                        + "\"captchaKey\":\"test-captcha-key\",\"captchaValue\":\"test-captcha-value\"}",
+                        + "\"captchaKey\":\"test-captcha-key\",\"captchaValue\":\"test-captcha-value\","
+                        + "\"smsCode\":\"123456\"}",
                 username, password, confirm, name, email, phone, age);
         return mockMvc.perform(post("/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body));
     }
 
-    /** 构造登录请求体（附带合法验证码占位值）并发起请求 */
+    /** 构造登录请求体（附带合法验证码 / 短信验证码占位值）并发起请求 */
     private ResultActions loginJson(String username, String password) throws Exception {
         String body = String.format(
                 "{\"username\":\"%s\",\"password\":\"%s\","
-                        + "\"captchaKey\":\"test-captcha-key\",\"captchaValue\":\"test-captcha-value\"}",
+                        + "\"captchaKey\":\"test-captcha-key\",\"captchaValue\":\"test-captcha-value\","
+                        + "\"smsCode\":\"123456\"}",
                 username, password);
         return mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -187,5 +196,55 @@ class AuthControllerExceptionTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400))
                 .andExpect(jsonPath("$.message").value("认证标识（用户名）不能为空"));
+    }
+
+    @Test
+    @DisplayName("参数校验：登录缺失 smsCode 字段（@NotBlank 触发 400）")
+    void loginSmsCodeMissing() throws Exception {
+        String body = "{\"username\":\"zhangsan\",\"password\":\"123456\","
+                + "\"captchaKey\":\"test-captcha-key\",\"captchaValue\":\"test-captcha-value\"}";
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("短信验证码不能为空"));
+    }
+
+    @Test
+    @DisplayName("业务异常：登录时短信验证码错误（凭证正确、validateCode 抛错）返回 400")
+    void loginSmsCodeWrong() throws Exception {
+        // zhangsan/123456 为预置正确凭证，流程会走到短信验证码校验
+        doThrow(new BusinessException(400, "短信验证码错误"))
+                .when(smsService).validateCode(any(), any());
+
+        loginJson("zhangsan", "123456")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("短信验证码错误"));
+    }
+
+    @Test
+    @DisplayName("业务异常：登录时短信验证码已过期（validateCode 抛错）返回 400")
+    void loginSmsCodeExpired() throws Exception {
+        doThrow(new BusinessException(400, "短信验证码已过期，请重新获取"))
+                .when(smsService).validateCode(any(), any());
+
+        loginJson("zhangsan", "123456")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("短信验证码已过期，请重新获取"));
+    }
+
+    @Test
+    @DisplayName("业务异常：注册时短信验证码错误（validateCode 抛错）返回 400")
+    void registerSmsCodeWrong() throws Exception {
+        doThrow(new BusinessException(400, "短信验证码错误或已过期，请重新获取"))
+                .when(smsService).validateCode(any(), any());
+
+        registerJson("sms_wrong_user", "123456", "123456", "张三", "smswrong@example.com", "13800000021", "25")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("短信验证码错误或已过期，请重新获取"));
     }
 }

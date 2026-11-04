@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.common.BusinessException;
 import com.example.demo.config.properties.SmsProperties;
+import com.example.demo.dto.SmsRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -111,5 +115,126 @@ class SmsServiceTest {
                 .hasMessage("短信发送失败，请稍后重试");
 
         verify(restTemplate, times(1)).postForObject(anyString(), any(), any());
+    }
+
+    @Test
+    @DisplayName("sendVerifyCode 存储验证码可用正确码校验通过（enabled=false 仍生成存储）")
+    void sendVerifyCodeStoresValidCode() {
+        properties.setEnabled(false);
+        String phone = "13800000101";
+
+        smsService.sendVerifyCode(phone);
+
+        // 从发送记录取出本次生成的明文验证码，校验应当通过
+        String code = latestRecord(phone).getCode();
+        assertThat(code).hasSize(6);
+        assertThatCode(() -> smsService.validateCode(phone, code)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("短信验证码校验：错误码抛出 code=400")
+    void validateCodeWrong() {
+        smsService.saveCodeForTest("13800000102", "123456", System.currentTimeMillis() + 60_000L);
+
+        assertThatThrownBy(() -> smsService.validateCode("13800000102", "000000"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", 400)
+                .hasMessage("短信验证码错误或已过期，请重新获取");
+    }
+
+    @Test
+    @DisplayName("短信验证码校验：一次性使用，同一手机号校验通过后再次校验必然失败")
+    void validateCodeIsOneTimeUse() {
+        smsService.saveCodeForTest("13800000103", "123456", System.currentTimeMillis() + 60_000L);
+
+        smsService.validateCode("13800000103", "123456");
+
+        assertThatThrownBy(() -> smsService.validateCode("13800000103", "123456"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("短信验证码错误或已过期，请重新获取");
+    }
+
+    @Test
+    @DisplayName("短信验证码校验：失败（不匹配）同样会消费该手机号验证码，不允许重试同一个码")
+    void validateCodeWrongConsumesEntry() {
+        smsService.saveCodeForTest("13800000104", "123456", System.currentTimeMillis() + 60_000L);
+
+        assertThatThrownBy(() -> smsService.validateCode("13800000104", "000000"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", 400);
+
+        // 错误校验已消费，即使再传正确码也应失败
+        assertThatThrownBy(() -> smsService.validateCode("13800000104", "123456"))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("短信验证码校验：已过期条目校验失败")
+    void validateCodeExpired() {
+        smsService.saveCodeForTest("13800000105", "123456", System.currentTimeMillis() - 1_000L);
+
+        assertThatThrownBy(() -> smsService.validateCode("13800000105", "123456"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("短信验证码错误或已过期，请重新获取");
+    }
+
+    @Test
+    @DisplayName("短信验证码校验：手机号 / 验证码缺失抛出提示异常")
+    void validateCodeBlankInput() {
+        assertThatThrownBy(() -> smsService.validateCode(null, "123456"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("请输入短信验证码");
+        assertThatThrownBy(() -> smsService.validateCode("13800000106", "  "))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("请输入短信验证码");
+    }
+
+    @Test
+    @DisplayName("发送记录：enabled=false 成功发送后记录手机号 / 明文验证码 / SUCCESS 状态")
+    void recordsSuccessOnDisabledSend() {
+        properties.setEnabled(false);
+        String phone = "13800000107";
+
+        smsService.sendVerifyCode(phone);
+
+        SmsRecord record = latestRecord(phone);
+        assertThat(record.getPhone()).isEqualTo(phone);
+        assertThat(record.getCode()).hasSize(6);
+        assertThat(record.getStatus()).isEqualTo("SUCCESS");
+        assertThat(record.getSentAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("发送记录：真实发送失败（重试耗尽）仍记录一条 FAILED")
+    void recordsFailureOnSendError() {
+        when(restTemplate.postForObject(anyString(), any(), any()))
+                .thenThrow(new ResourceAccessException("connect timed out"));
+        String phone = "13800000108";
+
+        assertThatThrownBy(() -> smsService.sendVerifyCode(phone))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", 502);
+
+        assertThat(latestRecord(phone).getStatus()).isEqualTo("FAILED");
+    }
+
+    @Test
+    @DisplayName("发送记录：按发送时间倒序，最新记录在前")
+    void recordsOrderedNewestFirst() {
+        properties.setEnabled(false);
+        smsService.sendVerifyCode("13800000109");
+        smsService.sendVerifyCode("13800000110");
+
+        List<SmsRecord> all = smsService.getRecords();
+        assertThat(all).isNotEmpty();
+        assertThat(all.get(0).getPhone()).isEqualTo("13800000110");
+    }
+
+    /** 从发送记录中取指定手机号最新一条（记录本身已按倒序存放） */
+    private SmsRecord latestRecord(String phone) {
+        return smsService.getRecords().stream()
+                .filter(r -> phone.equals(r.getPhone()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("未找到手机号 " + phone + " 的发送记录"));
     }
 }

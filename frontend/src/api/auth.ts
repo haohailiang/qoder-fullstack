@@ -7,6 +7,8 @@ export interface LoginParams {
   password: string
   captchaKey: string
   captchaValue: string
+  /** 短信验证码（图片验证码通过后由 /auth/send-sms-code 发送到此用户名对应手机号） */
+  smsCode: string
 }
 
 /** 登录响应（与后端 dto.LoginResponse 对应） */
@@ -27,6 +29,18 @@ export interface RegisterParams {
   age: number
   captchaKey: string
   captchaValue: string
+  /** 短信验证码（图片验证码通过后由 /auth/send-sms-code 发送到 phone） */
+  smsCode: string
+}
+
+/** 发送短信验证码请求参数（与后端 dto.SendSmsCodeRequest 对应） */
+export interface SendSmsCodeParams {
+  captchaKey: string
+  captchaValue: string
+  /** 注册场景：前端直接传入的目标手机号 */
+  phone?: string
+  /** 登录场景：已注册用户名，由后端查询其手机号 */
+  username?: string
 }
 
 /** 图片验证码响应（与后端 dto.CaptchaResponse 对应） */
@@ -39,6 +53,14 @@ export interface CaptchaResult {
 /** 获取图片验证码 */
 export function getCaptcha() {
   return request.get<CaptchaResult>('/auth/captcha')
+}
+
+/**
+ * 发送短信验证码（登录 / 注册页，匿名接口）：携带图片验证码 key/value + 手机号（注册）或用户名（登录）。
+ * 后端先校验图片验证码，通过后才真正发送（同一手机号 60 秒频控）；验证码错误则不发送并返回明确提示。
+ */
+export function sendSmsCode(data: SendSmsCodeParams) {
+  return request.post<void>('/auth/send-sms-code', data)
 }
 
 /** 登录 */

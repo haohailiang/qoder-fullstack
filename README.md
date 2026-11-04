@@ -3,7 +3,7 @@
 前后端分离的全栈示例项目，包含：
 
 - **backend/**：Spring Boot 3.x + Java 17 + Maven + MyBatis + MySQL，提供用户资源 REST API、图片验证码、云片网短信发送服务
-- **frontend/**：Vue 3 + TypeScript + Vite + Element Plus，提供登录 / 注册（含图片验证码）与用户管理（含手机号、发送短信验证码）页面
+- **frontend/**：Vue 3 + TypeScript + Vite + Element Plus，提供登录 / 注册（图片验证码 + 短信验证码两步验证）与用户管理（增删改查 + 短信发送记录查看）页面
 
 ## 目录结构
 
@@ -28,16 +28,18 @@ demo-fullstack/
 │   │       ├── application.yml           # 端口 8081，上下文路径 /api，MySQL / MyBatis / 验证码 / 短信配置
 │   │       ├── db/schema.sql             # MySQL 建表 SQL（users 表）
 │   │       └── mapper/UserMapper.xml     # 用户表 SQL（全部写在 XML，不使用注解写 SQL）
-│   └── src/test/                         # 异常处理 / 验证码 / 短信服务测试用例
+│   └── src/test/                         # 异常处理 / 验证码 / 短信服务 / 发送短信接口 / 短信记录测试用例
 │       └── java/com/example/demo/
 │           ├── common/
 │           │   └── GlobalExceptionHandlerTest.java   # 全局异常处理器单元测试
 │           ├── controller/
-│           │   ├── AuthControllerExceptionTest.java  # 注册/登录接口异常集成测试
-│           │   └── SecurityExceptionTest.java        # 认证/JWT/授权安全链路测试
+│           │   ├── AuthControllerExceptionTest.java  # 注册/登录接口异常集成测试（含短信验证码两步验证）
+│           │   ├── SecurityExceptionTest.java        # 认证/JWT/授权安全链路测试
+│           │   ├── SendSmsCodeControllerTest.java    # /auth/send-sms-code 发送短信接口测试
+│           │   └── SmsRecordsControllerTest.java     # /sms/records 短信记录查询接口测试
 │           └── service/
 │               ├── CaptchaServiceTest.java           # 图片验证码服务单元测试
-│               └── SmsServiceTest.java               # 短信服务重试/频控单元测试
+│               └── SmsServiceTest.java               # 短信服务验证码存储/校验/重试/频控/记录单元测试
 └── frontend/                             # Vue 3 前端
     ├── package.json
     ├── vite.config.ts                    # Vite 配置（含 /api 代理到后端）
@@ -46,13 +48,13 @@ demo-fullstack/
     └── src/
         ├── main.ts                       # 入口（注册 Element Plus、路由）
         ├── App.vue                       # 根组件（布局）
-        ├── api/                          # axios 封装 + 认证 / 用户 / 短信接口
+        ├── api/                          # axios 封装 + 认证（含短信两步验证）/ 用户 / 短信记录接口
         ├── router/                       # vue-router 路由
         ├── utils/                        # 令牌与登录用户状态管理
         └── views/
-            ├── Login.vue                 # 登录页（含图片验证码）
-            ├── Register.vue              # 注册页（含手机号、图片验证码）
-            └── UserManage.vue            # 用户管理页面（增删改查 + 发送短信验证码）
+            ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证）
+            ├── Register.vue              # 注册页（手机号 + 图片验证码 + 短信验证码两步验证）
+            └── UserManage.vue            # 用户管理页面（增删改查 + 短信发送记录查看）
 ```
 
 ## 环境要求
@@ -105,8 +107,9 @@ npm run dev
 | 方法   | 路径                    | 说明                                       |
 | ------ | ----------------------- | ------------------------------------------ |
 | GET    | /api/auth/captcha       | 获取图片验证码（匿名访问）                 |
-| POST   | /api/auth/register      | 注册（需携带验证码，需填写手机号）         |
-| POST   | /api/auth/login         | 登录（需携带验证码，返回 JWT）             |
+| POST   | /api/auth/send-sms-code | 发送短信验证码（匿名访问，先校验图片验证码）|
+| POST   | /api/auth/register      | 注册（需图片验证码 + 短信验证码 + 手机号）  |
+| POST   | /api/auth/login         | 登录（需图片验证码 + 短信验证码，返回 JWT） |
 | GET    | /api/auth/me            | 获取当前登录用户                           |
 | POST   | /api/auth/logout        | 退出登录                                   |
 | GET    | /api/users              | 查询用户列表                               |
@@ -114,7 +117,7 @@ npm run dev
 | POST   | /api/users              | 新增用户                                   |
 | PUT    | /api/users/{id}         | 更新用户                                   |
 | DELETE | /api/users/{id}         | 删除用户                                   |
-| POST   | /api/sms/send-code      | 按用户 id 发送短信验证码（需登录访问）     |
+| GET    | /api/sms/records        | 查询短信发送记录（需登录访问，按时间倒序） |
 | GET    | /api/health             | 健康检查                                   |
 
 请求 / 响应体示例（新增用户）：
@@ -128,7 +131,7 @@ npm run dev
 }
 ```
 
-注册 / 登录请求体需额外携带图片验证码相关字段：
+注册 / 登录请求体需额外携带图片验证码与短信验证码相关字段：
 
 ```json
 {
@@ -140,7 +143,8 @@ npm run dev
   "phone": "13800000003",
   "age": 28,
   "captchaKey": "<GET /api/auth/captcha 返回的 captchaKey>",
-  "captchaValue": "<用户输入的图片验证码字符>"
+  "captchaValue": "<用户输入的图片验证码字符>",
+  "smsCode": "<用户收到的 6 位短信验证码>"
 }
 ```
 
@@ -162,13 +166,23 @@ npm run dev
 - 提交登录 / 注册时须携带 `captchaKey` 与用户输入的 `captchaValue`；后端在执行业务逻辑（查重、密码校验）之前先调用 `CaptchaService.validate`，校验失败（不存在 / 已过期 / 已被使用 / 不匹配）统一返回「验证码错误或已过期，请重新获取」，前端会自动刷新验证码图片并清空输入框，允许重新提交。
 - 验证码内容用纯 JDK AWT 生成并保存在进程内存（不落库），有效期与一次性使用规则见 `application.yml` 的 `captcha.*` 配置（`expire-seconds`、`width`、`height`、`code-length`、`line-count`）；`captcha.enabled=false` 可临时关闭校验，便于本地调试。
 
-## 短信发送与云片网封装
+## 短信验证码两步验证与发送记录
 
+登录 / 注册采用「图片验证码 → 短信验证码」两步串行验证：
+
+1. 页面加载时通过 `GET /api/auth/captcha` 展示图片验证码（复用一次性 `captchaKey`）。
+2. 用户输入图片验证码后点击「发送短信验证码」，前端把 `captchaKey` / `captchaValue` 连同目标手机号（注册场景由前端传入 `phone`）或用户名（登录场景由 `username` 提交、后端查手机号）一起发送到匿名接口 `POST /api/auth/send-sms-code`；**只有图片验证码校验通过**，后端才调用 `SmsService.sendVerifyCode(phone)` 真正发送 6 位数字验证码，否则返回明确提示且短信不发送。
+3. 发送成功后按钮进入 60 秒倒计时禁用状态（与 `sms.rate-limit-seconds` 保持一致）；图片验证码一次性使用，每次成功发送后自动刷新，用户也可点击图片手动刷新。
+4. 登录 / 注册请求体携带 `captchaKey` / `captchaValue` 与新增的 `smsCode`；后端 `AuthServiceImpl` 按「先校验图片验证码、再校验短信验证码」顺序执行，任一环节失败均返回统一 `Result` 错误（不泄露内部密钥）。
+
+关键约束：
+
+- `POST /api/auth/send-sms-code` 为 permitAll（登录前即可调用），内部先 `CaptchaService.validate` 再 `SmsService.sendVerifyCode(phone)`；防滥发依赖图片验证码 + 同一手机号 60 秒频控（超频返回 `code=429`）。
+- `SmsService` 提供验证码「生成并存储 + 校验」的完整方法：验证码以手机号为 key 存于进程内内存（`ConcurrentHashMap`），有效期由 `sms.code-expire-seconds`（默认 300 秒，与图片验证码过期配置分开）控制，一次性使用（无论成功失败都消费同一个 key），校验逻辑与图片验证码一致。
+- 短信发送记录：每次实际发送（成功 / 失败）都会记录手机号、验证码明文（演示用途）、发送时间与状态，保存在进程内内存列表（`ConcurrentLinkedDeque`，不落库），通过需 JWT 认证的 `GET /api/sms/records` 按时间倒序返回，前端用户管理页以表格展示并支持手动刷新。
 - 前端不直接对接云片网 API；`apiKey`、`accountSid` 等敏感配置只在后端 `SmsService` 内部读取，不会出现在任何接口响应 / 异常信息中。
-- 前端用户管理页每行提供「发送验证码」按钮，点击调用 `POST /api/sms/send-code`（请求体为 `{ userId }`），后端根据 `userId` 查询用户手机号后调用 `SmsService` 发送验证码。
-- 后端对同一手机号做发送频率控制（`sms.rate-limit-seconds` 默认 60 秒内不允许重复发送，超出会返回 `code=429`）；前端按钮发送成功后进入倒计时禁用状态，倒计时结束前不可重复点击。
-- 调用云片网接口失败时（网络异常 / 超时 / 5xx 可恢复错误）会按 `sms.max-retry` 重试，重试间隔按 `sms.retry-backoff`（`linear` 线性 / `exponential` 指数）退避；4xx 客户端错误（如 `apiKey` 错误）不重试直接失败，统一返回 `code=502`「短信发送失败，请稍后重试」，不泄露敏感配置细节。
-- `sms.enabled=false`（默认值）时不调用真实云片网接口，仅打印日志，用于本地演示 / 自动化测试；配置真实密钥后改为 `true` 才会实际发送短信。
+- 调用云片网接口失败时（网络异常 / 超时 / 5xx 可恢复错误）会按 `sms.max-retry` 重试，重试间隔按 `sms.retry-backoff`（`linear` 线性 / `exponential` 指数）退避；4xx 客户端错误（如 `apiKey` 错误）不重试直接失败，统一返回 `code=502`「短信发送失败，请稍后重试」，不泄露敏感配置细节，并记录一条 `FAILED` 发送记录。
+- `sms.enabled=false`（默认值）时不调用真实云片网接口，仅打印日志，但**验证码仍会生成存储**以便本地联调；配置真实密钥后改为 `true` 才会实际发送短信。关闭状态下短信仍记为成功，可在用户管理页「短信发送记录」查看明文验证码。
 
 云片网配置项（`application.yml` 的 `sms.*`）需在 [云片网控制台](https://www.yunpian.com/) 申请后填入本地 `application.yml`，仓库中保留的是占位符（`your_yunpian_account_sid` / `your_yunpian_api_key`），**不要提交真实密钥**：
 
@@ -184,11 +198,12 @@ sms:
   retry-interval-ms: 1000
   retry-backoff: linear
   rate-limit-seconds: 60
+  code-expire-seconds: 300            # 短信验证码有效期（秒），与图片验证码 captcha.expire-seconds 分开配置
 ```
 
 ## 异常处理与测试
 
-后端通过 `common/GlobalExceptionHandler`（`@RestControllerAdvice`）将各类异常统一包装为前述 `Result` 结构返回。测试用例位于 `backend/src/test/`，基于 JUnit 5 + Spring Boot Test + MockMvc + Mockito（由已有的 `spring-boot-starter-test` 提供，无需额外依赖），共 39 个用例，覆盖以下场景：
+后端通过 `common/GlobalExceptionHandler`（`@RestControllerAdvice`）将各类异常统一包装为前述 `Result` 结构返回。测试用例位于 `backend/src/test/`，基于 JUnit 5 + Spring Boot Test + MockMvc + Mockito（由已有的 `spring-boot-starter-test` 提供，无需额外依赖），共 58 个用例，覆盖以下场景：
 
 | 异常 / 场景类型 | 触发场景 | 处理器 | `Result.code` | HTTP 状态 |
 | --------------- | -------- | ------ | ------------- | --------- |
@@ -200,6 +215,10 @@ sms:
 | JWT 异常 | Token 过期 `ExpiredJwtException`、签名 / 格式非法 `JwtException` | `GlobalExceptionHandler` | 401 | 200 |
 | 未认证 / 无效 Token（过滤器层） | 无 Token、Token 无效、Token 过期访问受保护接口 | `SecurityConfig` 入口点 / `JwtAuthenticationFilter` | 401 | 401 |
 | 图片验证码 | 正确 / 一次性使用 / 过期 / 不匹配 / 关闭开关（`CaptchaServiceTest`，不依赖数据库） | 单元测试直接调用 `CaptchaService.validate` | 400 | 不涉及 HTTP |
+| 短信验证码（服务） | 验证码生成 / 存储、正确校验、一次性使用、不匹配、过期、开关关闭、发送记录写入与倒序（`SmsServiceTest`，Mock `RestTemplate`，不发起真实网络请求） | 单元测试直接调用 `SmsService.send` / `validateCode` / `getRecords` | 400 / 429 / 502 | 不涉及 HTTP |
+| 短信验证码（登录 / 注册两步验证） | 登录 / 注册缺失 smsCode（参数校验）、短信验证码错误 / 过期（`AuthControllerExceptionTest`，`@MockBean CaptchaService + SmsService`） | `GlobalExceptionHandler` | 400 | 200 |
+| 发送短信验证码接口 | 图片验证码不通过不发送、通过则发送、频控 429、缺少验证码参数（`SendSmsCodeControllerTest`，`@MockBean`） | `GlobalExceptionHandler` / 过滤器 | 400 / 429 | 200 |
+| 短信发送记录查询 | 无 Token 访问 /sms/records、有效 Token 返回记录列表（`SmsRecordsControllerTest`） | `SecurityConfig` 入口点 / 控制器 | 401 / 200 | 401 / 200 |
 | 短信发送 | 频控 429、网络异常 / 5xx 触发重试、4xx 不重试（`SmsServiceTest`，Mock `RestTemplate`，不发起真实网络请求） | 单元测试直接调用 `SmsService.send` | 429 / 502 | 不涉及 HTTP |
 | 兜底异常 `Exception` | 不可预期的运行时异常 | `GlobalExceptionHandler` | 500 | 200 |
 
@@ -208,10 +227,11 @@ sms:
 测试类职责：
 
 - `GlobalExceptionHandlerTest`：单元测试，直接构造各类异常调用处理器方法，稳定覆盖全部 handler 分支（含 403 授权、429 / 502 短信相关分支、JWT 过期 / 无效、500 兜底）。
-- `AuthControllerExceptionTest`：MockMvc 集成测试，走真实 `/auth/register`、`/auth/login` 接口，验证业务异常、参数校验（含手机号、验证码字段）与登录凭证错误；通过 `@MockBean CaptchaService` 关闭真实验证码校验逻辑，使断言聚焦于注册 / 登录自身的参数与业务异常。
-- `SecurityExceptionTest`：MockMvc 集成测试，走安全过滤链，验证无 Token / 无效 Token / 过期 Token 的 401，以及有效 Token 查询不存在用户的 404。
+- `AuthControllerExceptionTest`：MockMvc 集成测试，走真实 `/auth/register`、`/auth/login` 接口，验证业务异常、参数校验（含手机号、验证码、smsCode 字段）与登录凭证错误；通过 `@MockBean CaptchaService` 与 `@MockBean SmsService` 关闭真实验证码 / 短信验证码校验，使断言聚焦于注册 / 登录自身的参数与业务异常；另有登录 / 注册短信验证码错误、过期、smsCode 缺失等两步验证异常用例。
+- `SendSmsCodeControllerTest`：MockMvc 集成测试，走匿名接口 `/auth/send-sms-code`，`@MockBean CaptchaService + SmsService` 验证「图片验证码不通过不发送」「通过则按手机号发送」「频控 429」「缺少验证码参数」等编排。
+- `SmsRecordsControllerTest`：MockMvc 集成测试，验证需 JWT 认证的 `GET /sms/records`：无 Token 返回 401，有效 Token 返回按时间倒序的发送记录列表。
 - `CaptchaServiceTest`：纯单元测试（不依赖 SpringBootTest / 数据库），验证图片验证码的生成、正确校验、一次性使用（成功 / 失败均消费同一个 key）、过期失效、开关关闭等规则。
-- `SmsServiceTest`：纯单元测试（Mock `RestTemplate`，不发起真实网络请求），验证发送开关关闭时不触达真实接口、同一手机号频控、网络异常 / 5xx 触发重试且次数受 `maxRetry` 限制、4xx 不重试直接失败。
+- `SmsServiceTest`：纯单元测试（Mock `RestTemplate`，不发起真实网络请求），验证发送开关关闭时不触达真实接口但仍生成验证码、同一手机号频控、网络异常 / 5xx 触发重试且次数受 `maxRetry` 限制、4xx 不重试直接失败，以及验证码存储 / 校验 / 一次性 / 过期与发送记录写入及倒序。
 
 > **运行集成测试前请先完成上方「数据库初始化」小节**（`AuthControllerExceptionTest` / `SecurityExceptionTest` 直连本地 MySQL，依赖真实数据库连接与 `zhangsan` 预置账号；`DemoDataInitializer` 会在测试上下文启动时自动补齐预置数据）。`CaptchaServiceTest` / `SmsServiceTest` / `GlobalExceptionHandlerTest` 不依赖数据库，可独立运行。
 

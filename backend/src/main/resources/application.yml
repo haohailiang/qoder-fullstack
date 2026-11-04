@@ -55,6 +55,7 @@ captcha:
 # - max-retry / retry-interval-ms / retry-backoff 控制网络异常、超时或 5xx 可恢复错误的重试策略
 #   retry-backoff: linear（重试间隔 = retry-interval-ms * 第几次重试）或 exponential（重试间隔 = retry-interval-ms * 2^(第几次重试-1)）
 # - rate-limit-seconds 为同一手机号发送频率限制窗口（秒），窗口内不允许重复发送
+# - code-expire-seconds 为短信验证码有效期（秒），与图片验证码过期配置（captcha.expire-seconds）分开独立配置
 sms:
   enabled: false
   api-url: https://sms.yunpian.com/v2/sms/tpl_send.json
@@ -66,3 +67,4 @@ sms:
   retry-interval-ms: 1000
   retry-backoff: linear
   rate-limit-seconds: 60
+  code-expire-seconds: 300

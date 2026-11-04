@@ -43,4 +43,7 @@ public class RegisterRequest {
 
     @NotBlank(message = "请输入验证码")
     private String captchaValue;
+
+    @NotBlank(message = "短信验证码不能为空")
+    private String smsCode;
 }

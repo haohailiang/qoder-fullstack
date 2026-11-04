@@ -45,4 +45,7 @@ public class SmsProperties {
 
     /** 同一手机号发送频率限制窗口（秒），窗口内不允许重复发送 */
     private int rateLimitSeconds = 60;
+
+    /** 短信验证码有效期（秒），过期后必须重新获取；与图片验证码过期配置（captcha.expire-seconds）相互独立 */
+    private int codeExpireSeconds = 300;
 }

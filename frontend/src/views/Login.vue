@@ -1,26 +1,50 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Lock, Picture, User } from '@element-plus/icons-vue'
-import { getCaptcha, login } from '@/api/auth'
+import { Lock, Message, Picture, User } from '@element-plus/icons-vue'
+import { getCaptcha, login, sendSmsCode } from '@/api/auth'
 import { setAuth } from '@/utils/auth'
+
+/** 与后端 sms.rate-limit-seconds 保持一致的倒计时秒数，防止重复发送 */
+const SMS_COUNTDOWN_SECONDS = 60
 
 const router = useRouter()
 const route = useRoute()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+const sending = ref(false)
 
 const form = reactive({
   username: '',
   password: '',
   captchaValue: '',
+  smsCode: '',
 })
 
 // 验证码 key 由后端生成并随图片一起返回，提交时原样回传给后端定位本次验证码
 const captchaKey = ref('')
 const captchaImage = ref('')
+
+// 短信发送倒计时（秒），> 0 时禁用发送按钮
+const countdown = ref(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+function startCountdown() {
+  countdown.value = SMS_COUNTDOWN_SECONDS
+  countdownTimer = setInterval(() => {
+    if (countdown.value > 1) {
+      countdown.value -= 1
+    } else {
+      countdown.value = 0
+      if (countdownTimer) {
+        clearInterval(countdownTimer)
+        countdownTimer = null
+      }
+    }
+  }, 1000)
+}
 
 const rules: FormRules = {
   username: [{ required: true, message: '请输入认证标识（用户名）', trigger: 'blur' }],
@@ -29,6 +53,7 @@ const rules: FormRules = {
     { min: 6, message: '密码长度至少 6 位', trigger: 'blur' },
   ],
   captchaValue: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
+  smsCode: [{ required: true, message: '请输入短信验证码', trigger: 'blur' }],
 }
 
 async function refreshCaptcha() {
@@ -39,6 +64,40 @@ async function refreshCaptcha() {
     form.captchaValue = ''
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理
+  }
+}
+
+/**
+ * 发送短信验证码（两步验证第一步之后的动作）：
+ * 先携带图片验证码 key/value + 用户名提交，后端校验图片验证码通过后才真正发送。
+ * 发送成功后进入倒计时，并刷新图片验证码（一次性）。
+ */
+async function handleSendSmsCode() {
+  if (countdown.value > 0 || sending.value) return
+  if (!form.username) {
+    ElMessage.warning('请先输入认证标识（用户名）')
+    return
+  }
+  if (!form.captchaValue) {
+    ElMessage.warning('请先输入图片验证码')
+    return
+  }
+  sending.value = true
+  try {
+    await sendSmsCode({
+      username: form.username,
+      captchaKey: captchaKey.value,
+      captchaValue: form.captchaValue,
+    })
+    ElMessage.success('短信验证码已发送')
+    startCountdown()
+    // 图片验证码一次性使用，发送成功后自动刷新
+    await refreshCaptcha()
+  } catch {
+    // 图片验证码错误 / 频控等提示已由拦截器统一处理；刷新验证码便于重新输入
+    await refreshCaptcha()
+  } finally {
+    sending.value = false
   }
 }
 
@@ -66,6 +125,13 @@ async function handleLogin() {
 }
 
 onMounted(refreshCaptcha)
+
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+})
 </script>
 
 <template>
@@ -119,6 +185,24 @@ onMounted(refreshCaptcha)
             </el-link>
           </div>
         </el-form-item>
+        <el-form-item prop="smsCode">
+          <div class="sms-row">
+            <el-input
+              v-model="form.smsCode"
+              placeholder="短信验证码"
+              :prefix-icon="Message"
+              @keyup.enter="handleLogin"
+            />
+            <el-button
+              class="sms-send-btn"
+              :disabled="countdown > 0"
+              :loading="sending"
+              @click="handleSendSmsCode"
+            >
+              {{ countdown > 0 ? `重新发送(${countdown}s)` : '发送短信验证码' }}
+            </el-button>
+          </div>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" class="auth-submit" :loading="loading" @click="handleLogin">
             登录
@@ -127,6 +211,7 @@ onMounted(refreshCaptcha)
       </el-form>
 
       <div class="auth-tip">演示账号：zhangsan / 123456（或 lisi / 123456）</div>
+      <div class="auth-tip">先输入图片验证码点「发送短信验证码」（演示短信默认关闭，验证码可在用户管理页查看）</div>
       <div class="auth-tip">点击图片可刷新验证码</div>
     </el-card>
   </div>
@@ -173,6 +258,18 @@ onMounted(refreshCaptcha)
   cursor: pointer;
   border: 1px solid #dcdfe6;
   border-radius: 4px;
+}
+
+.sms-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sms-send-btn {
+  flex-shrink: 0;
+  width: 130px;
 }
 
 .auth-tip {

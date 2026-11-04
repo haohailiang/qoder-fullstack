@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { createUser, deleteUser, listUsers, updateUser, type User } from '@/api/user'
-import { sendSmsCode } from '@/api/sms'
-
-/** 与后端 sms.rate-limit-seconds 保持一致的倒计时秒数，防止重复点击 / 短信滥发 */
-const SMS_COUNTDOWN_SECONDS = 60
+import { getSmsRecords, type SmsRecord } from '@/api/sms'
 
 const loading = ref(false)
 const keyword = ref('')
 const users = ref<User[]>([])
+
+const recordsLoading = ref(false)
+const records = ref<SmsRecord[]>([])
 
 const dialogVisible = ref(false)
 const submitting = ref(false)
@@ -116,50 +116,26 @@ async function handleDelete(row: User) {
   await loadUsers()
 }
 
-/** userId -> 剩余倒计时秒数；无对应 key 表示可点击发送 */
-const countdownMap = reactive<Record<number, number>>({})
-let countdownTimer: ReturnType<typeof setInterval> | null = null
-
-function startCountdown(userId: number) {
-  countdownMap[userId] = SMS_COUNTDOWN_SECONDS
-  if (countdownTimer) return
-  countdownTimer = setInterval(() => {
-    let hasActive = false
-    for (const key of Object.keys(countdownMap)) {
-      const id = Number(key)
-      if (countdownMap[id] > 1) {
-        countdownMap[id] -= 1
-        hasActive = true
-      } else {
-        delete countdownMap[id]
-      }
-    }
-    if (!hasActive && countdownTimer) {
-      clearInterval(countdownTimer)
-      countdownTimer = null
-    }
-  }, 1000)
+/** 将后端 ISO 时间字符串（LocalDateTime 序列化）格式化为 YYYY-MM-DD HH:mm:ss */
+function formatSentAt(sentAt: string) {
+  if (!sentAt) return '-'
+  return sentAt.replace('T', ' ').slice(0, 19)
 }
 
-async function handleSendCode(row: User) {
-  if (row.id == null) return
-  if (countdownMap[row.id]) return // 倒计时期间防止重复点击
+async function loadRecords() {
+  recordsLoading.value = true
   try {
-    await sendSmsCode(row.id)
-    ElMessage.success(`验证码已发送至 ${row.phone}`)
-    startCountdown(row.id)
+    records.value = await getSmsRecords()
   } catch {
-    // 错误提示（如“发送过于频繁”“该用户未设置手机号”）已在 axios 响应拦截器统一处理
+    // 错误提示已在 axios 响应拦截器中统一处理
+  } finally {
+    recordsLoading.value = false
   }
 }
 
-onMounted(loadUsers)
-
-onUnmounted(() => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
+onMounted(() => {
+  loadUsers()
+  loadRecords()
 })
 </script>
 
@@ -193,19 +169,33 @@ onUnmounted(() => {
         <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column prop="phone" label="手机号" width="130" />
         <el-table-column prop="age" label="年龄" width="80" />
-        <el-table-column label="操作" width="230" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
-            <el-button
-              link
-              type="success"
-              :disabled="!!countdownMap[row.id]"
-              @click="handleSendCode(row)"
-            >
-              {{ countdownMap[row.id] ? `重新发送(${countdownMap[row.id]}s)` : '发送验证码' }}
-            </el-button>
           </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="never" class="sms-records-card">
+      <div class="toolbar">
+        <span class="section-title">短信发送记录</span>
+        <el-button :icon="Refresh" :loading="recordsLoading" @click="loadRecords">刷新</el-button>
+      </div>
+
+      <el-table v-loading="recordsLoading" :data="records" border stripe empty-text="暂无发送记录">
+        <el-table-column prop="phone" label="手机号" width="140" />
+        <el-table-column prop="code" label="短信验证码" width="120" />
+        <el-table-column label="发送状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'SUCCESS' ? 'success' : 'danger'">
+              {{ row.status === 'SUCCESS' ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="发送时间" min-width="180">
+          <template #default="{ row }">{{ formatSentAt(row.sentAt) }}</template>
         </el-table-column>
       </el-table>
     </el-card>
@@ -248,5 +238,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.sms-records-card {
+  margin-top: 16px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
 }
 </style>
