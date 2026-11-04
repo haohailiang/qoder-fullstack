@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { createUser, deleteUser, listUsers, updateUser, type User } from '@/api/user'
+import { sendSmsCode } from '@/api/sms'
+
+/** 与后端 sms.rate-limit-seconds 保持一致的倒计时秒数，防止重复点击 / 短信滥发 */
+const SMS_COUNTDOWN_SECONDS = 60
 
 const loading = ref(false)
 const keyword = ref('')
@@ -16,6 +20,7 @@ const editingId = ref<number | null>(null)
 const form = reactive({
   name: '',
   email: '',
+  phone: '',
   age: 18,
 })
 
@@ -24,6 +29,10 @@ const rules: FormRules = {
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     { type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] },
+  ],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: ['blur', 'change'] },
   ],
   age: [{ required: true, message: '请输入年龄', trigger: 'blur' }],
 }
@@ -48,6 +57,7 @@ async function loadUsers() {
 function resetForm() {
   form.name = ''
   form.email = ''
+  form.phone = ''
   form.age = 18
   formRef.value?.clearValidate()
 }
@@ -62,6 +72,7 @@ function openEditDialog(row: User) {
   editingId.value = row.id ?? null
   form.name = row.name
   form.email = row.email
+  form.phone = row.phone
   form.age = row.age
   dialogVisible.value = true
 }
@@ -105,7 +116,51 @@ async function handleDelete(row: User) {
   await loadUsers()
 }
 
+/** userId -> 剩余倒计时秒数；无对应 key 表示可点击发送 */
+const countdownMap = reactive<Record<number, number>>({})
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+function startCountdown(userId: number) {
+  countdownMap[userId] = SMS_COUNTDOWN_SECONDS
+  if (countdownTimer) return
+  countdownTimer = setInterval(() => {
+    let hasActive = false
+    for (const key of Object.keys(countdownMap)) {
+      const id = Number(key)
+      if (countdownMap[id] > 1) {
+        countdownMap[id] -= 1
+        hasActive = true
+      } else {
+        delete countdownMap[id]
+      }
+    }
+    if (!hasActive && countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }, 1000)
+}
+
+async function handleSendCode(row: User) {
+  if (row.id == null) return
+  if (countdownMap[row.id]) return // 倒计时期间防止重复点击
+  try {
+    await sendSmsCode(row.id)
+    ElMessage.success(`验证码已发送至 ${row.phone}`)
+    startCountdown(row.id)
+  } catch {
+    // 错误提示（如“发送过于频繁”“该用户未设置手机号”）已在 axios 响应拦截器统一处理
+  }
+}
+
 onMounted(loadUsers)
+
+onUnmounted(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+})
 </script>
 
 <template>
@@ -134,13 +189,22 @@ onMounted(loadUsers)
             <el-text v-else type="info">-</el-text>
           </template>
         </el-table-column>
-        <el-table-column prop="name" label="姓名" min-width="120" />
-        <el-table-column prop="email" label="邮箱" min-width="200" />
-        <el-table-column prop="age" label="年龄" width="100" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column prop="name" label="姓名" min-width="100" />
+        <el-table-column prop="email" label="邮箱" min-width="180" />
+        <el-table-column prop="phone" label="手机号" width="130" />
+        <el-table-column prop="age" label="年龄" width="80" />
+        <el-table-column label="操作" width="230" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button
+              link
+              type="success"
+              :disabled="!!countdownMap[row.id]"
+              @click="handleSendCode(row)"
+            >
+              {{ countdownMap[row.id] ? `重新发送(${countdownMap[row.id]}s)` : '发送验证码' }}
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -158,6 +222,9 @@ onMounted(loadUsers)
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="form.email" placeholder="请输入邮箱" />
         </el-form-item>
+        <el-form-item label="手机号" prop="phone">
+          <el-input v-model="form.phone" placeholder="用于接收短信验证码" />
+        </el-form-item>
         <el-form-item label="年龄" prop="age">
           <el-input-number v-model="form.age" :min="0" :max="150" />
         </el-form-item>
@@ -172,7 +239,7 @@ onMounted(loadUsers)
 
 <style scoped>
 .user-manage {
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 

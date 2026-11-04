@@ -55,8 +55,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 预检请求放行
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                        // 匿名可访问：注册、登录、健康检查、基础静态资源
-                        .requestMatchers("/auth/register", "/auth/login").permitAll()
+                        // 匿名可访问：注册、登录、图片验证码、健康检查、基础静态资源
+                        .requestMatchers("/auth/register", "/auth/login", "/auth/captcha").permitAll()
                         .requestMatchers("/health").permitAll()
                         .requestMatchers("/", "/index.html", "/favicon.ico", "/error").permitAll()
                         // 其余接口（含用户 CRUD、/auth/me、/auth/logout）默认需要认证

@@ -21,6 +21,8 @@ export interface AuthUserInfo {
   username?: string
   name: string
   email: string
+  /** 手机号，注册、用户新增/编辑均必填，用于接收短信验证码 */
+  phone: string
   age: number
 }
 

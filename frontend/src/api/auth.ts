@@ -5,6 +5,8 @@ import type { User } from './user'
 export interface LoginParams {
   username: string
   password: string
+  captchaKey: string
+  captchaValue: string
 }
 
 /** 登录响应（与后端 dto.LoginResponse 对应） */
@@ -21,7 +23,22 @@ export interface RegisterParams {
   confirmPassword: string
   name: string
   email: string
+  phone: string
   age: number
+  captchaKey: string
+  captchaValue: string
+}
+
+/** 图片验证码响应（与后端 dto.CaptchaResponse 对应） */
+export interface CaptchaResult {
+  captchaKey: string
+  /** Base64 PNG Data URL（data:image/png;base64,...），可直接用于 img / el-image 展示 */
+  captchaImage: string
+}
+
+/** 获取图片验证码 */
+export function getCaptcha() {
+  return request.get<CaptchaResult>('/auth/captcha')
 }
 
 /** 登录 */

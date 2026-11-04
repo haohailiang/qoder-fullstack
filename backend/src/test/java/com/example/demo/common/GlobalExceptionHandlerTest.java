@@ -44,6 +44,24 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("业务异常：短信发送频控 code=429")
+    void handleBusinessExceptionRateLimited() {
+        Result<Void> result = handler.handleBusinessException(new BusinessException(429, "验证码发送过于频繁，请稍后再试"));
+
+        assertThat(result.getCode()).isEqualTo(429);
+        assertThat(result.getMessage()).isEqualTo("验证码发送过于频繁，请稍后再试");
+    }
+
+    @Test
+    @DisplayName("业务异常：短信发送失败 code=502")
+    void handleBusinessExceptionSmsSendFailed() {
+        Result<Void> result = handler.handleBusinessException(new BusinessException(502, "短信发送失败，请稍后重试"));
+
+        assertThat(result.getCode()).isEqualTo(502);
+        assertThat(result.getMessage()).isEqualTo("短信发送失败，请稍后重试");
+    }
+
+    @Test
     @DisplayName("参数校验异常：返回第一个字段错误信息，code=400")
     void handleValidationException() {
         BindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "registerRequest");

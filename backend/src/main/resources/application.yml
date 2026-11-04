@@ -8,6 +8,13 @@ server:
 spring:
   application:
     name: demo-backend
+  datasource:
+    # MySQL 连接配置：本地开发前请先按 README「数据库初始化」小节创建 demo_fullstack 库并执行 db/schema.sql
+    url: jdbc:mysql://localhost:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    # 占位示例值，本地开发请替换为自己的 MySQL 密码，不要将真实密码提交到仓库
+    password: your_mysql_password_here
+    driver-class-name: com.mysql.cj.jdbc.Driver
   devtools:
     restart:
       enabled: true
@@ -16,7 +23,46 @@ spring:
     livereload:
       enabled: true
 
+# MyBatis 配置：SQL 统一写在 classpath:mapper/*.xml；
+# map-underscore-to-camel-case 作为兜底，用户表下划线字段主要依赖 UserMapper.xml 中的 resultMap 显式映射
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.example.demo.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
 # JWT 配置：secret 用于 HS256 签名，长度必须 >= 32 字节；expiration-minutes 为 Token 有效期（分钟）
 jwt:
   secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
   expiration-minutes: 120
+
+# 图片验证码配置：
+# - enabled=false 时跳过生成/校验（便于本地调试或自动化测试临时关闭该功能）
+# - expire-seconds 为验证码有效期（秒），过期后需重新获取；校验成功后立即失效（一次性使用）
+# - width/height/code-length/line-count 控制图片尺寸、字符个数与干扰线数量
+captcha:
+  enabled: true
+  expire-seconds: 120
+  width: 130
+  height: 44
+  code-length: 4
+  line-count: 15
+
+# 云片网短信配置：
+# - enabled=false 时不调用真实云片网接口，仅打印日志（默认关闭，避免演示环境误发短信 / 泄露真实密钥）
+# - account-sid / api-key 需到云片网控制台获取后填入，仓库中保留占位符，不要提交真实密钥
+# - timeout-ms 为连接/读取超时时间（毫秒）
+# - max-retry / retry-interval-ms / retry-backoff 控制网络异常、超时或 5xx 可恢复错误的重试策略
+#   retry-backoff: linear（重试间隔 = retry-interval-ms * 第几次重试）或 exponential（重试间隔 = retry-interval-ms * 2^(第几次重试-1)）
+# - rate-limit-seconds 为同一手机号发送频率限制窗口（秒），窗口内不允许重复发送
+sms:
+  enabled: false
+  api-url: https://sms.yunpian.com/v2/sms/tpl_send.json
+  account-sid: your_yunpian_account_sid
+  api-key: your_yunpian_api_key
+  template-id: "0"
+  timeout-ms: 5000
+  max-retry: 3
+  retry-interval-ms: 1000
+  retry-backoff: linear
+  rate-limit-seconds: 60

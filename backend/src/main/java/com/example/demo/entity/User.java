@@ -4,10 +4,18 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
+
+import java.time.LocalDateTime;
 
 /**
  * 用户实体
+ * <p>
+ * 对应 MySQL users 表（见 resources/db/schema.sql 与 mapper/UserMapper.xml）。
+ * createdBy / createdDate / lastModifiedBy / lastModifiedDate 为审计字段，
+ * 数据库采用下划线命名，通过 UserMapper.xml 的 resultMap 映射为下述驼峰字段；
+ * 字段赋值统一在 UserRepository.save() 中自动完成（见该方法注释），业务代码无需手动设置。
  */
 @Data
 public class User {
@@ -28,6 +36,23 @@ public class User {
     @Email(message = "邮箱格式不正确")
     private String email;
 
+    /** 手机号：注册、用户新增/编辑均必填，用于接收短信验证码 */
+    @NotBlank(message = "手机号不能为空")
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
+    private String phone;
+
     @Min(value = 0, message = "年龄不能小于 0")
     private Integer age;
+
+    /** 创建人：当前登录用户标识，未登录或系统操作时为 "system"（新增时写入，之后不再变化） */
+    private String createdBy;
+
+    /** 创建时间（服务端时间，新增时写入） */
+    private LocalDateTime createdDate;
+
+    /** 最后修改人：当前登录用户标识，未登录或系统操作时为 "system"（每次新增/更新都会刷新） */
+    private String lastModifiedBy;
+
+    /** 最后修改时间（服务端时间，每次新增/更新都会刷新） */
+    private LocalDateTime lastModifiedDate;
 }
