@@ -7,7 +7,10 @@ import com.example.demo.dto.RegisterRequest;
 import com.example.demo.dto.SendSmsCodeRequest;
 import com.example.demo.entity.User;
 import com.example.demo.service.AuthService;
+import com.example.demo.service.RedisSessionService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,15 +23,22 @@ import org.springframework.web.bind.annotation.RestController;
  * 实际访问路径为 /api/auth/**（/api 来自 server.servlet.context-path 配置）。
  * 其中 /auth/register、/auth/login、/auth/captcha 与 /auth/send-sms-code 匿名可访问，
  * /auth/me 与 /auth/logout 需要携带有效 JWT。
+ * 
+ * <p>登出时会清除 Redis 中存储的会话 Token，确保该设备立即失效。
  */
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
-    private final AuthService authService;
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
-    public AuthController(AuthService authService) {
+    private final AuthService authService;
+    private final RedisSessionService redisSessionService;
+
+    public AuthController(AuthService authService,
+                          RedisSessionService redisSessionService) {
         this.authService = authService;
+        this.redisSessionService = redisSessionService;
     }
 
     /** 注册 */
@@ -62,11 +72,16 @@ public class AuthController {
 
     /**
      * 退出登录。
-     * JWT 无状态，服务端不维护会话，此接口仅作为前端调用后的确认；
-     * 真正的“退出”由前端清除本地 Token 完成。
+     * 清除 Redis 中存储的会话 Token，使当前设备立即失效。
+     * 前端也应同步清除本地 localStorage 中的 Token 和用户信息。
      */
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(Authentication authentication) {
+        // 获取当前登录用户信息
+        User user = authService.getCurrentUser(authentication.getName());
+        // 清除 Redis 中的会话 Token
+        redisSessionService.removeToken(user.getId());
+        log.info("用户 {} 已退出登录，Redis 会话已清除", user.getUsername());
         return Result.success();
     }
 }

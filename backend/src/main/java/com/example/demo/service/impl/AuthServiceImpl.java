@@ -10,7 +10,10 @@ import com.example.demo.repository.UserRepository;
 import com.example.demo.security.JwtTokenProvider;
 import com.example.demo.service.AuthService;
 import com.example.demo.service.CaptchaService;
+import com.example.demo.service.RedisSessionService;
 import com.example.demo.service.SmsService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -24,27 +27,33 @@ import org.springframework.stereotype.Service;
  *   实体上 @JsonIgnore 保证密文不会出现在任何接口响应里）
  * - 认证标识（username）唯一性由 userRepository.existsByUsername 保证
  * - 注册产生的用户，审计字段 createdBy / lastModifiedBy 由 UserRepository 自动记为 "system"
- *   （注册时尚无登录上下文，符合"未登录或系统操作默认记录 system"的约定）
+ *   （注册时尚无登录上下文，符合“未登录或系统操作默认记录 system”的约定）
+ * - 登录成功后将 JWT Token 写入 Redis，实现单设备登录（互踢/挤下线）机制
  */
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final CaptchaService captchaService;
     private final SmsService smsService;
+    private final RedisSessionService redisSessionService;
 
     public AuthServiceImpl(UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
                            JwtTokenProvider tokenProvider,
                            CaptchaService captchaService,
-                           SmsService smsService) {
+                           SmsService smsService,
+                           RedisSessionService redisSessionService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
         this.captchaService = captchaService;
         this.smsService = smsService;
+        this.redisSessionService = redisSessionService;
     }
 
     @Override
@@ -84,8 +93,25 @@ public class AuthServiceImpl implements AuthService {
         }
         // 第二步：校验短信验证码（登录场景短信已发往该用户的手机号）
         smsService.validateCode(user.getPhone(), request.getSmsCode());
-        String token = tokenProvider.generateToken(user.getUsername(), user.getId());
-        return new LoginResponse(token, tokenProvider.getExpiresInSeconds(), user);
+        
+        // 第三步：尝试获取分布式锁，防止同一账号并发登录导致会话状态错乱
+        if (!redisSessionService.tryAcquireLoginLock(user.getId())) {
+            throw new BusinessException(429, "登录请求过于频繁，请稍后重试");
+        }
+        
+        try {
+            // 第四步：生成新 JWT Token
+            String token = tokenProvider.generateToken(user.getUsername(), user.getId());
+            
+            // 第五步：将新 Token 写入 Redis（覆盖旧 Token，使旧设备自动失效）
+            redisSessionService.saveToken(user.getId(), token, tokenProvider.getExpiresInSeconds());
+            
+            log.info("用户 {} 登录成功，新 Token 已写入 Redis", user.getUsername());
+            return new LoginResponse(token, tokenProvider.getExpiresInSeconds(), user);
+        } finally {
+            // 第六步：释放分布式锁
+            redisSessionService.releaseLoginLock(user.getId());
+        }
     }
 
     @Override

@@ -35,6 +35,17 @@ function handleAuthFailure(message: string) {
   }
 }
 
+/**
+ * 被挤下线处理：清除本地状态并强制跳转登录页。
+ * 不保留 redirect 参数，避免用户回到原页面后再次被踢出造成死循环。
+ */
+function handleKickOut(message: string) {
+  clearAuth()
+  ElMessage.error(message)
+  // 使用 replace 而非 push，避免用户点击浏览器后退按钮回到已失效的页面
+  router.replace('/login')
+}
+
 // 响应拦截器：统一解包 Result，业务失败时弹出错误提示
 request.interceptors.response.use(
   (response) => {
@@ -49,7 +60,17 @@ request.interceptors.response.use(
     const status = error.response?.status as number | undefined
     if (status === 401 || status === 403) {
       // 后端 Security 过滤链返回的统一 Result 结构
-      const message = (error.response?.data as ApiResult | undefined)?.message
+      const result = error.response?.data as ApiResult | undefined
+      const code = result?.code
+      const message = result?.message
+      
+      // 业务码 40101 表示账号在其他设备登录，已被迫下线
+      if (code === 40101) {
+        handleKickOut(message || '您的账号已在其他设备登录，您已被迫下线')
+        return Promise.reject(error)
+      }
+      
+      // 普通的 Token 无效/过期/未授权
       handleAuthFailure(message || (status === 401 ? '登录已失效，请重新登录' : '未授权访问，请先登录'))
       return Promise.reject(error)
     }
