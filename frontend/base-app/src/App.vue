@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { logout } from '@/api/auth'
 import { clearAuth, currentUserRef, tokenRef } from '@/utils/auth'
 import { computed } from 'vue'
+import { themeRef, toggleTheme } from '@/utils/theme'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,6 +13,9 @@ const route = useRoute()
 const isInSubApp = computed(() => {
   return route.path.startsWith('/product') || route.path.startsWith('/order')
 })
+
+// 当前是否为暗黑模式
+const isDark = computed(() => themeRef.value === 'dark')
 
 async function handleLogout() {
   try {
@@ -45,9 +49,20 @@ function navigateTo(path: string) {
           <el-menu-item index="/order">订单管理</el-menu-item>
         </el-menu>
       </div>
-      <div v-if="tokenRef" class="user-area">
-        <span class="user-name">{{ currentUserRef?.name || currentUserRef?.username }}</span>
-        <el-button type="primary" plain size="small" @click="handleLogout">退出登录</el-button>
+      <div class="user-area">
+        <el-tooltip :content="isDark ? '切换到亮色模式' : '切换到暗黑模式'" placement="bottom">
+          <el-button
+            class="theme-toggle-btn"
+            :icon="isDark ? 'Sunny' : 'Moon'"
+            circle
+            size="small"
+            @click="toggleTheme"
+          />
+        </el-tooltip>
+        <template v-if="tokenRef">
+          <span class="user-name">{{ currentUserRef?.name || currentUserRef?.username }}</span>
+          <el-button type="primary" plain size="small" @click="handleLogout">退出登录</el-button>
+        </template>
       </div>
     </el-header>
     <el-main class="app-main">
@@ -68,9 +83,10 @@ function navigateTo(path: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #409eff;
+  background-color: var(--el-color-primary, #409eff);
   color: #fff;
   padding: 0 20px;
+  transition: background-color 0.3s;
 }
 
 .header-left {
@@ -95,21 +111,43 @@ function navigateTo(path: string) {
 }
 
 .nav-menu .el-menu-item {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.75);
   border-bottom-color: transparent;
+  font-weight: 400;
+  transition: all 0.2s ease;
 }
 
-.nav-menu .el-menu-item:hover,
-.nav-menu .el-menu-item.is-active {
+.nav-menu .el-menu-item:hover {
   color: #fff;
   background-color: rgba(255, 255, 255, 0.15);
+  border-bottom-color: rgba(255, 255, 255, 0.6);
+}
+
+.nav-menu .el-menu-item.is-active {
+  color: #fff;
+  background-color: rgba(0, 0, 0, 0.15);
   border-bottom-color: #fff;
+  border-bottom-width: 3px;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
 }
 
 .user-area {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.theme-toggle-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .user-name {

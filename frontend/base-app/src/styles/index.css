@@ -8,4 +8,16 @@ body {
     Arial,
     sans-serif;
   background-color: #f5f7fa;
+  color: #303133;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* 暗黑模式全局样式 */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #141414;
+  color: #e5eaf3;
 }

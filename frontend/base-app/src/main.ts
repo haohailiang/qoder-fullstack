@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 import App from './App.vue'
@@ -9,6 +10,9 @@ import router from './router'
 
 // 基础样式
 import './styles/index.css'
+
+// 主题管理
+import { initTheme } from './utils/theme'
 
 // 微前端
 import { startQiankun } from './micro'
@@ -26,6 +30,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 app.use(router)
 app.mount('#app')
+
+// 初始化主题（从后端加载用户偏好或应用本地缓存）
+initTheme()
 
 // 启动 qiankun 微前端
 startQiankun()

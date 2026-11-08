@@ -276,7 +276,7 @@ onUnmounted(() => {
   height: 44px;
   flex-shrink: 0;
   cursor: pointer;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--el-border-color, #dcdfe6);
   border-radius: 4px;
 }
 
@@ -295,7 +295,7 @@ onUnmounted(() => {
 .auth-tip {
   margin-top: 4px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary, #909399);
   text-align: center;
 }
 </style>

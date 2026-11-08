@@ -1,10 +1,13 @@
 import { registerMicroApps, start, initGlobalState, MicroAppStateActions } from 'qiankun'
 import { getToken, currentUserRef } from '@/utils/auth'
+import { getTheme, themeRef } from '@/utils/theme'
+import { watch } from 'vue'
 
 // 全局状态管理器
 const initialState = {
   token: getToken(),
   user: currentUserRef.value,
+  theme: getTheme(),
 }
 
 export const globalActions: MicroAppStateActions = initGlobalState(initialState)
@@ -12,6 +15,11 @@ export const globalActions: MicroAppStateActions = initGlobalState(initialState)
 // 监听全局状态变化
 globalActions.onGlobalStateChange((state, prev) => {
   console.log('[qiankun] 全局状态变化:', state, prev)
+})
+
+// 监听主题变化，同步到子应用
+watch(themeRef, (newTheme) => {
+  globalActions.setGlobalState({ theme: newTheme })
 })
 
 // 子应用配置
@@ -24,6 +32,7 @@ const apps = [
     props: {
       getToken,
       globalActions,
+      getTheme,
     },
   },
   {
@@ -34,6 +43,7 @@ const apps = [
     props: {
       getToken,
       globalActions,
+      getTheme,
     },
   },
 ]

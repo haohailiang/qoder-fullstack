@@ -24,6 +24,8 @@ export interface AuthUserInfo {
   /** 手机号，注册、用户新增/编辑均必填，用于接收短信验证码 */
   phone: string
   age: number
+  /** 主题偏好：dark（暗黑模式）或 light（亮色模式） */
+  themePreference?: string
 }
 
 function readStoredUser(): AuthUserInfo | null {

@@ -1,13 +1,15 @@
 import request from './request'
 import type { User } from './user'
 
-/** 登录请求参数 */
+/** 登录请求参数（admin 用户登录时无需验证码字段） */
 export interface LoginParams {
   username: string
   password: string
+  /** 图片验证码 key（admin 登录时可为空） */
   captchaKey: string
+  /** 图片验证码值（admin 登录时可为空） */
   captchaValue: string
-  /** 短信验证码（图片验证码通过后由 /auth/send-sms-code 发送到此用户名对应手机号） */
+  /** 短信验证码（admin 登录时可为空） */
   smsCode: string
 }
 

@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Lock, Message, Picture, User } from '@element-plus/icons-vue'
 import { getCaptcha, login, sendSmsCode } from '@/api/auth'
 import { setAuth } from '@/utils/auth'
+import { setTheme, type ThemeMode } from '@/utils/theme'
 
 /** 与后端 sms.rate-limit-seconds 保持一致的倒计时秒数，防止重复发送 */
 const SMS_COUNTDOWN_SECONDS = 60
+
+/** 管理员用户名：admin 登录时跳过图片验证码和短信验证码 */
+const ADMIN_USERNAME = 'admin'
 
 const router = useRouter()
 const route = useRoute()
@@ -31,6 +35,9 @@ const captchaImage = ref('')
 const countdown = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 
+/** 判断当前输入的用户名是否为 admin（忽略大小写） */
+const isAdmin = computed(() => form.username.trim().toLowerCase() === ADMIN_USERNAME)
+
 function startCountdown() {
   countdown.value = SMS_COUNTDOWN_SECONDS
   countdownTimer = setInterval(() => {
@@ -46,15 +53,27 @@ function startCountdown() {
   }, 1000)
 }
 
-const rules: FormRules = {
+/** 表单校验规则：admin 用户无需验证码和短信，动态移除对应必填校验 */
+const rules = computed<FormRules>(() => ({
   username: [{ required: true, message: '请输入认证标识（用户名）', trigger: 'blur' }],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码长度至少 6 位', trigger: 'blur' },
   ],
-  captchaValue: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
-  smsCode: [{ required: true, message: '请输入短信验证码', trigger: 'blur' }],
-}
+  ...(isAdmin.value
+    ? {}
+    : {
+        captchaValue: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
+        smsCode: [{ required: true, message: '请输入短信验证码', trigger: 'blur' }],
+      }),
+}))
+
+// 切换到 admin 时自动刷新验证码（避免过期），切回普通用户时也刷新
+watch(isAdmin, () => {
+  if (!isAdmin.value) {
+    refreshCaptcha()
+  }
+})
 
 async function refreshCaptcha() {
   try {
@@ -108,17 +127,27 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    const result = await login({ ...form, captchaKey: captchaKey.value })
+    // admin 用户登录无需验证码，传空字符串即可（后端会跳过校验）
+    const loginData = isAdmin.value
+      ? { username: form.username, password: form.password, captchaKey: '', captchaValue: '', smsCode: '' }
+      : { ...form, captchaKey: captchaKey.value }
+    const result = await login(loginData)
     // 登录成功：保存 JWT 与用户信息（localStorage，刷新/重开标签页仍保持登录态）
     setAuth(result.token, result.user)
+    // 登录成功后从用户数据中读取主题偏好并应用（数据库持久化）
+    if (result.user.themePreference) {
+      await setTheme(result.user.themePreference as ThemeMode)
+    }
     ElMessage.success('登录成功')
     // 支持路由守卫记录的 redirect 参数，默认跳用户管理页
     const redirect = route.query.redirect as string | undefined
     router.push(redirect || '/users')
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理（如"验证码错误或已过期"）
-    // 验证码为一次性使用，失败后自动刷新，允许用户重新输入
-    await refreshCaptcha()
+    // 验证码为一次性使用，失败后自动刷新，允许用户重新输入（admin 无需刷新）
+    if (!isAdmin.value) {
+      await refreshCaptcha()
+    }
   } finally {
     loading.value = false
   }
@@ -164,7 +193,7 @@ onUnmounted(() => {
             show-password
           />
         </el-form-item>
-        <el-form-item prop="captchaValue">
+        <el-form-item prop="captchaValue" v-if="!isAdmin">
           <div class="captcha-row">
             <el-input
               v-model="form.captchaValue"
@@ -185,7 +214,7 @@ onUnmounted(() => {
             </el-link>
           </div>
         </el-form-item>
-        <el-form-item prop="smsCode">
+        <el-form-item prop="smsCode" v-if="!isAdmin">
           <div class="sms-row">
             <el-input
               v-model="form.smsCode"
@@ -210,9 +239,10 @@ onUnmounted(() => {
         </el-form-item>
       </el-form>
 
+      <div class="auth-tip">管理员账号：admin / 123456（无需验证码，直接登录）</div>
       <div class="auth-tip">演示账号：zhangsan / 123456（或 lisi / 123456）</div>
-      <div class="auth-tip">先输入图片验证码点「发送短信验证码」（演示短信默认关闭，验证码可在用户管理页查看）</div>
-      <div class="auth-tip">点击图片可刷新验证码</div>
+      <div class="auth-tip" v-if="!isAdmin">先输入图片验证码点「发送短信验证码」（演示短信默认关闭，验证码可在用户管理页查看）</div>
+      <div class="auth-tip" v-if="!isAdmin">点击图片可刷新验证码</div>
     </el-card>
   </div>
 </template>
@@ -256,7 +286,7 @@ onUnmounted(() => {
   height: 44px;
   flex-shrink: 0;
   cursor: pointer;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--el-border-color, #dcdfe6);
   border-radius: 4px;
 }
 
@@ -275,7 +305,7 @@ onUnmounted(() => {
 .auth-tip {
   margin-top: 4px;
   font-size: 12px;
-  color: #909399;
+  color: var(--el-text-color-secondary, #909399);
   text-align: center;
 }
 </style>
