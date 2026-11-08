@@ -1,152 +1,317 @@
 # demo-fullstack
 
-前后端分离的全栈示例项目，包含：
+前后端分离的微服务电商示例项目，基于 Spring Cloud 微服务架构 + qiankun 微前端架构：
 
-- **backend/**：Spring Boot 3.x + Java 17 + Maven + MyBatis + MySQL，提供用户资源 REST API、图片验证码、云片网短信发送服务
-- **frontend/**：Vue 3 + TypeScript + Vite + Element Plus，提供登录 / 注册（图片验证码 + 短信验证码两步验证）与用户管理（增删改查 + 短信发送记录查看）页面
+- **backend/**：Spring Boot 3.3.x + Java 17 + Maven + Spring Cloud + Spring Cloud Alibaba，拆分为 5 个微服务模块
+  - `ecommerce-common` — 公共模块（统一响应 Result / 业务异常 / 全局异常处理 / 秒杀消息体）
+  - `ecommerce-gateway` — API 网关（Spring Cloud Gateway，JWT 全局鉴权，按路径路由到下游微服务）
+  - `ecommerce-user` — 用户服务（注册 / 登录 / 图片验证码 / 短信验证码 / 用户 CRUD / 会话管理）
+  - `ecommerce-product` — 商品服务（商品 CRUD / Elasticsearch 搜索 / 秒杀库存预扣 / Lua 脚本）
+  - `ecommerce-order` — 订单服务（订单 CRUD / 秒杀订单异步消费 / OpenFeign 调用商品服务）
+- **frontend/**：基于 qiankun 微前端框架，拆分为 3 个子应用
+  - `base-app` — Vue 3 + TypeScript + Vite + Element Plus，主应用（登录 / 注册 / 用户管理 / 子应用容器）
+  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀）
+  - `order-app` — 原生 TypeScript + Vite + Axios，订单子应用（我的订单 / 全部订单 / 订单详情）
+
+## 架构概览
+
+```
+                          ┌─────────────────────────────────────────┐
+                          │           Spring Cloud Gateway          │
+                          │         (port 8080, JWT 鉴权)           │
+                          └──────┬──────────┬──────────┬────────────┘
+                                 │          │          │
+                    /api/user/**  │ /api/product/** │ /api/order/**
+                                 │          │          │
+                    ┌────────────┴──┐ ┌─────┴──────┐ ┌┴─────────────┐
+                    │ ecommerce-user│ │ecommerce-  │ │ecommerce-    │
+                    │  (port 8081)  │ │ product    │ │  order       │
+                    │               │ │(port 8082) │ │ (port 8083)  │
+                    └───────┬───────┘ └─────┬──────┘ └┬─────────────┘
+                            │               │          │
+              ┌─────────────┴───────────────┴──────────┴─────────┐
+              │              中间件服务（Docker）                    │
+              │  MySQL 8.0 · Redis 7 · Nacos v2.3.0              │
+              │  RabbitMQ 3 · Elasticsearch 8.11.0                │
+              └───────────────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────────────────────────┐
+    │                   qiankun 微前端                              │
+    │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐ │
+    │  │  base-app      │  │  product-app   │  │  order-app     │ │
+    │  │  Vue 3 :5173   │→ │  React :7100   │  │  TS    :7200   │ │
+    │  │  (主应用容器)    │→ │  (商品/秒杀)    │  │  (订单管理)     │ │
+    │  └────────────────┘  └────────────────┘  └────────────────┘ │
+    └──────────────────────────────────────────────────────────────┘
+```
 
 ## 目录结构
 
 ```
 demo-fullstack/
-├── backend/                              # Spring Boot 后端
-│   ├── pom.xml                           # Maven 配置（Spring Boot 3.3.x，Java 17，MyBatis，MySQL 驱动）
-│   ├── src/main/
-│   │   ├── java/com/example/demo/
-│   │   │   ├── DemoApplication.java      # 启动入口
-│   │   │   ├── common/                   # 统一响应 Result / 业务异常 / 全局异常处理
-│   │   │   ├── config/                   # CORS / Spring Security / RestTemplate / 演示数据初始化配置
-│   │   │   │   └── properties/            # 图片验证码 / 云片网短信配置项
-│   │   │   ├── controller/               # 控制层（认证 / 验证码 / 用户 / 短信 / 健康检查）
-│   │   │   ├── dto/                      # 请求 / 响应 DTO
-│   │   │   ├── entity/                   # 实体类（含审计字段）
-│   │   │   ├── repository/               # 仓储层（基于 MyBatis Mapper 访问 MySQL，统一填充审计字段）
-│   │   │   │   └── mapper/               # MyBatis Mapper 接口（SQL 见 resources/mapper/*.xml）
-│   │   │   ├── security/                 # JWT 工具与认证过滤器
-│   │   │   └── service/                  # 服务层（认证 / 用户 / 图片验证码 / 短信）
-│   │   └── resources/
-│   │       ├── application.yml           # 端口 8081，上下文路径 /api，MySQL / MyBatis / 验证码 / 短信配置
-│   │       ├── db/schema.sql             # MySQL 建表 SQL（users 表）
-│   │       └── mapper/UserMapper.xml     # 用户表 SQL（全部写在 XML，不使用注解写 SQL）
-│   └── src/test/                         # 异常处理 / 验证码 / 短信服务 / 发送短信接口 / 短信记录测试用例
-│       └── java/com/example/demo/
-│           ├── common/
-│           │   └── GlobalExceptionHandlerTest.java   # 全局异常处理器单元测试
-│           ├── controller/
-│           │   ├── AuthControllerExceptionTest.java  # 注册/登录接口异常集成测试（含短信验证码两步验证）
-│           │   ├── SecurityExceptionTest.java        # 认证/JWT/授权安全链路测试
-│           │   ├── SendSmsCodeControllerTest.java    # /auth/send-sms-code 发送短信接口测试
-│           │   └── SmsRecordsControllerTest.java     # /sms/records 短信记录查询接口测试
-│           └── service/
-│               ├── CaptchaServiceTest.java           # 图片验证码服务单元测试
-│               └── SmsServiceTest.java               # 短信服务验证码存储/校验/重试/频控/记录单元测试
-└── frontend/                             # Vue 3 前端
-    ├── package.json
-    ├── vite.config.ts                    # Vite 配置（含 /api 代理到后端）
-    ├── tsconfig.json / tsconfig.node.json
-    ├── index.html
-    └── src/
-        ├── main.ts                       # 入口（注册 Element Plus、路由）
-        ├── App.vue                       # 根组件（布局）
-        ├── api/                          # axios 封装 + 认证（含短信两步验证）/ 用户 / 短信记录接口
-        ├── router/                       # vue-router 路由
-        ├── utils/                        # 令牌与登录用户状态管理
-        └── views/
-            ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证）
-            ├── Register.vue              # 注册页（手机号 + 图片验证码 + 短信验证码两步验证）
-            └── UserManage.vue            # 用户管理页面（增删改查 + 短信发送记录查看）
+├── backend/                                  # Spring Cloud 微服务后端
+│   ├── pom.xml                               # Maven 父 POM（Spring Boot 3.3.x, Java 17, Spring Cloud 2023.0.x）
+│   ├── ecommerce-common/                     # 公共模块
+│   │   └── src/main/java/com/ecommerce/common/
+│   │       ├── Result.java                   # 统一响应结构
+│   │       ├── BusinessException.java        # 业务异常
+│   │       ├── GlobalExceptionHandler.java   # 全局异常处理器
+│   │       └── SeckillMessage.java           # 秒杀消息体（MQ 传输）
+│   ├── ecommerce-gateway/                    # API 网关服务
+│   │   └── src/main/java/com/ecommerce/gateway/
+│   │       ├── GatewayApplication.java       # 网关启动入口
+│   │       ├── config/                       # CORS 等网关配置
+│   │       └── filter/
+│   │           └── AuthGlobalFilter.java     # JWT 全局鉴权过滤器（白名单放行 + Token 校验 + 用户信息透传）
+│   ├── ecommerce-user/                       # 用户微服务
+│   │   └── src/main/
+│   │       ├── java/com/ecommerce/user/
+│   │       │   ├── controller/               # AuthController / CaptchaController / SmsController / UserController / HealthController
+│   │       │   ├── service/                  # 认证 / 用户 / 图片验证码 / 短信 / Redis 会话服务
+│   │       │   ├── entity/                   # User 实体（含审计字段）
+│   │       │   ├── repository/               # MyBatis Mapper 访问层
+│   │       │   ├── config/                   # SecurityConfig（Spring Security 配置）
+│   │       │   └── security/                 # JWT 工具与认证过滤器
+│   │       └── resources/
+│   │           ├── application.yml           # 端口 8081，context-path /user
+│   │           ├── db/schema.sql             # MySQL 建表 SQL（users 表）
+│   │           └── mapper/UserMapper.xml     # 用户表 SQL
+│   ├── ecommerce-product/                    # 商品微服务
+│   │   └── src/main/
+│   │       ├── java/com/ecommerce/product/
+│   │       │   ├── controller/               # ProductController / SeckillController
+│   │       │   ├── service/                  # 商品 / 秒杀库存 / ES 搜索服务
+│   │       │   ├── entity/                   # Product 实体
+│   │       │   ├── repository/               # MyBatis Mapper 访问层
+│   │       │   ├── elasticsearch/            # ES 商品文档与 Repository
+│   │       │   ├── config/                   # SeckillRabbitConfig / Redis / ES 配置
+│   │       │   └── security/                 # TrustedAuthenticationFilter（信任网关注入的用户头）
+│   │       └── resources/
+│   │           ├── application.yml           # 端口 8082，context-path /product
+│   │           ├── db/schema.sql             # 商品表建表 SQL
+│   │           ├── lua/seckill.lua           # Redis Lua 秒杀库存预扣脚本
+│   │           └── mapper/ProductMapper.xml  # 商品表 SQL
+│   ├── ecommerce-order/                      # 订单微服务
+│   │   └── src/main/
+│   │       ├── java/com/ecommerce/order/
+│   │       │   ├── controller/               # OrderController
+│   │       │   ├── service/                  # 订单服务（含秒杀订单异步消费）
+│   │       │   ├── entity/                   # Order 实体
+│   │       │   ├── repository/               # MyBatis Mapper 访问层
+│   │       │   ├── client/                   # ProductClient（OpenFeign 调用商品服务）
+│   │       │   ├── consumer/                 # SeckillOrderConsumer（RabbitMQ 秒杀消息消费者）
+│   │       │   ├── config/                   # SeckillRabbitConfig / SecurityConfig
+│   │       │   └── security/                 # TrustedAuthenticationFilter
+│   │       └── resources/
+│   │           ├── application.yml           # 端口 8083，context-path /order
+│   │           ├── db/schema.sql             # 订单表建表 SQL
+│   │           └── mapper/OrderMapper.xml    # 订单表 SQL
+│   ├── Dockerfile.gateway                    # 网关 Docker 构建文件
+│   ├── Dockerfile.user                       # 用户服务 Docker 构建文件
+│   ├── Dockerfile.product                    # 商品服务 Docker 构建文件
+│   └── Dockerfile.order                      # 订单服务 Docker 构建文件
+├── frontend/                                 # qiankun 微前端
+│   ├── base-app/                             # 主应用（Vue 3 + Element Plus）
+│   │   ├── src/
+│   │   │   ├── main.ts                       # 入口（注册 Element Plus、路由、qiankun 启动）
+│   │   │   ├── App.vue                       # 根组件（布局 + 子应用容器 #subapp-container）
+│   │   │   ├── micro/index.ts                # qiankun 子应用注册与全局状态管理
+│   │   │   ├── api/                          # axios 封装 + 认证 / 用户 / 短信接口
+│   │   │   ├── router/                       # vue-router（含子应用路由占位）
+│   │   │   ├── utils/                        # 令牌与登录用户状态管理
+│   │   │   └── views/
+│   │   │       ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证）
+│   │   │       ├── Register.vue              # 注册页（手机号 + 图片验证码 + 短信验证码两步验证）
+│   │   │       ├── UserManage.vue            # 用户管理页面（增删改查 + 短信发送记录查看）
+│   │   │       └── SubAppPlaceholder.vue     # 子应用容器占位组件
+│   │   ├── vite.config.ts                    # Vite 配置（/api 代理到网关 8080）
+│   │   └── package.json
+│   ├── product-app/                          # 商品子应用（React 18 + Ant Design）
+│   │   ├── src/
+│   │   │   ├── main.tsx                      # 入口（qiankun 生命周期导出 + 独立运行支持）
+│   │   │   ├── App.tsx                       # 根组件（React Router + Ant Design）
+│   │   │   └── pages/
+│   │   │       ├── ProductList.tsx           # 商品列表页
+│   │   │       └── ProductDetail.tsx         # 商品详情页（含秒杀入口）
+│   │   ├── vite.config.ts                    # Vite 配置（端口 7100，/api 代理到网关 8080）
+│   │   └── package.json
+│   └── order-app/                            # 订单子应用（原生 TypeScript）
+│       ├── src/
+│       │   ├── main.ts                       # 入口（qiankun 生命周期导出 + 独立运行支持）
+│       │   └── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消）
+│       ├── vite.config.ts                    # Vite 配置（端口 7200，/api 代理到网关 8080）
+│       └── package.json
+├── init-sql/
+│   └── 01-init-database.sql                  # 数据库初始化脚本（建库 + 建表 + 演示数据）
+├── docker-compose.yml                        # 全栈 Docker 编排（基础设施 + 后端微服务 + 前端子应用）
+├── docker-compose-infra.yml                  # 仅基础设施 Docker 编排（MySQL / Redis / Nacos / RabbitMQ / ES）
+└── vm-ssh.js                                 # 远程服务器 SSH 工具脚本
 ```
 
 ## 环境要求
 
 - JDK 17+
-- Maven 3.6+
+- Maven 3.6+（推荐使用项目自带的 Maven Wrapper `mvnw`）
 - Node.js 18+（推荐 20 LTS）
-- MySQL 8.x（本项目用户数据持久化依赖 MySQL，注册/登录、用户管理、集成测试均需要真实数据库，见下方「数据库初始化」）
+- MySQL 8.x
+- Redis 7.x
+- Nacos v2.3.0
+- RabbitMQ 3.x（含 Management 插件）
+- Elasticsearch 8.11.0
 
 ## 数据库初始化
 
-后端启动或运行集成测试前，需要先创建数据库和表：
+后端启动前，需要先创建数据库和表。推荐使用项目根目录的初始化脚本 [`init-sql/01-init-database.sql`](init-sql/01-init-database.sql)，包含：
 
-```sql
-CREATE DATABASE IF NOT EXISTS demo_fullstack DEFAULT CHARSET utf8mb4;
-USE demo_fullstack;
+- 创建数据库 `demo_fullstack`（utf8mb4）
+- `users` 表 — 用户数据（含审计字段 `created_by / created_date / last_modified_by / last_modified_date`）
+- `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`）
+- `orders` 表 — 订单数据（含状态流转 `0待支付 → 1已支付 → 2已发货 → 3已完成 → 4已取消`）
+- 演示数据 — 3 个用户（admin / zhangsan / lisi，密码均为 `123456`）+ 6 个商品（含 3 个秒杀商品）
+
+```bash
+# 方式一：Docker 部署时自动执行（挂载 init-sql 目录到 /docker-entrypoint-initdb.d）
+#         脚本开头的 SET NAMES utf8mb4 已保证容器内客户端按 UTF-8 解释，无需额外参数
+# 方式二：手动执行（必须带 --default-character-set=utf8mb4，
+#         否则 mysql 客户端默认 latin1，会把脚本里的中文二次编码成乱码）
+mysql -u root -p --default-character-set=utf8mb4 < init-sql/01-init-database.sql
 ```
 
-然后执行建表脚本 [`backend/src/main/resources/db/schema.sql`](backend/src/main/resources/db/schema.sql)（`users` 表包含 `id / username / password / name / email / phone / age` 业务字段，以及 `created_by / created_date / last_modified_by / last_modified_date` 四个审计字段，均为下划线命名，通过 `mapper/UserMapper.xml` 的 `resultMap` 映射为 Java 实体中的驼峰字段）。
-
-建库建表完成后，还需要把 `application.yml` 中的 `spring.datasource.password` 从占位符 `your_mysql_password_here` 改成本机 MySQL 的真实密码（该文件仅供本地开发使用，不要把真实密码提交到仓库）。
-
-应用首次启动时，`DemoDataInitializer`（`config/DemoDataInitializer.java`）会检查 `users` 表中是否存在预置演示账号，若不存在则自动插入两条演示数据（`zhangsan` / `lisi`，初始密码均为 `123456`，默认手机号为 `13800000001` / `13800000002`），无需手动执行 `INSERT` 语句；逻辑幂等，重复启动不会产生脏数据。审计字段在数据初始化、注册（无登录上下文）等场景下会自动记录为 `system`，登录后的用户新增 / 更新操作会记录当前登录用户名。
+各微服务的 `application.yml` 中 `spring.datasource.password` 需从占位符改为本机 MySQL 的真实密码（该配置仅供本地开发使用，不要把真实密码提交到仓库）。
 
 ## 后端启动
 
+### 1. 启动基础设施
+
+确保 MySQL、Redis、Nacos、RabbitMQ、Elasticsearch 已启动。可使用 Docker 一键部署：
+
 ```bash
-cd backend
+# 仅启动基础设施
+docker compose -f docker-compose-infra.yml up -d
+```
+
+### 2. 启动微服务
+
+按以下顺序依次启动（网关最后启动）：
+
+```bash
+# 用户服务（port 8081）
+cd backend/ecommerce-user
+mvn spring-boot:run
+
+# 商品服务（port 8082）
+cd backend/ecommerce-product
+mvn spring-boot:run
+
+# 订单服务（port 8083）
+cd backend/ecommerce-order
+mvn spring-boot:run
+
+# API 网关（port 8080）
+cd backend/ecommerce-gateway
 mvn spring-boot:run
 ```
 
-- 服务地址：http://localhost:8081/api
-- 用户接口：http://localhost:8081/api/users
+> 也可在项目根目录使用 Maven Wrapper 统一构建：`cd backend; ./mvnw clean package -DskipTests`
 
-> 端口说明：默认端口为 8081（本机 8080 被 Windows 系统进程占用）。如需更换端口，请同时修改 `backend/src/main/resources/application.yml` 的 `server.port` 与 `frontend/vite.config.ts` 的代理 `target`。
+### 3. 服务地址
+
+| 微服务 | 端口 | context-path | 说明 |
+|--------|------|-------------|------|
+| API 网关 | 8080 | / | 统一入口，JWT 鉴权，路由分发 |
+| 用户服务 | 8081 | /user | 认证 / 用户 / 短信 / 验证码 |
+| 商品服务 | 8082 | /product | 商品 CRUD / 搜索 / 秒杀 |
+| 订单服务 | 8083 | /order | 订单管理 / 秒杀订单消费 |
+
+> 前端及外部调用统一走网关 `http://localhost:8080`，由网关按路径前缀路由到对应微服务。
 
 ## 前端启动
 
+### 1. 安装依赖
+
 ```bash
-cd frontend
-npm install
+cd frontend/base-app && npm install
+cd frontend/product-app && npm install
+cd frontend/order-app && npm install
+```
+
+### 2. 启动子应用（先启动子应用，再启动主应用）
+
+```bash
+# 商品子应用（port 7100）
+cd frontend/product-app
+npm run dev
+
+# 订单子应用（port 7200）
+cd frontend/order-app
+npm run dev
+
+# 主应用（port 5173）
+cd frontend/base-app
 npm run dev
 ```
 
-- 访问地址：http://localhost:5173
-- 开发代理：Vite 将 `/api` 前缀请求转发到 `http://localhost:8081`（后端 context-path 即为 `/api`，代理不做路径重写）
+### 3. 访问地址
+
+| 子应用 | 开发端口 | 技术栈 | 说明 |
+|--------|---------|--------|------|
+| 主应用 base-app | 5173 | Vue 3 + Element Plus | 登录 / 注册 / 用户管理 / qiankun 容器 |
+| 商品子应用 product-app | 7100 | React 18 + Ant Design | 商品列表 / 商品详情 / 秒杀 |
+| 订单子应用 order-app | 7200 | 原生 TypeScript | 我的订单 / 全部订单 / 订单详情 |
+
+- 主应用访问地址：http://localhost:5173
+- 开发代理：各子应用均将 `/api` 前缀请求转发到 `http://localhost:8080`（API 网关）
+- 微前端：主应用通过 qiankun 注册商品 / 订单子应用，路由 `/product/**` 和 `/order/**` 自动加载对应子应用
 
 ## API 一览
 
-| 方法   | 路径                    | 说明                                       |
-| ------ | ----------------------- | ------------------------------------------ |
-| GET    | /api/auth/captcha       | 获取图片验证码（匿名访问）                 |
-| POST   | /api/auth/send-sms-code | 发送短信验证码（匿名访问，先校验图片验证码）|
-| POST   | /api/auth/register      | 注册（需图片验证码 + 短信验证码 + 手机号）  |
-| POST   | /api/auth/login         | 登录（需图片验证码 + 短信验证码，返回 JWT） |
-| GET    | /api/auth/me            | 获取当前登录用户                           |
-| POST   | /api/auth/logout        | 退出登录                                   |
-| GET    | /api/users              | 查询用户列表                               |
-| GET    | /api/users/{id}         | 查询单个用户                               |
-| POST   | /api/users              | 新增用户                                   |
-| PUT    | /api/users/{id}         | 更新用户                                   |
-| DELETE | /api/users/{id}         | 删除用户                                   |
-| GET    | /api/sms/records        | 查询短信发送记录（需登录访问，按时间倒序） |
-| GET    | /api/health             | 健康检查                                   |
+所有外部请求统一经 API 网关（port 8080）路由到下游微服务，网关 `AuthGlobalFilter` 负责 JWT 鉴权并将 `X-User-Id` / `X-User-Name` 写入请求头透传给下游。
 
-请求 / 响应体示例（新增用户）：
+### 用户服务（/api/user/**）
 
-```json
-{
-  "name": "王五",
-  "email": "wangwu@example.com",
-  "phone": "13800000003",
-  "age": 28
-}
-```
+| 方法 | 路径 | 说明 | 鉴权 |
+|------|------|------|------|
+| GET | /api/user/auth/captcha | 获取图片验证码（返回 Base64 PNG + captchaKey） | 匿名 |
+| POST | /api/user/auth/send-sms-code | 发送短信验证码（先校验图片验证码，60 秒频控） | 匿名 |
+| POST | /api/user/auth/register | 注册（需图片验证码 + 短信验证码 + 手机号） | 匿名 |
+| POST | /api/user/auth/login | 登录（需图片验证码 + 短信验证码，返回 JWT） | 匿名 |
+| GET | /api/user/auth/me | 获取当前登录用户信息 | JWT |
+| POST | /api/user/auth/logout | 退出登录（清除 Redis 会话 Token） | JWT |
+| GET | /api/user/users | 查询用户列表 | JWT |
+| GET | /api/user/users/{id} | 查询单个用户 | JWT |
+| POST | /api/user/users | 新增用户 | JWT |
+| PUT | /api/user/users/{id} | 更新用户 | JWT |
+| DELETE | /api/user/users/{id} | 删除用户 | JWT |
+| GET | /api/user/sms/records | 查询短信发送记录（按时间倒序） | JWT |
+| GET | /api/user/health | 健康检查 | 匿名 |
 
-注册 / 登录请求体需额外携带图片验证码与短信验证码相关字段：
+### 商品服务（/api/product/**）
 
-```json
-{
-  "username": "wangwu",
-  "password": "123456",
-  "confirmPassword": "123456",
-  "name": "王五",
-  "email": "wangwu@example.com",
-  "phone": "13800000003",
-  "age": 28,
-  "captchaKey": "<GET /api/auth/captcha 返回的 captchaKey>",
-  "captchaValue": "<用户输入的图片验证码字符>",
-  "smsCode": "<用户收到的 6 位短信验证码>"
-}
-```
+| 方法 | 路径 | 说明 | 鉴权 |
+|------|------|------|------|
+| GET | /api/product/products | 查询所有商品 | JWT |
+| GET | /api/product/products/{id} | 根据 ID 查询商品 | JWT |
+| GET | /api/product/products/category/{category} | 根据分类查询商品 | JWT |
+| GET | /api/product/products/search | 搜索商品（关键词 / 分类 / 价格区间） | JWT |
+| POST | /api/product/products | 创建商品 | JWT |
+| PUT | /api/product/products/{id} | 更新商品 | JWT |
+| DELETE | /api/product/products/{id} | 删除商品 | JWT |
+| POST | /api/product/products/sync-es | 全量同步商品到 Elasticsearch | JWT |
+| POST | /api/product/products/deduct-stock | 扣减库存（供订单服务 Feign 内部调用） | JWT |
+| POST | /api/product/products/seckill/init/{productId} | 初始化秒杀库存（ Redis 预加载） | JWT |
+| POST | /api/product/products/seckill/{productId} | 秒杀抢购（Lua 预扣 + MQ 异步下单） | JWT |
+| GET | /api/product/products/seckill/stock/{productId} | 查询秒杀库存 | JWT |
+
+### 订单服务（/api/order/**）
+
+| 方法 | 路径 | 说明 | 鉴权 |
+|------|------|------|------|
+| POST | /api/order/orders | 创建订单 | JWT |
+| GET | /api/order/orders/my | 查询当前用户的订单列表 | JWT |
+| GET | /api/order/orders/{orderNo} | 根据订单号查询订单 | JWT |
+| GET | /api/order/orders | 查询所有订单（管理用） | JWT |
+| POST | /api/order/orders/{orderId}/cancel | 取消订单 | JWT |
+| PUT | /api/order/orders/{orderId}/status | 更新订单状态 | JWT |
 
 ## 统一响应结构
 
@@ -162,98 +327,143 @@ npm run dev
 
 ## 图片验证码
 
-- 前端登录 / 注册页面通过 `GET /api/auth/captcha` 获取验证码图片（Base64 PNG）与一次性 `captchaKey`，点击图片可刷新。
-- 提交登录 / 注册时须携带 `captchaKey` 与用户输入的 `captchaValue`；后端在执行业务逻辑（查重、密码校验）之前先调用 `CaptchaService.validate`，校验失败（不存在 / 已过期 / 已被使用 / 不匹配）统一返回「验证码错误或已过期，请重新获取」，前端会自动刷新验证码图片并清空输入框，允许重新提交。
-- 验证码内容用纯 JDK AWT 生成并保存在进程内存（不落库），有效期与一次性使用规则见 `application.yml` 的 `captcha.*` 配置（`expire-seconds`、`width`、`height`、`code-length`、`line-count`）；`captcha.enabled=false` 可临时关闭校验，便于本地调试。
+- 前端登录 / 注册页面通过 `GET /api/user/auth/captcha` 获取验证码图片（Base64 PNG）与一次性 `captchaKey`，点击图片可刷新。
+- 提交登录 / 注册时须携带 `captchaKey` 与用户输入的 `captchaValue`；后端在执行业务逻辑（查重、密码校验）之前先校验图片验证码，校验失败（不存在 / 已过期 / 已被使用 / 不匹配）统一返回错误提示，前端自动刷新验证码图片并清空输入框。
+- 验证码内容用纯 JDK AWT 生成并保存在进程内存（不落库），有效期与一次性使用规则见用户服务 `application.yml` 的 `captcha.*` 配置。
 
 ## 短信验证码两步验证与发送记录
 
 登录 / 注册采用「图片验证码 → 短信验证码」两步串行验证：
 
-1. 页面加载时通过 `GET /api/auth/captcha` 展示图片验证码（复用一次性 `captchaKey`）。
-2. 用户输入图片验证码后点击「发送短信验证码」，前端把 `captchaKey` / `captchaValue` 连同目标手机号（注册场景由前端传入 `phone`）或用户名（登录场景由 `username` 提交、后端查手机号）一起发送到匿名接口 `POST /api/auth/send-sms-code`；**只有图片验证码校验通过**，后端才调用 `SmsService.sendVerifyCode(phone)` 真正发送 6 位数字验证码，否则返回明确提示且短信不发送。
-3. 发送成功后按钮进入 60 秒倒计时禁用状态（与 `sms.rate-limit-seconds` 保持一致）；图片验证码一次性使用，每次成功发送后自动刷新，用户也可点击图片手动刷新。
-4. 登录 / 注册请求体携带 `captchaKey` / `captchaValue` 与新增的 `smsCode`；后端 `AuthServiceImpl` 按「先校验图片验证码、再校验短信验证码」顺序执行，任一环节失败均返回统一 `Result` 错误（不泄露内部密钥）。
+1. 页面加载时获取图片验证码（复用一次性 `captchaKey`）。
+2. 用户输入图片验证码后点击「发送短信验证码」，前端把 `captchaKey` / `captchaValue` 连同目标手机号（注册）或用户名（登录）发送到匿名接口 `POST /api/user/auth/send-sms-code`；**只有图片验证码校验通过**，才真正发送 6 位数字验证码。
+3. 发送成功后按钮进入 60 秒倒计时禁用状态；图片验证码一次性使用，每次成功发送后自动刷新。
+4. 登录 / 注册请求体携带 `captchaKey` / `captchaValue` 与 `smsCode`；后端按「先校验图片验证码、再校验短信验证码」顺序执行。
 
 关键约束：
 
-- `POST /api/auth/send-sms-code` 为 permitAll（登录前即可调用），内部先 `CaptchaService.validate` 再 `SmsService.sendVerifyCode(phone)`；防滥发依赖图片验证码 + 同一手机号 60 秒频控（超频返回 `code=429`）。
-- `SmsService` 提供验证码「生成并存储 + 校验」的完整方法：验证码以手机号为 key 存于进程内内存（`ConcurrentHashMap`），有效期由 `sms.code-expire-seconds`（默认 300 秒，与图片验证码过期配置分开）控制，一次性使用（无论成功失败都消费同一个 key），校验逻辑与图片验证码一致。
-- 短信发送记录：每次实际发送（成功 / 失败）都会记录手机号、验证码明文（演示用途）、发送时间与状态，保存在进程内内存列表（`ConcurrentLinkedDeque`，不落库），通过需 JWT 认证的 `GET /api/sms/records` 按时间倒序返回，前端用户管理页以表格展示并支持手动刷新。
-- 前端不直接对接云片网 API；`apiKey`、`accountSid` 等敏感配置只在后端 `SmsService` 内部读取，不会出现在任何接口响应 / 异常信息中。
-- 调用云片网接口失败时（网络异常 / 超时 / 5xx 可恢复错误）会按 `sms.max-retry` 重试，重试间隔按 `sms.retry-backoff`（`linear` 线性 / `exponential` 指数）退避；4xx 客户端错误（如 `apiKey` 错误）不重试直接失败，统一返回 `code=502`「短信发送失败，请稍后重试」，不泄露敏感配置细节，并记录一条 `FAILED` 发送记录。
-- `sms.enabled=false`（默认值）时不调用真实云片网接口，仅打印日志，但**验证码仍会生成存储**以便本地联调；配置真实密钥后改为 `true` 才会实际发送短信。关闭状态下短信仍记为成功，可在用户管理页「短信发送记录」查看明文验证码。
+- 防滥发依赖图片验证码 + 同一手机号 60 秒频控（超频返回 `code=429`）。
+- 短信验证码以手机号为 key 存于进程内存，有效期 300 秒，一次性使用。
+- 短信发送记录保存在进程内存列表（不落库），通过需 JWT 认证的 `GET /api/user/sms/records` 按时间倒序返回。
+- `sms.enabled=false`（默认值）时不调用真实云片网接口，仅打印日志，验证码仍会生成存储以便本地联调。
 
-云片网配置项（`application.yml` 的 `sms.*`）需在 [云片网控制台](https://www.yunpian.com/) 申请后填入本地 `application.yml`，仓库中保留的是占位符（`your_yunpian_account_sid` / `your_yunpian_api_key`），**不要提交真实密钥**：
+## 秒杀流程
 
-```yaml
-sms:
-  enabled: false                     # 本地演示默认关闭，配置真实密钥后改为 true
-  api-url: https://sms.yunpian.com/v2/sms/tpl_send.json
-  account-sid: your_yunpian_account_sid   # 占位符，请替换为云片网控制台的真实 Account SID
-  api-key: your_yunpian_api_key           # 占位符，请替换为云片网控制台的真实 API Key，不要提交到仓库
-  template-id: "0"                        # 占位符，请替换为云片网控制台的真实模板 ID
-  timeout-ms: 5000
-  max-retry: 3
-  retry-interval-ms: 1000
-  retry-backoff: linear
-  rate-limit-seconds: 60
-  code-expire-seconds: 300            # 短信验证码有效期（秒），与图片验证码 captcha.expire-seconds 分开配置
-```
+商品服务支持秒杀功能，核心流程：
 
-## 异常处理与测试
+1. **库存初始化**：`POST /api/product/products/seckill/init/{productId}` 将秒杀库存加载到 Redis。
+2. **Lua 脚本预扣减**：`POST /api/product/products/seckill/{productId}` 通过 Redis Lua 脚本原子扣减库存，防止超卖。
+3. **MQ 异步下单**：扣减成功后发送 `SeckillMessage` 到 RabbitMQ，订单服务 `SeckillOrderConsumer` 异步消费创建订单。
+4. **防重复购买**：Redis 记录用户已购买标识，同一用户同一秒杀商品不可重复购买。
 
-后端通过 `common/GlobalExceptionHandler`（`@RestControllerAdvice`）将各类异常统一包装为前述 `Result` 结构返回。测试用例位于 `backend/src/test/`，基于 JUnit 5 + Spring Boot Test + MockMvc + Mockito（由已有的 `spring-boot-starter-test` 提供，无需额外依赖），共 58 个用例，覆盖以下场景：
+相关配置：
 
-| 异常 / 场景类型 | 触发场景 | 处理器 | `Result.code` | HTTP 状态 |
-| --------------- | -------- | ------ | ------------- | --------- |
-| 业务异常 `BusinessException` | 认证标识已存在（409）、确认密码不一致（400）、用户不存在（404）、短信发送频控（429）、短信发送失败（502）等 | `GlobalExceptionHandler` | 400 / 404 / 409 / 429 / 502 | 200 |
-| 参数校验异常 `MethodArgumentNotValidException` | `@Valid` 触发的字段校验失败（username 为空、密码长度不合法、邮箱 / 手机号格式错误、年龄 < 0、姓名 / 确认密码缺失等） | `GlobalExceptionHandler` | 400 | 200 |
-| 认证异常 | 登录凭证错误（认证标识不存在 / 密码不正确） | `GlobalExceptionHandler`（`BusinessException` 分支） | 401 | 200 |
-| 认证异常 | 已抛出到控制器层的 `AuthenticationException` | `GlobalExceptionHandler` | 401 | 200 |
-| 授权异常 `AccessDeniedException` | 已登录但权限不足 | `GlobalExceptionHandler` | 403 | 200 |
-| JWT 异常 | Token 过期 `ExpiredJwtException`、签名 / 格式非法 `JwtException` | `GlobalExceptionHandler` | 401 | 200 |
-| 未认证 / 无效 Token（过滤器层） | 无 Token、Token 无效、Token 过期访问受保护接口 | `SecurityConfig` 入口点 / `JwtAuthenticationFilter` | 401 | 401 |
-| 图片验证码 | 正确 / 一次性使用 / 过期 / 不匹配 / 关闭开关（`CaptchaServiceTest`，不依赖数据库） | 单元测试直接调用 `CaptchaService.validate` | 400 | 不涉及 HTTP |
-| 短信验证码（服务） | 验证码生成 / 存储、正确校验、一次性使用、不匹配、过期、开关关闭、发送记录写入与倒序（`SmsServiceTest`，Mock `RestTemplate`，不发起真实网络请求） | 单元测试直接调用 `SmsService.send` / `validateCode` / `getRecords` | 400 / 429 / 502 | 不涉及 HTTP |
-| 短信验证码（登录 / 注册两步验证） | 登录 / 注册缺失 smsCode（参数校验）、短信验证码错误 / 过期（`AuthControllerExceptionTest`，`@MockBean CaptchaService + SmsService`） | `GlobalExceptionHandler` | 400 | 200 |
-| 发送短信验证码接口 | 图片验证码不通过不发送、通过则发送、频控 429、缺少验证码参数（`SendSmsCodeControllerTest`，`@MockBean`） | `GlobalExceptionHandler` / 过滤器 | 400 / 429 | 200 |
-| 短信发送记录查询 | 无 Token 访问 /sms/records、有效 Token 返回记录列表（`SmsRecordsControllerTest`） | `SecurityConfig` 入口点 / 控制器 | 401 / 200 | 401 / 200 |
-| 短信发送 | 频控 429、网络异常 / 5xx 触发重试、4xx 不重试（`SmsServiceTest`，Mock `RestTemplate`，不发起真实网络请求） | 单元测试直接调用 `SmsService.send` | 429 / 502 | 不涉及 HTTP |
-| 兜底异常 `Exception` | 不可预期的运行时异常 | `GlobalExceptionHandler` | 500 | 200 |
+- Redis Lua 脚本：`ecommerce-product/src/main/resources/lua/seckill.lua`
+- RabbitMQ 队列配置：`ecommerce-product/config/SeckillRabbitConfig.java`、`ecommerce-order/config/SeckillRabbitConfig.java`
+- 秒杀消费者：`ecommerce-order/consumer/SeckillOrderConsumer.java`
 
-> 说明：`GlobalExceptionHandler` 未标注 `@ResponseStatus`，因此**经由它处理的异常 HTTP 状态恒为 200**，真正的错误码体现在响应体的 `code` 字段；而「未认证 / 无效 Token」的 401 由 Spring Security 入口点与 JWT 过滤器**直接写出真实 HTTP 401**，二者路径不同，测试断言也据此区分。
+## 网关鉴权
 
-测试类职责：
+API 网关 `AuthGlobalFilter` 实现全局 JWT 鉴权：
 
-- `GlobalExceptionHandlerTest`：单元测试，直接构造各类异常调用处理器方法，稳定覆盖全部 handler 分支（含 403 授权、429 / 502 短信相关分支、JWT 过期 / 无效、500 兜底）。
-- `AuthControllerExceptionTest`：MockMvc 集成测试，走真实 `/auth/register`、`/auth/login` 接口，验证业务异常、参数校验（含手机号、验证码、smsCode 字段）与登录凭证错误；通过 `@MockBean CaptchaService` 与 `@MockBean SmsService` 关闭真实验证码 / 短信验证码校验，使断言聚焦于注册 / 登录自身的参数与业务异常；另有登录 / 注册短信验证码错误、过期、smsCode 缺失等两步验证异常用例。
-- `SendSmsCodeControllerTest`：MockMvc 集成测试，走匿名接口 `/auth/send-sms-code`，`@MockBean CaptchaService + SmsService` 验证「图片验证码不通过不发送」「通过则按手机号发送」「频控 429」「缺少验证码参数」等编排。
-- `SmsRecordsControllerTest`：MockMvc 集成测试，验证需 JWT 认证的 `GET /sms/records`：无 Token 返回 401，有效 Token 返回按时间倒序的发送记录列表。
-- `CaptchaServiceTest`：纯单元测试（不依赖 SpringBootTest / 数据库），验证图片验证码的生成、正确校验、一次性使用（成功 / 失败均消费同一个 key）、过期失效、开关关闭等规则。
-- `SmsServiceTest`：纯单元测试（Mock `RestTemplate`，不发起真实网络请求），验证发送开关关闭时不触达真实接口但仍生成验证码、同一手机号频控、网络异常 / 5xx 触发重试且次数受 `maxRetry` 限制、4xx 不重试直接失败，以及验证码存储 / 校验 / 一次性 / 过期与发送记录写入及倒序。
+- **白名单放行**：`/api/user/auth/login`、`/api/user/auth/register`、`/api/user/auth/captcha`、`/api/user/auth/send-sms-code`、`/api/user/health`
+- **Token 提取**：从 `Authorization: Bearer <token>` 头提取 JWT
+- **校验与透传**：校验 JWT 签名与有效期，通过后从 Claims 提取 `userId` / `username`，写入 `X-User-Id` / `X-User-Name` 请求头透传给下游微服务
+- **下游信任**：各微服务通过 `TrustedAuthenticationFilter` 读取网关注入的请求头，无需重复校验 JWT
 
-> **运行集成测试前请先完成上方「数据库初始化」小节**（`AuthControllerExceptionTest` / `SecurityExceptionTest` 直连本地 MySQL，依赖真实数据库连接与 `zhangsan` 预置账号；`DemoDataInitializer` 会在测试上下文启动时自动补齐预置数据）。`CaptchaServiceTest` / `SmsServiceTest` / `GlobalExceptionHandlerTest` 不依赖数据库，可独立运行。
+## 异常处理
 
-### 本地运行测试
+后端通过 `ecommerce-common` 的 `GlobalExceptionHandler`（`@RestControllerAdvice`）将各类异常统一包装为 `Result` 结构返回：
+
+| 异常类型 | 触发场景 | `Result.code` | HTTP 状态 |
+|---------|---------|---------------|----------|
+| `BusinessException` | 业务校验（资源不存在 / 已存在 / 频控 / 秒杀校验等） | 400 / 404 / 409 / 429 / 502 | 200 |
+| `MethodArgumentNotValidException` | `@Valid` 字段校验失败 | 400 | 200 |
+| `ExpiredJwtException` | Token 过期 | 401 | 401（网关直接返回） |
+| `JwtException` | Token 签名 / 格式非法 | 401 | 401（网关直接返回） |
+| `AccessDeniedException` | 已登录但权限不足 | 403 | 200 |
+| `Exception` | 不可预期的运行时异常 | 500 | 200 |
+
+> 说明：经由 `GlobalExceptionHandler` 处理的异常 HTTP 状态恒为 200，真正的错误码体现在响应体的 `code` 字段；而 JWT 鉴权失败的 401 由网关 `AuthGlobalFilter` **直接写出真实 HTTP 401**。
+
+## Docker 全栈部署
+
+### 方式一：仅部署基础设施
+
+使用 `docker-compose-infra.yml` 部署中间件，后端和前端单独启动：
 
 ```bash
-cd backend
-# 运行全部测试
-mvn test
-# 仅运行指定测试类
-mvn test -Dtest=GlobalExceptionHandlerTest
-mvn test -Dtest=CaptchaServiceTest,SmsServiceTest
-mvn test -Dtest=AuthControllerExceptionTest,SecurityExceptionTest
+docker compose -f docker-compose-infra.yml up -d
 ```
 
-## CORS 说明
+### 方式二：全栈部署
 
-后端已通过 `CorsConfig` 配置全局 CORS（允许任意来源、任意方法）。开发环境下前端经 Vite 代理访问，不会触发跨域；该配置用于前端直连后端（如生产环境不同域名部署）的场景。
+使用 `docker-compose.yml` 一键部署所有服务（基础设施 + 后端微服务 + 前端子应用）：
+
+```bash
+docker compose up -d
+```
+
+### 服务清单
+
+| 序号 | 服务 | 镜像 / 构建 | 端口 | 用途 |
+|------|------|------------|------|------|
+| 1 | MySQL | `mysql:8.0` | 3306 | 关系型数据库（用户 / 商品 / 订单） |
+| 2 | Redis | `redis:7-alpine` | 6379 | 缓存 / 会话 Token / 秒杀库存预扣 |
+| 3 | Nacos | `nacos/nacos-server:v2.3.0` | 8848, 9848, 9849 | 微服务注册与配置中心 |
+| 4 | RabbitMQ | `rabbitmq:3-management-alpine` | 5672, 15672 | 消息队列（秒杀订单异步处理） |
+| 5 | Elasticsearch | `elasticsearch:8.11.0` | 9200, 9300 | 商品搜索引擎 |
+| 6 | API 网关 | 构建自 `Dockerfile.gateway` | 8080 | Spring Cloud Gateway |
+| 7 | 用户服务 | 构建自 `Dockerfile.user` | 8081 | 认证 / 用户管理 |
+| 8 | 商品服务 | 构建自 `Dockerfile.product` | 8082 | 商品 / 秒杀 |
+| 9 | 订单服务 | 构建自 `Dockerfile.order` | 8083 | 订单 / 秒杀消费 |
+| 10 | 前端主应用 | 构建自 `frontend/base-app/Dockerfile` | 80 | Nginx 托管 Vue 主应用 |
+| 11 | 商品子应用 | 构建自 `frontend/product-app/Dockerfile` | 7100 | Nginx 托管 React 子应用 |
+| 12 | 订单子应用 | 构建自 `frontend/order-app/Dockerfile` | 7200 | Nginx 托管原生 TS 子应用 |
+
+### 访问地址
+
+| 服务 | 地址 | 备注 |
+|------|------|------|
+| 前端主应用 | `http://服务器IP:80` | Nginx 托管，登录后自动加载子应用 |
+| 商品子应用 | `http://服务器IP:7100` | 由主应用 qiankun 加载，也可独立访问 |
+| 订单子应用 | `http://服务器IP:7200` | 由主应用 qiankun 加载，也可独立访问 |
+| API 网关 | `http://服务器IP:8080` | 统一 API 入口 |
+| Nacos 控制台 | `http://服务器IP:8848/nacos/` | 用户名 nacos / 密码 nacos |
+| RabbitMQ 管理界面 | `http://服务器IP:15672/` | 用户名 guest / 密码 guest |
+| Elasticsearch | `http://服务器IP:9200/` | 无认证 |
+
+### 后端配置适配
+
+部署完成后，各微服务的 `application.yml` 中中间件连接地址需指向 Docker 所在服务器 IP，涉及以下文件：
+
+- `backend/ecommerce-user/src/main/resources/application.yml`
+- `backend/ecommerce-product/src/main/resources/application.yml`
+- `backend/ecommerce-order/src/main/resources/application.yml`
+- `backend/ecommerce-gateway/src/main/resources/application.yml`
+- `backend/ecommerce-gateway/src/main/resources/bootstrap.yml`
+
+需要修改的配置项示例（以 MySQL 为例）：
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://<Docker服务器IP>:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+  data:
+    redis:
+      host: <Docker服务器IP>
+  rabbitmq:
+    host: <Docker服务器IP>
+  cloud:
+    nacos:
+      discovery:
+        server-addr: <Docker服务器IP>:8848
+```
 
 ## 说明
 
-- 后端用户数据持久化到 MySQL，数据库访问统一使用 MyBatis，SQL 全部写在 `resources/mapper/UserMapper.xml`（不使用注解方式写 SQL）。
-- `users` 表包含 `created_by / created_date / last_modified_by / last_modified_date` 审计字段，实体对应 `createdBy / createdDate / lastModifiedBy / lastModifiedDate`；新增和更新用户（含注册等认证相关数据写入）时由 `UserRepository.save()` 统一自动填充，无需业务代码手动设置。
-- 图片验证码内容与短信发送频控记录均为进程内内存实现（重启后失效 / 重置），未引入 Redis；如需多实例共享需后续替换存储方案。
-- 前端 Element Plus 采用完整引入方式（简单可靠）；生产环境可改用 `unplugin-auto-import` + `unplugin-vue-components` 实现按需引入。
+- **微服务通信**：各微服务通过 Nacos 服务发现注册，网关通过路由规则将请求分发到对应微服务；商品服务与订单服务之间通过 OpenFeign 进行同步调用，秒杀场景通过 RabbitMQ 异步解耦。
+- **数据持久化**：MySQL 存储用户、商品、订单核心数据；Redis 存储会话 Token、秒杀库存、验证码等热点数据；Elasticsearch 存储商品搜索索引。
+- **认证链路**：登录返回 JWT → 前端存储到 localStorage → 每次请求携带 `Authorization: Bearer <token>` → 网关校验 JWT 并透传用户信息 → 下游微服务信任网关注入的请求头。
+- **前端微前端**：主应用（base-app）通过 qiankun 注册并加载商品子应用（product-app）和订单子应用（order-app），子应用可独立开发、独立部署、独立运行。
+- **图片验证码与短信频控**：均为进程内内存实现（重启后失效 / 重置），未做分布式持久化；如需多实例共享需替换为 Redis 存储方案。
+- **前端 Element Plus / Ant Design**：均采用完整引入方式（简单可靠）；生产环境可改用按需引入插件优化包体积。
