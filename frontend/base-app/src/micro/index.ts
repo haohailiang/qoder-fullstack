@@ -42,6 +42,14 @@ const apps = [
 registerMicroApps(apps, {
   beforeLoad: [async (app) => {
     console.log('[qiankun] beforeLoad:', app.name)
+    // 在真实 window 上设置 React Refresh 兼容标志和桩函数
+    // qiankun 沙箱中 eval() 设置的 window 是代理对象，而子应用组件
+    // 通过 import() 加载后运行在模块作用域，访问的是真实 window
+    if (app.name === 'product-app') {
+      (window as any).__vite_plugin_react_preamble_installed__ = true
+      ;(window as any).$RefreshReg$ = () => {}
+      ;(window as any).$RefreshSig$ = () => (type: any) => type
+    }
   }],
   beforeMount: [async (app) => {
     console.log('[qiankun] beforeMount:', app.name)

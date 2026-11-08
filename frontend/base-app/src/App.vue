@@ -33,7 +33,7 @@ function navigateTo(path: string) {
   <el-container class="app-container">
     <el-header class="app-header">
       <div class="header-left">
-        <span class="app-title">微服务电商平台</span>
+        <span class="app-title">郝海亮电商平台</span>
         <el-menu
           mode="horizontal"
           :default-active="route.path"
@@ -76,7 +76,9 @@ function navigateTo(path: string) {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .app-title {
@@ -88,6 +90,8 @@ function navigateTo(path: string) {
 .nav-menu {
   background-color: transparent;
   border-bottom: none;
+  flex: 1;
+  min-width: 0;
 }
 
 .nav-menu .el-menu-item {
