@@ -2,7 +2,7 @@ const { Client } = require('ssh2');
 const fs = require('fs');
 const path = require('path');
 
-const VM_HOST = '192.168.204.128';
+const VM_HOST = '192.168.178.100';
 const VM_USER = 'root';
 const VM_PASS = 'root123456';
 

@@ -8,6 +8,11 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: demo_fullstack
+      # 官方 mysql:8.0 镜像默认 locale 为 POSIX，容器内 mysql 客户端（含
+      # /docker-entrypoint-initdb.d 的初始化客户端）此时 character_set_client
+      # 会退化成 latin1，导致 init-sql 里的中文被二次编码成乱码。
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     ports:
       - "3306:3306"
     volumes:
