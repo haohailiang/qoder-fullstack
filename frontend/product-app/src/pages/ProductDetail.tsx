@@ -1,0 +1,199 @@
+import { useEffect, useState } from 'react'
+import { Card, Button, Tag, Space, InputNumber, message, Descriptions, Divider } from 'antd'
+import { ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import axios from 'axios'
+import { useParams, useNavigate } from 'react-router-dom'
+
+interface Product {
+  id: number
+  name: string
+  description: string
+  price: number
+  stock: number
+  category: string
+  imageUrl: string
+  status: number
+  isSeckill: number
+  seckillPrice: number
+  seckillStartTime: string
+  seckillEndTime: string
+}
+
+function ProductDetail() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const [product, setProduct] = useState<Product | null>(null)
+  const [quantity, setQuantity] = useState(1)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    fetchProduct()
+  }, [id])
+
+  const fetchProduct = async () => {
+    try {
+      const token = localStorage.getItem('demo_token')
+      const response = await axios.get(`/api/product/products/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (response.data.code === 200) {
+        setProduct(response.data.data)
+      }
+    } catch (error) {
+      message.error('获取商品详情失败')
+    }
+  }
+
+  const handleBuy = async () => {
+    if (!product) return
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('demo_token')
+      const response = await axios.post(
+        '/api/order/orders',
+        {
+          productId: product.id,
+          productName: product.name,
+          quantity,
+          totalAmount: product.price * quantity,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      if (response.data.code === 200) {
+        message.success('下单成功！')
+        navigate('/order/my')
+      }
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '下单失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSeckill = async () => {
+    if (!product) return
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('demo_token')
+      const response = await axios.post(
+        `/api/product/products/seckill/${product.id}?quantity=${quantity}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      if (response.data.code === 200) {
+        const result = response.data.data
+        message.success(result.message || '抢购成功，排队中...')
+        navigate(`/order/detail/${result.orderNo}`)
+      }
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || '抢购失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!product) {
+    return <Card loading />
+  }
+
+  const isSeckillActive =
+    product.isSeckill === 1 &&
+    product.seckillStartTime &&
+    product.seckillEndTime &&
+    new Date() >= new Date(product.seckillStartTime) &&
+    new Date() <= new Date(product.seckillEndTime)
+
+  return (
+    <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
+      <Card>
+        <div style={{ display: 'flex', gap: 24 }}>
+          <div
+            style={{
+              width: 400,
+              height: 400,
+              background: '#f0f2f5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 8,
+              flexShrink: 0,
+            }}
+          >
+            <ShoppingCartOutlined style={{ fontSize: 80, color: '#bfbfbf' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h1 style={{ fontSize: 24, marginBottom: 12 }}>
+              {product.name}
+              {product.isSeckill === 1 && <Tag color="red" style={{ marginLeft: 8 }}>秒杀</Tag>}
+            </h1>
+            <p style={{ color: '#666', marginBottom: 16 }}>{product.description}</p>
+            <Divider />
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ color: '#999', marginRight: 8 }}>价格:</span>
+              {isSeckillActive ? (
+                <Space>
+                  <span style={{ color: '#f5222d', fontSize: 28, fontWeight: 'bold' }}>
+                    ¥{product.seckillPrice}
+                  </span>
+                  <span style={{ color: '#999', textDecoration: 'line-through' }}>
+                    ¥{product.price}
+                  </span>
+                </Space>
+              ) : (
+                <span style={{ color: '#f5222d', fontSize: 28, fontWeight: 'bold' }}>
+                  ¥{product.price}
+                </span>
+              )}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ color: '#999', marginRight: 8 }}>库存:</span>
+              <span>{product.stock}</span>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ color: '#999', marginRight: 8 }}>分类:</span>
+              <Tag>{product.category || '未分类'}</Tag>
+            </div>
+            <Divider />
+            <Space>
+              <span>数量:</span>
+              <InputNumber min={1} max={product.stock} value={quantity} onChange={(v) => setQuantity(v || 1)} />
+            </Space>
+            <div style={{ marginTop: 24 }}>
+              {isSeckillActive ? (
+                <Button
+                  type="primary"
+                  danger
+                  size="large"
+                  icon={<ThunderboltOutlined />}
+                  onClick={handleSeckill}
+                  loading={loading}
+                >
+                  立即抢购
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<ShoppingCartOutlined />}
+                  onClick={handleBuy}
+                  loading={loading}
+                >
+                  立即购买
+                </Button>
+              )}
+              <Button size="large" onClick={() => navigate(-1)} style={{ marginLeft: 12 }}>
+                返回
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+export default ProductDetail
