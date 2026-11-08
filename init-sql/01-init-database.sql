@@ -1,3 +1,11 @@
+-- 强制本次会话按 UTF-8 解释脚本内容。
+-- 原因：/docker-entrypoint-initdb.d 自动执行、或 docker exec 里的 mysql 客户端，
+-- 在容器 LANG 为 C/POSIX 时 character_set_client 默认取 latin1，
+-- 会把本文件里合法的 UTF-8 字节当作 latin1 字符再转成 utf8mb4 存盘，
+-- 造成中文数据和全部表/列注释出现“双重编码”乱码（管理员 -> ç®¡ç†å‘˜）。
+-- 加了这句后，客户端即使默认 latin1 也不会再转坏。
+SET NAMES utf8mb4;
+
 -- 创建数据库
 CREATE DATABASE IF NOT EXISTS demo_fullstack DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -13,7 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
     phone           VARCHAR(20)     NOT NULL COMMENT '手机号',
     age             INT             COMMENT '年龄',
     status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0禁用 1启用',
+    created_by      VARCHAR(100)    COMMENT '创建人',
     created_date    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    last_modified_by VARCHAR(100)   COMMENT '最后修改人',
     last_modified_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     INDEX idx_username (username),
     INDEX idx_email (email),

@@ -1,3 +1,7 @@
+-- 强制本次会话按 UTF-8 解释脚本内容，避免客户端按 latin1 处理本文件
+-- 导致中文注释/数据出现双重编码乱码。
+SET NAMES utf8mb4;
+
 -- 用户表：承载注册、登录、用户 CRUD 所需字段，以及 createdBy / createdDate /
 -- lastModifiedBy / lastModifiedDate 四个审计字段（下划线命名，Java 侧通过
 -- MyBatis UserMapper.xml 的 resultMap 映射为驼峰命名的实体字段）。

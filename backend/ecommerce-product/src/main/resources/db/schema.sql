@@ -1,3 +1,7 @@
+-- 强制本次会话按 UTF-8 解释脚本内容，避免客户端按 latin1 处理本文件
+-- 导致中文注释出现双重编码乱码。
+SET NAMES utf8mb4;
+
 -- 商品表
 CREATE TABLE IF NOT EXISTS products (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
