@@ -57,7 +57,12 @@ demo-fullstack/
 │   │       ├── Result.java                   # 统一响应结构
 │   │       ├── BusinessException.java        # 业务异常
 │   │       ├── GlobalExceptionHandler.java   # 全局异常处理器
-│   │       └── SeckillMessage.java           # 秒杀消息体（MQ 传输）
+│   │       ├── SeckillMessage.java           # 秒杀消息体（MQ 传输）
+│   │       ├── config/
+│   │       │   ├── SecurityConfig.java       # 统一安全配置（SecurityFilterChain）
+│   │       │   └── SeckillRabbitConfig.java  # RabbitMQ 秒杀队列配置
+│   │       └── security/
+│   │           └── TrustedAuthenticationFilter.java  # 可信认证过滤器（信任网关请求头）
 │   ├── ecommerce-gateway/                    # API 网关服务
 │   │   └── src/main/java/com/ecommerce/gateway/
 │   │       ├── GatewayApplication.java       # 网关启动入口
@@ -71,7 +76,7 @@ demo-fullstack/
 │   │       │   ├── service/                  # 认证 / 用户 / 图片验证码 / 短信 / Redis 会话服务
 │   │       │   ├── entity/                   # User 实体（含审计字段 + 主题偏好字段）
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
-│   │       │   ├── config/                   # SecurityConfig（Spring Security 配置）
+│   │       │   ├── config/                   # UserSecurityConfig（PasswordEncoder）
 │   │       │   └── security/                 # JWT 工具与认证过滤器
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8081，context-path /user
@@ -85,8 +90,7 @@ demo-fullstack/
 │   │       │   ├── entity/                   # Product 实体
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
 │   │       │   ├── elasticsearch/            # ES 商品文档与 Repository
-│   │       │   ├── config/                   # SeckillRabbitConfig / Redis / ES 配置
-│   │       │   └── security/                 # TrustedAuthenticationFilter（信任网关注入的用户头）
+│   │       │   ├── config/                   # Redis / ES 配置
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8082，context-path /product
 │   │           ├── db/schema.sql             # 商品表建表 SQL
@@ -101,8 +105,7 @@ demo-fullstack/
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
 │   │       │   ├── client/                   # ProductClient（OpenFeign 调用商品服务）
 │   │       │   ├── consumer/                 # SeckillOrderConsumer（RabbitMQ 秒杀消息消费者）
-│   │       │   ├── config/                   # SeckillRabbitConfig / SecurityConfig
-│   │       │   └── security/                 # TrustedAuthenticationFilter
+│   │       │   ├── config/                   # 无（安全配置已由 common 模块统一提供）
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8083，context-path /order
 │   │           ├── db/schema.sql             # 订单表建表 SQL
@@ -375,7 +378,7 @@ npm run dev
 相关配置：
 
 - Redis Lua 脚本：`ecommerce-product/src/main/resources/lua/seckill.lua`
-- RabbitMQ 队列配置：`ecommerce-product/config/SeckillRabbitConfig.java`、`ecommerce-order/config/SeckillRabbitConfig.java`
+- RabbitMQ 队列配置：`ecommerce-common/config/SeckillRabbitConfig.java`（公共模块统一提供）
 - 秒杀消费者：`ecommerce-order/consumer/SeckillOrderConsumer.java`
 
 ## 全局主题切换

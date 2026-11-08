@@ -13,12 +13,24 @@
 - [Register.vue](file://frontend/base-app/src/views/Register.vue)
 - [UserManage.vue](file://frontend/base-app/src/views/UserManage.vue)
 - [i18n/index.ts](file://frontend/base-app/src/i18n/index.ts)
+- [i18n/zh.ts](file://frontend/base-app/src/i18n/zh.ts)
+- [i18n/en.ts](file://frontend/base-app/src/i18n/en.ts)
 - [utils/auth.ts](file://frontend/base-app/src/utils/auth.ts)
 - [utils/theme.ts](file://frontend/base-app/src/utils/theme.ts)
 - [utils/lang.ts](file://frontend/base-app/src/utils/lang.ts)
 - [micro/index.ts](file://frontend/base-app/src/micro/index.ts)
+- [product-app i18n/index.ts](file://frontend/product-app/src/i18n/index.ts)
+- [order-app i18n.ts](file://frontend/order-app/src/i18n.ts)
 - [vite.config.ts](file://frontend/base-app/vite.config.ts)
 </cite>
+
+## 更新摘要
+**变更内容**   
+- 增强了前端国际化系统，实现了跨所有微应用的完整 i18n 支持
+- 在 base-app 中添加了语言切换下拉菜单组件
+- 实现了 Element Plus 动态语言切换功能
+- 完善了子应用（product-app、order-app）的国际化配置
+- 优化了语言状态管理和同步机制
 
 ## 目录
 1. [简介](#简介)
@@ -34,12 +46,14 @@
 ## 简介
 本文件面向基于 Vue 3 + Element Plus 的主应用 base-app，系统性说明其架构设计、路由与布局、页面与组件组织、用户认证流程、权限控制、用户管理界面与交互、国际化与主题切换、响应式适配，以及构建配置、部署策略和性能优化方案。该主应用作为微前端基座，通过 qiankun 加载 React 商品子应用与 Angular 订单子应用，统一提供导航、鉴权、语言与主题能力。
 
+**更新** 本次更新重点增强了国际化系统，实现了跨所有微应用的完整 i18n 支持，包括 base-app 的语言切换下拉菜单和 Element Plus 动态语言切换功能。
+
 ## 项目结构
 base-app 采用按功能域组织的目录结构：
 - src/api：后端接口定义与请求封装
 - src/views：页面级视图组件
 - src/router：路由与守卫
-- src/i18n：多语言资源与初始化
+- src/i18n：多语言资源与初始化（包含 zh.ts 和 en.ts）
 - src/utils：认证状态、主题、语言等工具模块
 - src/micro：qiankun 微前端集成
 - src/styles：全局样式
@@ -55,11 +69,17 @@ A --> E["micro/index.ts<br/>qiankun 微前端"]
 B --> F["views/*<br/>登录/注册/用户管理/子应用占位"]
 B --> G["utils/*<br/>auth/theme/lang"]
 F --> H["api/*<br/>auth/user/sms/request"]
+D --> I["i18n/zh.ts<br/>中文语言包"]
+D --> J["i18n/en.ts<br/>英文语言包"]
+end
+subgraph "子应用"
+K["product-app<br/>React 商品应用"] --> L["i18n/index.ts<br/>react-i18next"]
+M["order-app<br/>Angular 订单应用"] --> N["i18n.ts<br/>轻量级 i18n"]
 end
 subgraph "开发环境"
-V["vite.config.ts<br/>代理 /api -> 网关:8080"]
+O["vite.config.ts<br/>代理 /api -> 网关:8080"]
 end
-V --> |"HTTP"| 网关["后端网关(8080)"]
+O --> |"HTTP"| 网关["后端网关(8080)"]
 ```
 
 图表来源
@@ -68,6 +88,8 @@ V --> |"HTTP"| 网关["后端网关(8080)"]
 - [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
+- [product-app i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
+- [order-app i18n.ts:1-129](file://frontend/order-app/src/i18n.ts#L1-L129)
 - [vite.config.ts:1-26](file://frontend/base-app/vite.config.ts#L1-L26)
 
 章节来源
@@ -76,16 +98,20 @@ V --> |"HTTP"| 网关["后端网关(8080)"]
 
 ## 核心组件
 - 应用入口 main.ts：创建 Vue 应用，挂载 Element Plus、图标库、路由、国际化；启动主题与语言初始化；启动 qiankun。
-- 根组件 App.vue：使用 el-config-provider 包裹，提供顶部导航、语言切换、主题切换、用户信息展示与退出；根据路由判断渲染基座视图或子应用容器。
+- 根组件 App.vue：使用 el-config-provider 包裹，提供顶部导航、**语言切换下拉菜单**、主题切换、用户信息展示与退出；根据路由判断渲染基座视图或子应用容器。**新增 Element Plus 动态语言切换功能**。
 - 路由 index.ts：定义公开与受保护路由，包含登录、注册、用户管理、商品与订单子应用路由；beforeEach 实现基于 token 的访问控制。
-- 请求封装 request.ts：Axios 实例，统一拦截器处理 Authorization、业务码校验、401/403 与“被挤下线”逻辑、错误提示。
+- 请求封装 request.ts：Axios 实例，统一拦截器处理 Authorization、业务码校验、401/403 与"被挤下线"逻辑、错误提示。
 - 认证接口 auth.ts：登录、注册、验证码、短信验证码、当前用户、登出等 API 类型与调用。
 - 用户接口 user.ts：用户 CRUD 接口类型与调用。
 - 短信记录接口 sms.ts：查询短信发送记录。
 - 工具模块：
   - utils/auth.ts：token 与用户信息的响应式状态与持久化。
   - utils/theme.ts：主题模式 dark/light 的读取、切换、应用到 <html>、与后端同步。
-  - utils/lang.ts：语言 zh/en 的读取、切换、与 vue-i18n 同步、与后端同步。
+  - **utils/lang.ts：语言 zh/en 的读取、切换、与 vue-i18n 同步、与后端同步，包含完整的语言状态管理**。
+- **i18n 系统**：
+  - **i18n/index.ts：vue-i18n 初始化配置**
+  - **i18n/zh.ts：中文语言包，包含 app、login、register、users、lang、common 等模块**
+  - **i18n/en.ts：英文语言包，结构与中文包对应**
 - 微前端 micro/index.ts：qiankun 注册 product-app 与 order-app，透传 getToken/getTheme/getLang/globalActions，并监听主题/语言变化同步到子应用。
 
 章节来源
@@ -99,13 +125,16 @@ V --> |"HTTP"| 网关["后端网关(8080)"]
 - [utils/auth.ts:1-60](file://frontend/base-app/src/utils/auth.ts#L1-L60)
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
+- [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
+- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
+- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 
 ## 架构总览
 主应用作为微前端基座，承担以下职责：
 - 统一 UI 框架与基础组件（Element Plus）
 - 统一鉴权与路由守卫
-- 统一国际化与主题
+- **统一的国际化与主题管理**
 - 承载自有页面（登录、注册、用户管理）
 - 通过 qiankun 动态加载子应用（商品、订单）
 
@@ -114,13 +143,14 @@ graph TB
 Client["浏览器客户端"] --> Base["主应用(base-app)<br/>Vue3 + ElementPlus"]
 Base --> Router["路由与守卫"]
 Base --> Auth["认证状态(utils/auth)"]
-Base --> I18N["国际化(i18n)"]
+Base --> I18N["国际化(i18n)<br/>vue-i18n + 语言包"]
 Base --> Theme["主题(utils/theme)"]
 Base --> Micro["微前端(qiankun)"]
-Micro --> SubProduct["子应用: 商品(product-app)"]
-Micro --> SubOrder["子应用: 订单(order-app)"]
+Micro --> SubProduct["子应用: 商品(product-app)<br/>react-i18next"]
+Micro --> SubOrder["子应用: 订单(order-app)<br/>轻量级 i18n"]
 Base --> API["API 层(request.ts)"]
 API --> Gateway["后端网关(8080)"]
+I18N --> EP["Element Plus<br/>动态语言切换"]
 ```
 
 图表来源
@@ -173,7 +203,7 @@ HasToken2 --> |是| AllowRoute
   - 成功后跳转登录页
 - 权限验证：
   - 路由守卫基于 token 控制
-  - Axios 响应拦截器对 401/403 进行统一处理，区分“被挤下线”与“普通未授权”，必要时强制跳转登录
+  - Axios 响应拦截器对 401/403 进行统一处理，区分"被挤下线"与"普通未授权"，必要时强制跳转登录
 
 ```mermaid
 sequenceDiagram
@@ -244,14 +274,31 @@ Records["加载短信记录"] --> RecordTable["渲染记录表格"]
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
 
 ### 国际化配置与语言切换
-- i18n 初始化：
+
+**更新** 本次更新重点增强了国际化系统，实现了跨所有微应用的完整 i18n 支持。
+
+#### 主应用国际化架构
+- **i18n 初始化**：
+  - 使用 vue-i18n v9 Composition API
   - 本地缓存键 LANG_KEY，默认 zh，fallbackLocale 为 zh
-- 语言切换：
-  - utils/lang.ts 维护响应式 langRef，切换时更新 localStorage 与 i18n.global.locale
+  - 支持中英文语言包动态加载
+- **语言切换组件**：
+  - **App.vue 中实现了语言切换下拉菜单**
+  - 使用 el-dropdown 组件提供语言选择界面
+  - 显示当前语言标签（中文/EN）
+  - 禁用当前已选语言选项
+- **Element Plus 动态语言切换**：
+  - **通过 computed 属性 epLocale 动态切换 Element Plus 语言**
+  - 根据 langRef.value 自动切换 zhCn 或 enUs
+  - 所有 Element Plus 组件语言跟随应用语言设置
+- **语言状态管理**：
+  - utils/lang.ts 维护响应式 langRef
+  - 切换时更新 localStorage 与 i18n.global.locale
   - 已登录时异步将语言偏好保存到后端
-- 应用内联动：
+- **应用内联动**：
   - App.vue 中根据语言设置页面标题与 Element Plus 组件语言
   - Login/Register 表单提示与按钮文案均通过 t() 获取
+  - 所有界面文本完全国际化
 
 ```mermaid
 flowchart TD
@@ -259,8 +306,10 @@ Init["应用启动 initLang()"] --> Local["读取本地缓存语言"]
 Local --> Apply["设置 i18n.global.locale"]
 Apply --> Sync["如已登录，从后端拉取最新语言偏好"]
 Sync --> Update["更新 langRef 与 localStorage"]
-UserChange["用户切换语言"] --> SetLang["setLang(lang)"]
-SetLang --> Apply
+UserChange["用户切换语言"] --> Dropdown["语言切换下拉菜单"]
+Dropdown --> SetLang["setLang(lang)"]
+SetLang --> EP["Element Plus 动态语言切换"]
+EP --> Apply
 ```
 
 图表来源
@@ -268,10 +317,24 @@ SetLang --> Apply
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
 - [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
 
+#### 子应用国际化支持
+- **product-app（React）**：
+  - 使用 react-i18next 库
+  - 独立的 i18n 配置和语言包
+  - 通过 qiankun props 接收主应用语言状态
+- **order-app（Angular）**：
+  - 轻量级自定义 i18n 实现
+  - 内置翻译函数 t(key)
+  - 支持中英文完整覆盖
+
 章节来源
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
+- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
+- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
 - [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
+- [product-app i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
+- [order-app i18n.ts:1-129](file://frontend/order-app/src/i18n.ts#L1-L129)
 
 ### 主题切换与响应式设计
 - 主题模式：dark/light，默认 dark
@@ -356,6 +419,8 @@ main_ts --> micro_idx["micro/index.ts"]
 app_vue --> utils_auth["utils/auth.ts"]
 app_vue --> utils_theme["utils/theme.ts"]
 app_vue --> utils_lang["utils/lang.ts"]
+app_vue --> i18n_zh["i18n/zh.ts"]
+app_vue --> i18n_en["i18n/en.ts"]
 router_idx --> utils_auth
 views_login["views/Login.vue"] --> api_auth["api/auth.ts"]
 views_register["views/Register.vue"] --> api_auth
@@ -367,6 +432,8 @@ api_sms --> api_request
 micro_idx --> utils_auth
 micro_idx --> utils_theme
 micro_idx --> utils_lang
+micro_idx --> sub_product["product-app i18n"]
+micro_idx --> sub_order["order-app i18n"]
 ```
 
 图表来源
@@ -381,6 +448,10 @@ micro_idx --> utils_lang
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
 - [request.ts:1-110](file://frontend/base-app/src/api/request.ts#L1-L110)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
+- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
+- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
+- [product-app i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
+- [order-app i18n.ts:1-129](file://frontend/order-app/src/i18n.ts#L1-L129)
 
 ## 性能与构建部署
 - 构建与开发
@@ -398,6 +469,7 @@ micro_idx --> utils_lang
   - 微前端子应用按需加载：仅在匹配 activeRule 时加载
   - 图片与静态资源优化：使用现代图片格式与懒加载
   - 首屏优化：关键 CSS 内联、预加载关键字体与资源
+  - **国际化资源优化：按需加载语言包，减少首屏体积**
 - 安全与健壮性
   - Token 存储于 localStorage，适合演示；生产建议结合短期 Token + 刷新机制
   - 统一错误处理与用户提示，避免白屏
@@ -415,6 +487,15 @@ micro_idx --> utils_lang
 - 登录后仍被跳转回登录页
   - 检查 Axios 响应拦截器对 401/403 的处理逻辑
   - 确认后端返回的业务码是否为 40101（被挤下线）
+- **语言切换相关问题**：
+  - **检查 utils/lang.ts 是否正确写入 localStorage 与响应式状态**
+  - **确认 App.vue 中 Element Plus 动态语言切换逻辑是否正常**
+  - **检查语言切换下拉菜单的事件绑定是否正确**
+  - **验证 i18n.global.locale 是否正确更新**
+- **国际化相关错误**：
+  - **检查语言包文件（zh.ts、en.ts）语法是否正确**
+  - **确认所有需要的翻译键都已定义**
+  - **检查子应用的 i18n 配置是否与主应用同步**
 - 主题/语言切换无效
   - 检查 utils/theme.ts 与 utils/lang.ts 是否正确写入 localStorage 与响应式状态
   - 确认 App.vue 中是否正确使用 computed 与 watch 联动
@@ -430,7 +511,17 @@ micro_idx --> utils_lang
 - [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
+- [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
+- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
+- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 
 ## 结论
-base-app 作为微前端基座，围绕 Vue 3 + Element Plus 构建了清晰的路由与权限体系、统一的认证与状态管理、完善的国际化与主题能力，并通过 qiankun 实现了多技术栈子应用的无缝集成。配合 Vite 的开发体验与可扩展的构建配置，既满足演示场景的快速迭代，也具备向生产环境演进的基础能力。建议在后续版本中逐步推进 Element Plus 按需引入、Token 刷新机制与更细粒度的权限控制，进一步提升性能与安全。
+base-app 作为微前端基座，围绕 Vue 3 + Element Plus 构建了清晰的路由与权限体系、统一的认证与状态管理、**完善的国际化与主题能力**，并通过 qiankun 实现了多技术栈子应用的无缝集成。**本次更新重点增强了国际化系统，实现了跨所有微应用的完整 i18n 支持，包括 base-app 的语言切换下拉菜单和 Element Plus 动态语言切换功能**。配合 Vite 的开发体验与可扩展的构建配置，既满足演示场景的快速迭代，也具备向生产环境演进的基础能力。建议在后续版本中逐步推进 Element Plus 按需引入、Token 刷新机制与更细粒度的权限控制，进一步提升性能与安全。
+
+**更新总结** 本次更新成功实现了全面的国际化系统，包括：
+- 主应用中完整的 vue-i18n 配置和多语言包
+- 语言切换下拉菜单组件
+- Element Plus 动态语言切换
+- 子应用的国际化支持
+- 语言状态的全局管理和同步机制

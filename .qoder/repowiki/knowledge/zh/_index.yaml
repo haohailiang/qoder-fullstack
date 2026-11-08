@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-11-08T12:46:21Z"
+exported_at: "2026-11-08T14:15:02Z"
 modules:
     "":
-        dir_name: 电商全栈微服务工程（根编排）
-        title: 电商全栈微服务工程（根编排）
+        dir_name: 全栈电商微服务编排根工程
+        title: 全栈电商微服务编排根工程
         scope:
             - README.md
             - .gitignore
@@ -24,8 +24,8 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: 电商微服务后端（Spring Cloud + Nacos）
-        title: 电商微服务后端（Spring Cloud + Nacos）
+        dir_name: 电商微服务后端（用户_商品_订单_网关）
+        title: 电商微服务后端（用户/商品/订单/网关）
         scope:
             - backend/
         source_files: []
@@ -34,8 +34,8 @@ modules:
         related_to:
             - path: frontend
     frontend:
-        dir_name: 微前端前端应用集合（Vue 主应用 + React_原生子应用）
-        title: 微前端前端应用集合（Vue 主应用 + React/原生子应用）
+        dir_name: 基于 qiankun 的微前端前端工程
+        title: 基于 qiankun 的微前端前端工程
         scope:
             - frontend/
         source_files: []

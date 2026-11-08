@@ -18,7 +18,18 @@
 - [SmsRecord.java](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/dto/SmsRecord.java)
 - [User.java](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/entity/User.java)
 - [Result.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java)
+- [application.yml](file://backend/ecommerce-user/src/main/resources/application.yml)
+- [pom.xml](file://backend/ecommerce-user/pom.xml)
+- [gateway-application.yml](file://backend/ecommerce-gateway/src/main/resources/application.yml)
+- [start-order.bat](file://backend/start-order.bat)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增 Springdoc OpenAPI 集成配置说明
+- 新增 Windows 启动脚本使用指南
+- 更新 API 文档访问方式说明
+- 增强开发环境配置说明
 
 ## 目录
 1. [简介](#简介)
@@ -28,11 +39,17 @@
 5. [接口详细文档](#接口详细文档)
 6. [依赖关系分析](#依赖关系分析)
 7. [性能与容量特性](#性能与容量特性)
-8. [故障排查指南](#故障排查指南)
-9. [结论](#结论)
+8. [开发环境配置](#开发环境配置)
+9. [故障排查指南](#故障排查指南)
+10. [结论](#结论)
 
 ## 简介
 本文件为用户服务的完整 API 文档，覆盖认证、用户管理、图片验证码与短信验证码相关能力。系统采用 Spring Boot + Spring Security + JWT 的认证方案，统一响应体为 Result<T>，所有接口路径以 /api 为上下文根（由 server.servlet.context-path 配置）。
+
+**新增功能**：
+- **Springdoc OpenAPI 集成**：支持 Swagger UI 在线文档和 API 规范导出
+- **Windows 启动脚本**：提供便捷的 Windows 环境启动脚本
+- **网关聚合文档**：通过 API 网关统一管理所有微服务的 API 文档
 
 - 认证接口：注册、登录、登出、获取当前用户、发送短信验证码、获取图片验证码。
 - 用户管理接口：用户列表查询、按 ID 查询、新增、更新、删除，以及主题与语言偏好设置。
@@ -54,6 +71,7 @@ CS["验证码服务<br/>CaptchaService"]
 SS["短信服务<br/>SmsService"]
 U["用户实体<br/>User"]
 R["统一响应<br/>Result"]
+SD["Springdoc OpenAPI<br/>API文档"]
 end
 AC --> AS
 UC --> US
@@ -63,6 +81,10 @@ AS --> U
 US --> U
 CS --> R
 SS --> R
+SD --> AC
+SD --> UC
+SD --> CC
+SD --> SC
 ```
 
 **图表来源**
@@ -826,22 +848,120 @@ Retryable --> |否| RecordFailed["记录发送失败"] --> Throw502["抛出 502 
 - [SmsService.java:87-138](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/service/SmsService.java#L87-L138)
 - [SmsService.java:189-198](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/service/SmsService.java#L189-L198)
 
+## 开发环境配置
+
+### Springdoc OpenAPI 集成
+
+**新增功能**：用户服务现已集成 Springdoc OpenAPI，提供完整的 API 文档和交互式测试界面。
+
+#### 依赖配置
+用户服务已添加 Springdoc OpenAPI 依赖：
+```xml
+<!-- Springdoc OpenAPI (Swagger UI) -->
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>${springdoc.version}</version>
+</dependency>
+```
+
+#### 配置说明
+用户服务 application.yml 中的 Springdoc 配置：
+```yaml
+springdoc:
+  api-docs:
+    title: 用户服务 API
+    description: 用户注册、登录、用户管理、验证码、短信等接口
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+```
+
+#### API 文档访问方式
+
+**独立服务访问**：
+- Swagger UI：http://localhost:8081/swagger-ui.html
+- API 规范：http://localhost:8081/v3/api-docs
+
+**通过网关访问**：
+- 用户服务 Swagger UI：http://localhost:8080/api/user/swagger-ui.html
+- 用户服务 API 规范：http://localhost:8080/api/user/v3/api-docs
+
+**网关聚合文档**：
+- 统一 Swagger UI：http://localhost:8080/swagger-ui.html
+- 支持下拉选择不同微服务的 API 文档
+
+### Windows 启动脚本
+
+**新增功能**：提供了 Windows 环境下的便捷启动脚本。
+
+#### 订单服务启动脚本
+项目根目录下提供了 `start-order.bat` 脚本：
+```batch
+@echo off
+cd /d backend
+call mvnw.cmd spring-boot:run "-Dspring-boot.run.fork=true" -pl ecommerce-order
+```
+
+使用方法：
+1. 双击运行 `backend/start-order.bat`
+2. 脚本会自动切换到 backend 目录
+3. 使用 Maven Wrapper 启动订单服务
+
+#### 其他服务启动
+对于其他服务，可以使用类似的命令：
+```bash
+# 启动用户服务
+mvnw.cmd spring-boot:run -pl ecommerce-user
+
+# 启动商品服务  
+mvnw.cmd spring-boot:run -pl ecommerce-product
+
+# 启动网关服务
+mvnw.cmd spring-boot:run -pl ecommerce-gateway
+```
+
+### 开发环境要求
+
+#### 前置条件
+- Java 8+ 环境
+- Maven 3.6+（或使用 Maven Wrapper）
+- MySQL 数据库
+- Redis 缓存服务
+- Nacos 服务注册中心
+
+#### 快速开始
+1. 初始化数据库：执行 `init-sql/01-init-database.sql`
+2. 启动基础设施：MySQL、Redis、Nacos
+3. 启动后端服务：按顺序启动网关、用户、商品、订单服务
+4. 启动前端应用：按 README 指引启动前端应用
+
+**章节来源**
+- [application.yml:88-96](file://backend/ecommerce-user/src/main/resources/application.yml#L88-L96)
+- [pom.xml:103-108](file://backend/ecommerce-user/pom.xml#L103-L108)
+- [gateway-application.yml:116-130](file://backend/ecommerce-gateway/src/main/resources/application.yml#L116-L130)
+- [start-order.bat:1-4](file://backend/start-order.bat#L1-L4)
+
 ## 故障排查指南
 - 参数校验失败：
   - 现象：返回 400，message 提示字段校验不通过。
   - 排查：检查 RegisterRequest、LoginRequest、SendSmsCodeRequest 字段是否符合约束（如邮箱格式、手机号正则、长度范围）。
 - 验证码错误：
-  - 现象：返回 400，提示“验证码错误或已过期”。
+  - 现象：返回 400，提示"验证码错误或已过期"。
   - 排查：确认图片验证码 key/value 是否正确且未被复用；确认短信验证码是否在有效期内且未被消费。
 - 短信发送频繁：
-  - 现象：返回 429，提示“验证码发送过于频繁”。
+  - 现象：返回 429，提示"验证码发送过于频繁"。
   - 排查：检查 rateLimitSeconds 配置，确保同一手机号在冷却期内不再次发送。
 - 短信发送失败：
-  - 现象：返回 502，提示“短信发送失败，请稍后重试”。
+  - 现象：返回 502，提示"短信发送失败，请稍后重试"。
   - 排查：检查云片网接口配置（apiKey、templateId、apiUrl）、网络连通性与限流策略；查看重试次数与退避策略。
 - 未授权访问：
-  - 现象：返回 401，提示“未授权访问”或 JWT 无效。
+  - 现象：返回 401，提示"未授权访问"或 JWT 无效。
   - 排查：确认请求是否携带有效 JWT；确认登出后是否清除了 Redis 会话 Token；确认前端是否正确传递 Authorization 头。
+- API 文档无法访问：
+  - 现象：Swagger UI 无法打开或 API 规范无法获取。
+  - 排查：确认 Springdoc 依赖是否正确引入；检查端口配置和网络连通性；确认网关路由配置是否正确。
 
 **章节来源**
 - [RegisterRequest.java:13-49](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/dto/RegisterRequest.java#L13-L49)
@@ -853,4 +973,11 @@ Retryable --> |否| RecordFailed["记录发送失败"] --> Throw502["抛出 502 
 - [UserController.java:133-139](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/controller/UserController.java#L133-L139)
 
 ## 结论
-用户服务提供了完整的认证、用户管理与验证码能力，结合 JWT 与 Redis 会话管理实现了安全的无状态鉴权与设备级失效控制。图片验证码与短信验证码分别通过一次性使用、过期清理与频率限制等机制保障安全性。建议在生产环境中开启短信开关、合理配置验证码有效期与频率限制，并结合网关层的统一鉴权与限流策略进一步提升整体安全性与稳定性。
+用户服务提供了完整的认证、用户管理与验证码能力，结合 JWT 与 Redis 会话管理实现了安全的无状态鉴权与设备级失效控制。图片验证码与短信验证码分别通过一次性使用、过期清理与频率限制等机制保障安全性。
+
+**新增特性**：
+- **Springdoc OpenAPI 集成**：提供完整的 API 文档和交互式测试界面，支持独立的 Swagger UI 和网关聚合文档
+- **Windows 启动脚本**：简化了 Windows 环境下的服务启动流程
+- **完善的开发体验**：通过网关统一管理所有微服务的 API 文档，提升开发效率
+
+建议在生产环境中开启短信开关、合理配置验证码有效期与频率限制，并结合网关层的统一鉴权与限流策略进一步提升整体安全性与稳定性。同时利用 Springdoc OpenAPI 提供的文档功能，确保 API 的一致性和可维护性。
