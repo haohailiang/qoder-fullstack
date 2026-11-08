@@ -1,0 +1,62 @@
+server:
+  port: 8082
+  servlet:
+    context-path: /product
+
+spring:
+  application:
+    name: ecommerce-product
+  datasource:
+    url: jdbc:mysql://192.168.204.128:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: 192.168.204.128
+      port: 6379
+      password:
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+    # Elasticsearch 配置（默认禁用，设置 enabled=true 启用）
+    elasticsearch:
+      repositories:
+        enabled: true
+  elasticsearch:
+    uris: http://192.168.204.128:9200
+    enabled: true
+    username:
+    password:
+  # RabbitMQ 配置
+  rabbitmq:
+    host: 192.168.204.128
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    publisher-confirm-type: correlated
+    publisher-returns: true
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 192.168.204.128:8848
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ecommerce.product.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# JWT 配置（网关传入的 header 信任模式，此处仅保留 secret 以备内部校验）
+jwt:
+  secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
+
+logging:
+  level:
+    com.ecommerce.product: DEBUG

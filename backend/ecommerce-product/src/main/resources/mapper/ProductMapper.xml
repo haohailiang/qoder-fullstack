@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecommerce.product.repository.mapper.ProductMapper">
+
+    <resultMap id="ProductResultMap" type="com.ecommerce.product.entity.Product">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="price" column="price"/>
+        <result property="stock" column="stock"/>
+        <result property="category" column="category"/>
+        <result property="imageUrl" column="image_url"/>
+        <result property="status" column="status"/>
+        <result property="isSeckill" column="is_seckill"/>
+        <result property="seckillPrice" column="seckill_price"/>
+        <result property="seckillStartTime" column="seckill_start_time"/>
+        <result property="seckillEndTime" column="seckill_end_time"/>
+        <result property="createdBy" column="created_by"/>
+        <result property="createdDate" column="created_date"/>
+        <result property="lastModifiedBy" column="last_modified_by"/>
+        <result property="lastModifiedDate" column="last_modified_date"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, name, description, price, stock, category, image_url, status,
+        is_seckill, seckill_price, seckill_start_time, seckill_end_time,
+        created_by, created_date, last_modified_by, last_modified_date
+    </sql>
+
+    <select id="selectAll" resultMap="ProductResultMap">
+        SELECT <include refid="BaseColumns"/> FROM products ORDER BY id
+    </select>
+
+    <select id="selectById" parameterType="long" resultMap="ProductResultMap">
+        SELECT <include refid="BaseColumns"/> FROM products WHERE id = #{id}
+    </select>
+
+    <select id="selectByCategory" parameterType="string" resultMap="ProductResultMap">
+        SELECT <include refid="BaseColumns"/> FROM products WHERE category = #{category} AND status = 1 ORDER BY id
+    </select>
+
+    <select id="searchProducts" resultMap="ProductResultMap">
+        SELECT <include refid="BaseColumns"/> FROM products
+        WHERE status = 1
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="category != null and category != ''">
+            AND category = #{category}
+        </if>
+        <if test="priceMin != null">
+            AND price &gt;= #{priceMin}
+        </if>
+        <if test="priceMax != null">
+            AND price &lt;= #{priceMax}
+        </if>
+        ORDER BY id
+    </select>
+
+    <insert id="insert" parameterType="com.ecommerce.product.entity.Product"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO products (name, description, price, stock, category, image_url, status,
+                              is_seckill, seckill_price, seckill_start_time, seckill_end_time,
+                              created_by, created_date, last_modified_by, last_modified_date)
+        VALUES (#{name}, #{description}, #{price}, #{stock}, #{category}, #{imageUrl}, #{status},
+                #{isSeckill}, #{seckillPrice}, #{seckillStartTime}, #{seckillEndTime},
+                #{createdBy}, #{createdDate}, #{lastModifiedBy}, #{lastModifiedDate})
+    </insert>
+
+    <update id="updateById" parameterType="com.ecommerce.product.entity.Product">
+        UPDATE products
+        SET name = #{name}, description = #{description}, price = #{price}, stock = #{stock},
+            category = #{category}, image_url = #{imageUrl}, status = #{status},
+            is_seckill = #{isSeckill}, seckill_price = #{seckillPrice},
+            seckill_start_time = #{seckillStartTime}, seckill_end_time = #{seckillEndTime},
+            last_modified_by = #{lastModifiedBy}, last_modified_date = #{lastModifiedDate}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM products WHERE id = #{id}
+    </delete>
+
+    <update id="updateStock">
+        UPDATE products SET stock = stock - #{quantity} WHERE id = #{id} AND stock &gt;= #{quantity}
+    </update>
+</mapper>
