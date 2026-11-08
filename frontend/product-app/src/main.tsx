@@ -36,7 +36,13 @@ renderWithQiankun({
     }
   },
   update(props) {
-    console.log('[product-app] update')
+    console.log('[product-app] update', props)
+    // 接收基座应用的主题状态
+    if (props?.theme) {
+      localStorage.setItem('demo_theme', props.theme)
+      // 触发 storage 事件让 App 组件重新读取
+      window.dispatchEvent(new Event('storage'))
+    }
   },
 })
 

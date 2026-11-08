@@ -29,7 +29,15 @@ renderWithQiankun({
     }
   },
   update(props) {
-    console.log('[order-app] update')
+    console.log('[order-app] update', props)
+    // 接收基座应用的主题状态
+    if (props?.theme) {
+      localStorage.setItem('demo_theme', props.theme)
+      // 重新渲染以应用新主题
+      if (appInstance) {
+        appInstance.render()
+      }
+    }
   },
 })
 

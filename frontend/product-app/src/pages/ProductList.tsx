@@ -20,9 +20,12 @@ interface Product {
 function ProductList() {
   const [products, setProducts] = useState<Product[]>([])
   const [keyword, setKeyword] = useState('')
-  const [category, setCategory] = useState('')
+  const [category, setCategory] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+
+  const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
+  const pageBg = isDark ? '#141414' : '#f5f5f5'
 
   const fetchProducts = async () => {
     setLoading(true)
@@ -60,8 +63,9 @@ function ProductList() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      <Card title="商品中心" style={{ marginBottom: 16 }}>
+    <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <Card title="商品中心" style={{ marginBottom: 16 }}>
         <Space wrap>
           <Input
             placeholder="搜索商品名称或描述"
@@ -102,13 +106,13 @@ function ProductList() {
                 <div
                   style={{
                     height: 200,
-                    background: '#f0f2f5',
+                    background: 'var(--ant-color-fill-tertiary, #f0f2f5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <ShoppingCartOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
+                  <ShoppingCartOutlined style={{ fontSize: 48, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
                 </div>
               }
               actions={[
@@ -127,15 +131,15 @@ function ProductList() {
                 description={item.description?.substring(0, 50) + (item.description?.length > 50 ? '...' : '')}
               />
               <div style={{ marginTop: 12 }}>
-                <span style={{ color: '#f5222d', fontSize: 20, fontWeight: 'bold' }}>
+                <span style={{ color: 'var(--ant-color-error, #f5222d)', fontSize: 20, fontWeight: 'bold' }}>
                   ¥{item.isSeckill === 1 ? item.seckillPrice : item.price}
                 </span>
                 {item.isSeckill === 1 && (
-                  <span style={{ color: '#999', textDecoration: 'line-through', marginLeft: 8 }}>
+                  <span style={{ color: 'var(--ant-color-text-quaternary, #999)', textDecoration: 'line-through', marginLeft: 8 }}>
                     ¥{item.price}
                   </span>
                 )}
-                <span style={{ float: 'right', color: '#999' }}>
+                <span style={{ float: 'right', color: 'var(--ant-color-text-tertiary, #999)' }}>
                   库存: {item.stock}
                 </span>
               </div>
@@ -143,6 +147,7 @@ function ProductList() {
           </List.Item>
         )}
       />
+      </div>
     </div>
   )
 }

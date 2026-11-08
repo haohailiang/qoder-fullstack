@@ -26,6 +26,9 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(false)
 
+  const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
+  const pageBg = isDark ? '#141414' : '#f5f5f5'
+
   useEffect(() => {
     fetchProduct()
   }, [id])
@@ -97,7 +100,13 @@ function ProductDetail() {
   }
 
   if (!product) {
-    return <Card loading />
+    return (
+      <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <Card loading />
+        </div>
+      </div>
+    )
   }
 
   const isSeckillActive =
@@ -108,14 +117,15 @@ function ProductDetail() {
     new Date() <= new Date(product.seckillEndTime)
 
   return (
-    <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>
-      <Card>
+    <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+        <Card>
         <div style={{ display: 'flex', gap: 24 }}>
           <div
             style={{
               width: 400,
               height: 400,
-              background: '#f0f2f5',
+              background: 'var(--ant-color-fill-tertiary, #f0f2f5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -123,38 +133,38 @@ function ProductDetail() {
               flexShrink: 0,
             }}
           >
-            <ShoppingCartOutlined style={{ fontSize: 80, color: '#bfbfbf' }} />
+            <ShoppingCartOutlined style={{ fontSize: 80, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
           </div>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 24, marginBottom: 12 }}>
               {product.name}
               {product.isSeckill === 1 && <Tag color="red" style={{ marginLeft: 8 }}>秒杀</Tag>}
             </h1>
-            <p style={{ color: '#666', marginBottom: 16 }}>{product.description}</p>
+            <p style={{ color: 'var(--ant-color-text-secondary, #666)', marginBottom: 16 }}>{product.description}</p>
             <Divider />
             <div style={{ marginBottom: 16 }}>
-              <span style={{ color: '#999', marginRight: 8 }}>价格:</span>
+              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>价格:</span>
               {isSeckillActive ? (
                 <Space>
-                  <span style={{ color: '#f5222d', fontSize: 28, fontWeight: 'bold' }}>
+                  <span style={{ color: 'var(--ant-color-error, #f5222d)', fontSize: 28, fontWeight: 'bold' }}>
                     ¥{product.seckillPrice}
                   </span>
-                  <span style={{ color: '#999', textDecoration: 'line-through' }}>
+                  <span style={{ color: 'var(--ant-color-text-quaternary, #999)', textDecoration: 'line-through' }}>
                     ¥{product.price}
                   </span>
                 </Space>
               ) : (
-                <span style={{ color: '#f5222d', fontSize: 28, fontWeight: 'bold' }}>
+                <span style={{ color: 'var(--ant-color-error, #f5222d)', fontSize: 28, fontWeight: 'bold' }}>
                   ¥{product.price}
                 </span>
               )}
             </div>
             <div style={{ marginBottom: 16 }}>
-              <span style={{ color: '#999', marginRight: 8 }}>库存:</span>
+              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>库存:</span>
               <span>{product.stock}</span>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <span style={{ color: '#999', marginRight: 8 }}>分类:</span>
+              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>分类:</span>
               <Tag>{product.category || '未分类'}</Tag>
             </div>
             <Divider />
@@ -192,6 +202,7 @@ function ProductDetail() {
           </div>
         </div>
       </Card>
+      </div>
     </div>
   )
 }

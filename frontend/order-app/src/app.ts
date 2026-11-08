@@ -21,28 +21,44 @@ export class OrderApp {
   private orders: Order[] = []
   private selectedOrder: Order | null = null
   private loading = false
+  private theme: 'dark' | 'light' = 'dark'
 
   constructor(container: HTMLElement, props: any = {}) {
     this.container = container
     this.props = props
+    this.theme = (localStorage.getItem('demo_theme') as 'dark' | 'light') || 'dark'
   }
 
   async render() {
+    const isDark = this.theme === 'dark'
+    const pageBg = isDark ? '#141414' : '#f5f5f5'
+    const bgColor = isDark ? '#1f1f1f' : '#fff'
+    const textColor = isDark ? '#e5eaf3' : '#333'
+    const secondaryText = isDark ? '#a6a6a6' : '#999'
+    const borderColor = isDark ? '#424242' : '#f0f0f0'
+    const headerBg = isDark ? '#2a2a2a' : '#fafafa'
+    const btnPrimaryBg = '#1890ff'
+    const btnDefaultBg = isDark ? '#333' : '#fff'
+    const btnDefaultText = isDark ? '#e5eaf3' : '#333'
+    const btnDefaultBorder = isDark ? '#555' : '#d9d9d9'
+
     this.container.innerHTML = `
-      <div style="padding: 24px; max-width: 1200px; margin: 0 auto;">
-        <div style="background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 16px;">
-          <h2 style="margin: 0 0 16px 0; color: #333;">订单管理</h2>
-          <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-            <button id="btn-my-orders" style="padding: 8px 16px; background: #1890ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
-              我的订单
-            </button>
-            <button id="btn-all-orders" style="padding: 8px 16px; background: #fff; color: #333; border: 1px solid #d9d9d9; border-radius: 4px; cursor: pointer;">
-              全部订单
-            </button>
+      <div style="min-height: 100vh; padding: 24px; background: ${pageBg};">
+        <div style="max-width: 1200px; margin: 0 auto;">
+          <div style="background: ${bgColor}; border-radius: 8px; padding: 24px; margin-bottom: 16px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
+            <h2 style="margin: 0 0 16px 0; color: ${textColor};">订单管理</h2>
+            <div style="display: flex; gap: 12px; margin-bottom: 0;">
+              <button id="btn-my-orders" style="padding: 8px 16px; background: ${btnPrimaryBg}; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+                我的订单
+              </button>
+              <button id="btn-all-orders" style="padding: 8px 16px; background: ${btnDefaultBg}; color: ${btnDefaultText}; border: 1px solid ${btnDefaultBorder}; border-radius: 4px; cursor: pointer;">
+                全部订单
+              </button>
+            </div>
           </div>
-        </div>
-        <div id="order-content" style="background: #fff; border-radius: 8px; padding: 24px;">
-          <div style="text-align: center; color: #999; padding: 40px;">加载中...</div>
+          <div id="order-content" style="background: ${bgColor}; border-radius: 8px; padding: 24px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
+            <div style="text-align: center; color: ${secondaryText}; padding: 40px;">加载中...</div>
+          </div>
         </div>
       </div>
     `
@@ -52,26 +68,31 @@ export class OrderApp {
   }
 
   private bindEvents() {
+    const isDark = this.theme === 'dark'
+    const btnPrimaryBg = '#1890ff'
+    const btnDefaultBg = isDark ? '#333' : '#fff'
+    const btnDefaultText = isDark ? '#e5eaf3' : '#333'
+
     const btnMy = this.container.querySelector('#btn-my-orders') as HTMLButtonElement
     const btnAll = this.container.querySelector('#btn-all-orders') as HTMLButtonElement
 
     btnMy?.addEventListener('click', () => {
       this.loadOrders()
-      btnMy.style.background = '#1890ff'
+      btnMy.style.background = btnPrimaryBg
       btnMy.style.color = '#fff'
       if (btnAll) {
-        btnAll.style.background = '#fff'
-        btnAll.style.color = '#333'
+        btnAll.style.background = btnDefaultBg
+        btnAll.style.color = btnDefaultText
       }
     })
 
     btnAll?.addEventListener('click', () => {
       this.loadAllOrders()
-      btnAll.style.background = '#1890ff'
+      btnAll.style.background = btnPrimaryBg
       btnAll.style.color = '#fff'
       if (btnMy) {
-        btnMy.style.background = '#fff'
-        btnMy.style.color = '#333'
+        btnMy.style.background = btnDefaultBg
+        btnMy.style.color = btnDefaultText
       }
     })
   }
@@ -116,8 +137,14 @@ export class OrderApp {
     const content = this.container.querySelector('#order-content')
     if (!content) return
 
+    const isDark = this.theme === 'dark'
+    const textColor = isDark ? '#e5eaf3' : '#333'
+    const secondaryText = isDark ? '#a6a6a6' : '#999'
+    const borderColor = isDark ? '#424242' : '#f0f0f0'
+    const headerBg = isDark ? '#2a2a2a' : '#fafafa'
+
     if (this.orders.length === 0) {
-      content.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">暂无订单数据</div>'
+      content.innerHTML = `<div style="text-align: center; color: ${secondaryText}; padding: 40px;">暂无订单数据</div>`
       return
     }
 
@@ -130,9 +157,9 @@ export class OrderApp {
     }
 
     content.innerHTML = `
-      <table style="width: 100%; border-collapse: collapse;">
+      <table style="width: 100%; border-collapse: collapse; color: ${textColor};">
         <thead>
-          <tr style="background: #fafafa; border-bottom: 1px solid #f0f0f0;">
+          <tr style="background: ${headerBg}; border-bottom: 1px solid ${borderColor};">
             <th style="padding: 12px; text-align: left;">订单号</th>
             <th style="padding: 12px; text-align: left;">商品</th>
             <th style="padding: 12px; text-align: center;">数量</th>
@@ -145,7 +172,7 @@ export class OrderApp {
           ${this.orders.map(order => {
             const status = statusMap[order.status] || { text: '未知', color: '#999' }
             return `
-              <tr style="border-bottom: 1px solid #f0f0f0;">
+              <tr style="border-bottom: 1px solid ${borderColor};">
                 <td style="padding: 12px;">${order.orderNo}</td>
                 <td style="padding: 12px;">${order.productName || '-'}</td>
                 <td style="padding: 12px; text-align: center;">${order.quantity}</td>
@@ -196,32 +223,38 @@ export class OrderApp {
     const content = this.container.querySelector('#order-content')
     if (!content) return
 
+    const isDark = this.theme === 'dark'
+    const textColor = isDark ? '#e5eaf3' : '#333'
+    const secondaryText = isDark ? '#a6a6a6' : '#999'
+    const btnDefaultBg = isDark ? '#333' : '#fff'
+    const btnDefaultBorder = isDark ? '#555' : '#d9d9d9'
+
     const statusMap: Record<number, string> = {
       0: '待支付', 1: '已支付', 2: '已发货', 3: '已完成', 4: '已取消',
     }
 
     content.innerHTML = `
-      <div>
-        <button id="btn-back" style="margin-bottom: 16px; padding: 6px 12px; background: #fff; border: 1px solid #d9d9d9; border-radius: 4px; cursor: pointer;">
+      <div style="color: ${textColor};">
+        <button id="btn-back" style="margin-bottom: 16px; padding: 6px 12px; background: ${btnDefaultBg}; color: ${textColor}; border: 1px solid ${btnDefaultBorder}; border-radius: 4px; cursor: pointer;">
           ← 返回列表
         </button>
         <h3 style="margin-bottom: 16px;">订单详情</h3>
         <div style="display: grid; grid-template-columns: 120px 1fr; gap: 12px;">
-          <span style="color: #999;">订单号:</span>
+          <span style="color: ${secondaryText};">订单号:</span>
           <span>${order.orderNo}</span>
-          <span style="color: #999;">商品名称:</span>
+          <span style="color: ${secondaryText};">商品名称:</span>
           <span>${order.productName || '-'}</span>
-          <span style="color: #999;">购买数量:</span>
+          <span style="color: ${secondaryText};">购买数量:</span>
           <span>${order.quantity}</span>
-          <span style="color: #999;">订单金额:</span>
+          <span style="color: ${secondaryText};">订单金额:</span>
           <span style="color: #f5222d; font-weight: bold;">¥${order.totalAmount}</span>
-          <span style="color: #999;">订单状态:</span>
+          <span style="color: ${secondaryText};">订单状态:</span>
           <span>${statusMap[order.status] || '未知'}</span>
-          <span style="color: #999;">收货地址:</span>
+          <span style="color: ${secondaryText};">收货地址:</span>
           <span>${order.address || '-'}</span>
-          <span style="color: #999;">备注:</span>
+          <span style="color: ${secondaryText};">备注:</span>
           <span>${order.remark || '-'}</span>
-          <span style="color: #999;">创建时间:</span>
+          <span style="color: ${secondaryText};">创建时间:</span>
           <span>${order.createdDate ? new Date(order.createdDate).toLocaleString('zh-CN') : '-'}</span>
         </div>
       </div>
@@ -251,6 +284,7 @@ export class OrderApp {
   private renderError(message: string) {
     const content = this.container.querySelector('#order-content')
     if (content) {
+      const isDark = this.theme === 'dark'
       content.innerHTML = `<div style="text-align: center; color: #ff4d4f; padding: 40px;">${message}</div>`
     }
   }
