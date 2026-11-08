@@ -4,21 +4,21 @@
 
 - **backend/**：Spring Boot 3.3.x + Java 17 + Maven + Spring Cloud + Spring Cloud Alibaba，拆分为 5 个微服务模块
   - `ecommerce-common` — 公共模块（统一响应 Result / 业务异常 / 全局异常处理 / 秒杀消息体）
-  - `ecommerce-gateway` — API 网关（Spring Cloud Gateway，JWT 全局鉴权，按路径路由到下游微服务）
-  - `ecommerce-user` — 用户服务（注册 / 登录 / 图片验证码 / 短信验证码 / 用户 CRUD / 会话管理）
+  - `ecommerce-gateway` — API 网关（Spring Cloud Gateway，JWT 全局鉴权，按路径路由到下游微服务，聚合 Swagger 文档）
+  - `ecommerce-user` — 用户服务（注册 / 登录 / 图片验证码 / 短信验证码 / 用户 CRUD / 会话管理 / 主题偏好）
   - `ecommerce-product` — 商品服务（商品 CRUD / Elasticsearch 搜索 / 秒杀库存预扣 / Lua 脚本）
   - `ecommerce-order` — 订单服务（订单 CRUD / 秒杀订单异步消费 / OpenFeign 调用商品服务）
 - **frontend/**：基于 qiankun 微前端框架，拆分为 3 个子应用
-  - `base-app` — Vue 3 + TypeScript + Vite + Element Plus，主应用（登录 / 注册 / 用户管理 / 子应用容器）
-  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀）
-  - `order-app` — 原生 TypeScript + Vite + Axios，订单子应用（我的订单 / 全部订单 / 订单详情）
+  - `base-app` — Vue 3 + TypeScript + Vite + Element Plus，主应用（登录 / 注册 / 用户管理 / 子应用容器 / 全局主题切换）
+  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀 / 暗黑模式适配）
+  - `order-app` — 原生 TypeScript + Vite + Axios，订单子应用（我的订单 / 全部订单 / 订单详情 / 暗黑模式适配）
 
 ## 架构概览
 
 ```
                           ┌─────────────────────────────────────────┐
                           │           Spring Cloud Gateway          │
-                          │         (port 8080, JWT 鉴权)           │
+                          │    (port 8080, JWT 鉴权, Swagger 聚合)   │
                           └──────┬──────────┬──────────┬────────────┘
                                  │          │          │
                     /api/user/**  │ /api/product/** │ /api/order/**
@@ -26,9 +26,9 @@
                     ┌────────────┴──┐ ┌─────┴──────┐ ┌┴─────────────┐
                     │ ecommerce-user│ │ecommerce-  │ │ecommerce-    │
                     │  (port 8081)  │ │ product    │ │  order       │
-                    │               │ │(port 8082) │ │ (port 8083)  │
-                    └───────┬───────┘ └─────┬──────┘ └┬─────────────┘
-                            │               │          │
+                    │  + Swagger UI │ │(port 8082) │ │ (port 8083)  │
+                    └───────┬───────┘ │+ Swagger UI│ │+ Swagger UI  │
+                            │         └─────┬──────┘ └┬─────────────┘
               ┌─────────────┴───────────────┴──────────┴─────────┐
               │              中间件服务（Docker）                    │
               │  MySQL 8.0 · Redis 7 · Nacos v2.3.0              │
@@ -40,8 +40,9 @@
     │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐ │
     │  │  base-app      │  │  product-app   │  │  order-app     │ │
     │  │  Vue 3 :5173   │→ │  React :7100   │  │  TS    :7200   │ │
-    │  │  (主应用容器)    │→ │  (商品/秒杀)    │  │  (订单管理)     │ │
-    │  └────────────────┘  └────────────────┘  └────────────────┘ │
+    │  │  主题切换+暗黑  │→ │  Ant Design    │  │  暗黑模式适配   │ │
+    │  └────────────────┘  │  暗黑/亮色主题  │  └────────────────┘ │
+    │                         └────────────────┘                  │
     └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -50,7 +51,7 @@
 ```
 demo-fullstack/
 ├── backend/                                  # Spring Cloud 微服务后端
-│   ├── pom.xml                               # Maven 父 POM（Spring Boot 3.3.x, Java 17, Spring Cloud 2023.0.x）
+│   ├── pom.xml                               # Maven 父 POM（Spring Boot 3.3.x, Java 17, Spring Cloud 2023.0.x, springdoc 2.6.0）
 │   ├── ecommerce-common/                     # 公共模块
 │   │   └── src/main/java/com/ecommerce/common/
 │   │       ├── Result.java                   # 统一响应结构
@@ -62,13 +63,13 @@ demo-fullstack/
 │   │       ├── GatewayApplication.java       # 网关启动入口
 │   │       ├── config/                       # CORS 等网关配置
 │   │       └── filter/
-│   │           └── AuthGlobalFilter.java     # JWT 全局鉴权过滤器（白名单放行 + Token 校验 + 用户信息透传）
+│   │           └── AuthGlobalFilter.java     # JWT 全局鉴权过滤器（白名单放行 + Token 校验 + 用户信息透传 + Swagger 路径放行）
 │   ├── ecommerce-user/                       # 用户微服务
 │   │   └── src/main/
 │   │       ├── java/com/ecommerce/user/
-│   │       │   ├── controller/               # AuthController / CaptchaController / SmsController / UserController / HealthController
+│   │       │   ├── controller/               # AuthController / CaptchaController / SmsController / UserController（含主题 API） / HealthController
 │   │       │   ├── service/                  # 认证 / 用户 / 图片验证码 / 短信 / Redis 会话服务
-│   │       │   ├── entity/                   # User 实体（含审计字段）
+│   │       │   ├── entity/                   # User 实体（含审计字段 + 主题偏好字段）
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
 │   │       │   ├── config/                   # SecurityConfig（Spring Security 配置）
 │   │       │   └── security/                 # JWT 工具与认证过滤器
@@ -79,7 +80,7 @@ demo-fullstack/
 │   ├── ecommerce-product/                    # 商品微服务
 │   │   └── src/main/
 │   │       ├── java/com/ecommerce/product/
-│   │       │   ├── controller/               # ProductController / SeckillController
+│   │       │   ├── controller/               # ProductController / SeckillController（含 OpenAPI 注解）
 │   │       │   ├── service/                  # 商品 / 秒杀库存 / ES 搜索服务
 │   │       │   ├── entity/                   # Product 实体
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
@@ -94,7 +95,7 @@ demo-fullstack/
 │   ├── ecommerce-order/                      # 订单微服务
 │   │   └── src/main/
 │   │       ├── java/com/ecommerce/order/
-│   │       │   ├── controller/               # OrderController
+│   │       │   ├── controller/               # OrderController（含 OpenAPI 注解）
 │   │       │   ├── service/                  # 订单服务（含秒杀订单异步消费）
 │   │       │   ├── entity/                   # Order 实体
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
@@ -113,14 +114,14 @@ demo-fullstack/
 ├── frontend/                                 # qiankun 微前端
 │   ├── base-app/                             # 主应用（Vue 3 + Element Plus）
 │   │   ├── src/
-│   │   │   ├── main.ts                       # 入口（注册 Element Plus、路由、qiankun 启动）
-│   │   │   ├── App.vue                       # 根组件（布局 + 子应用容器 #subapp-container）
+│   │   │   ├── main.ts                       # 入口（注册 Element Plus、路由、qiankun 启动、主题初始化）
+│   │   │   ├── App.vue                       # 根组件（布局 + 子应用容器 + 主题切换按钮）
 │   │   │   ├── micro/index.ts                # qiankun 子应用注册与全局状态管理
 │   │   │   ├── api/                          # axios 封装 + 认证 / 用户 / 短信接口
 │   │   │   ├── router/                       # vue-router（含子应用路由占位）
-│   │   │   ├── utils/                        # 令牌与登录用户状态管理
+│   │   │   ├── utils/                        # 令牌与登录用户状态管理 + 主题管理 (theme.ts)
 │   │   │   └── views/
-│   │   │       ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证）
+│   │   │       ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证 + 登录后同步主题）
 │   │   │       ├── Register.vue              # 注册页（手机号 + 图片验证码 + 短信验证码两步验证）
 │   │   │       ├── UserManage.vue            # 用户管理页面（增删改查 + 短信发送记录查看）
 │   │   │       └── SubAppPlaceholder.vue     # 子应用容器占位组件
@@ -128,8 +129,8 @@ demo-fullstack/
 │   │   └── package.json
 │   ├── product-app/                          # 商品子应用（React 18 + Ant Design）
 │   │   ├── src/
-│   │   │   ├── main.tsx                      # 入口（qiankun 生命周期导出 + 独立运行支持）
-│   │   │   ├── App.tsx                       # 根组件（React Router + Ant Design）
+│   │   │   ├── main.tsx                      # 入口（qiankun 生命周期导出 + 独立运行支持 + 主题同步）
+│   │   │   ├── App.tsx                       # 根组件（React Router + Ant Design ConfigProvider 暗黑/亮色主题）
 │   │   │   └── pages/
 │   │   │       ├── ProductList.tsx           # 商品列表页
 │   │   │       └── ProductDetail.tsx         # 商品详情页（含秒杀入口）
@@ -137,8 +138,8 @@ demo-fullstack/
 │   │   └── package.json
 │   └── order-app/                            # 订单子应用（原生 TypeScript）
 │       ├── src/
-│       │   ├── main.ts                       # 入口（qiankun 生命周期导出 + 独立运行支持）
-│       │   └── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消）
+│       │   ├── main.ts                       # 入口（qiankun 生命周期导出 + 独立运行支持 + 主题同步）
+│       │   └── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消 / 暗黑模式颜色适配）
 │       ├── vite.config.ts                    # Vite 配置（端口 7200，/api 代理到网关 8080）
 │       └── package.json
 ├── init-sql/
@@ -164,7 +165,7 @@ demo-fullstack/
 后端启动前，需要先创建数据库和表。推荐使用项目根目录的初始化脚本 [`init-sql/01-init-database.sql`](init-sql/01-init-database.sql)，包含：
 
 - 创建数据库 `demo_fullstack`（utf8mb4）
-- `users` 表 — 用户数据（含审计字段 `created_by / created_date / last_modified_by / last_modified_date`）
+- `users` 表 — 用户数据（含审计字段 `created_by / created_date / last_modified_by / last_modified_date`，主题偏好 `theme_preference`）
 - `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`）
 - `orders` 表 — 订单数据（含状态流转 `0待支付 → 1已支付 → 2已发货 → 3已完成 → 4已取消`）
 - 演示数据 — 3 个用户（admin / zhangsan / lisi，密码均为 `123456`）+ 6 个商品（含 3 个秒杀商品）
@@ -218,12 +219,25 @@ mvn spring-boot:run
 
 | 微服务 | 端口 | context-path | 说明 |
 |--------|------|-------------|------|
-| API 网关 | 8080 | / | 统一入口，JWT 鉴权，路由分发 |
-| 用户服务 | 8081 | /user | 认证 / 用户 / 短信 / 验证码 |
+| API 网关 | 8080 | / | 统一入口，JWT 鉴权，路由分发，Swagger 文档聚合 |
+| 用户服务 | 8081 | /user | 认证 / 用户 / 短信 / 验证码 / 主题偏好 |
 | 商品服务 | 8082 | /product | 商品 CRUD / 搜索 / 秒杀 |
 | 订单服务 | 8083 | /order | 订单管理 / 秒杀订单消费 |
 
 > 前端及外部调用统一走网关 `http://localhost:8080`，由网关按路径前缀路由到对应微服务。
+
+### 4. Swagger API 文档
+
+各微服务均集成 `springdoc-openapi`，可通过网关聚合入口或各服务独立访问：
+
+| 访问方式 | 地址 |
+|----------|------|
+| 网关聚合（推荐） | `http://localhost:8080/swagger-ui/index.html` |
+| 用户服务 | `http://localhost:8081/user/swagger-ui/index.html` |
+| 商品服务 | `http://localhost:8082/product/swagger-ui/index.html` |
+| 订单服务 | `http://localhost:8083/order/swagger-ui/index.html` |
+
+> 网关聚合页面提供下拉选择各微服务文档，Swagger 路径已加入鉴权白名单无需 Token 即可访问。
 
 ## 前端启动
 
@@ -255,9 +269,9 @@ npm run dev
 
 | 子应用 | 开发端口 | 技术栈 | 说明 |
 |--------|---------|--------|------|
-| 主应用 base-app | 5173 | Vue 3 + Element Plus | 登录 / 注册 / 用户管理 / qiankun 容器 |
-| 商品子应用 product-app | 7100 | React 18 + Ant Design | 商品列表 / 商品详情 / 秒杀 |
-| 订单子应用 order-app | 7200 | 原生 TypeScript | 我的订单 / 全部订单 / 订单详情 |
+| 主应用 base-app | 5173 | Vue 3 + Element Plus | 登录 / 注册 / 用户管理 / qiankun 容器 / 全局主题切换 |
+| 商品子应用 product-app | 7100 | React 18 + Ant Design | 商品列表 / 商品详情 / 秒杀 / 暗黑模式适配 |
+| 订单子应用 order-app | 7200 | 原生 TypeScript | 我的订单 / 全部订单 / 订单详情 / 暗黑模式适配 |
 
 - 主应用访问地址：http://localhost:5173
 - 开发代理：各子应用均将 `/api` 前缀请求转发到 `http://localhost:8080`（API 网关）
@@ -274,7 +288,7 @@ npm run dev
 | GET | /api/user/auth/captcha | 获取图片验证码（返回 Base64 PNG + captchaKey） | 匿名 |
 | POST | /api/user/auth/send-sms-code | 发送短信验证码（先校验图片验证码，60 秒频控） | 匿名 |
 | POST | /api/user/auth/register | 注册（需图片验证码 + 短信验证码 + 手机号） | 匿名 |
-| POST | /api/user/auth/login | 登录（需图片验证码 + 短信验证码，返回 JWT） | 匿名 |
+| POST | /api/user/auth/login | 登录（需图片验证码 + 短信验证码，返回 JWT + 用户信息含主题偏好） | 匿名 |
 | GET | /api/user/auth/me | 获取当前登录用户信息 | JWT |
 | POST | /api/user/auth/logout | 退出登录（清除 Redis 会话 Token） | JWT |
 | GET | /api/user/users | 查询用户列表 | JWT |
@@ -284,6 +298,8 @@ npm run dev
 | DELETE | /api/user/users/{id} | 删除用户 | JWT |
 | GET | /api/user/sms/records | 查询短信发送记录（按时间倒序） | JWT |
 | GET | /api/user/health | 健康检查 | 匿名 |
+| GET | /api/user/users/theme | 获取当前用户主题偏好（dark / light） | JWT |
+| PUT | /api/user/users/theme | 更新当前用户主题偏好 | JWT |
 
 ### 商品服务（/api/product/**）
 
@@ -362,11 +378,36 @@ npm run dev
 - RabbitMQ 队列配置：`ecommerce-product/config/SeckillRabbitConfig.java`、`ecommerce-order/config/SeckillRabbitConfig.java`
 - 秒杀消费者：`ecommerce-order/consumer/SeckillOrderConsumer.java`
 
+## 全局主题切换
+
+前端支持暗黑模式 / 亮色模式全局切换，主题偏好持久化到数据库：
+
+- **默认主题**：暗黑模式（dark）
+- **切换入口**：主应用导航栏右侧主题切换按钮（始终可见）
+- **持久化策略**：
+  - 客户端缓存：`localStorage` 存储 `demo_theme` 键值，保证页面刷新即时恢复
+  - 数据库持久化：`users.theme_preference` 字段存储用户偏好，登录时自动同步
+- **跨应用同步**：通过 qiankun 全局状态 + `MutationObserver` + `storage` 事件实现主应用与子应用实时同步
+
+各前端应用的主题适配方式：
+
+| 应用 | 技术栈 | 适配方式 |
+|------|--------|----------|
+| base-app | Vue 3 + Element Plus | `<html class="dark">` + Element Plus 暗黑 CSS 变量 |
+| product-app | React 18 + Ant Design 5 | `ConfigProvider` + `theme.darkAlgorithm` / `theme.defaultAlgorithm` |
+| order-app | 原生 TypeScript | CSS 变量（`--bg-primary` 等）+ 主题感知颜色计算 |
+
+相关代码：
+
+- 主题核心模块：`frontend/base-app/src/utils/theme.ts`
+- 主题 API：`GET / PUT /api/user/users/theme`（用户服务）
+- 数据库字段：`users.theme_preference VARCHAR(10) NOT NULL DEFAULT 'dark'`
+
 ## 网关鉴权
 
 API 网关 `AuthGlobalFilter` 实现全局 JWT 鉴权：
 
-- **白名单放行**：`/api/user/auth/login`、`/api/user/auth/register`、`/api/user/auth/captcha`、`/api/user/auth/send-sms-code`、`/api/user/health`
+- **白名单放行**：`/api/user/auth/login`、`/api/user/auth/register`、`/api/user/auth/captcha`、`/api/user/auth/send-sms-code`、`/api/user/health`，以及所有 Swagger 文档路径（`/api/*/swagger-ui/**`、`/api/*/v3/api-docs/**`）
 - **Token 提取**：从 `Authorization: Bearer <token>` 头提取 JWT
 - **校验与透传**：校验 JWT 签名与有效期，通过后从 Claims 提取 `userId` / `username`，写入 `X-User-Id` / `X-User-Name` 请求头透传给下游微服务
 - **下游信任**：各微服务通过 `TrustedAuthenticationFilter` 读取网关注入的请求头，无需重复校验 JWT
@@ -413,22 +454,23 @@ docker compose up -d
 | 3 | Nacos | `nacos/nacos-server:v2.3.0` | 8848, 9848, 9849 | 微服务注册与配置中心 |
 | 4 | RabbitMQ | `rabbitmq:3-management-alpine` | 5672, 15672 | 消息队列（秒杀订单异步处理） |
 | 5 | Elasticsearch | `elasticsearch:8.11.0` | 9200, 9300 | 商品搜索引擎 |
-| 6 | API 网关 | 构建自 `Dockerfile.gateway` | 8080 | Spring Cloud Gateway |
-| 7 | 用户服务 | 构建自 `Dockerfile.user` | 8081 | 认证 / 用户管理 |
-| 8 | 商品服务 | 构建自 `Dockerfile.product` | 8082 | 商品 / 秒杀 |
-| 9 | 订单服务 | 构建自 `Dockerfile.order` | 8083 | 订单 / 秒杀消费 |
-| 10 | 前端主应用 | 构建自 `frontend/base-app/Dockerfile` | 80 | Nginx 托管 Vue 主应用 |
-| 11 | 商品子应用 | 构建自 `frontend/product-app/Dockerfile` | 7100 | Nginx 托管 React 子应用 |
-| 12 | 订单子应用 | 构建自 `frontend/order-app/Dockerfile` | 7200 | Nginx 托管原生 TS 子应用 |
+| 6 | API 网关 | 构建自 `Dockerfile.gateway` | 8080 | Spring Cloud Gateway + Swagger 聚合 |
+| 7 | 用户服务 | 构建自 `Dockerfile.user` | 8081 | 认证 / 用户管理 / 主题偏好 / Swagger |
+| 8 | 商品服务 | 构建自 `Dockerfile.product` | 8082 | 商品 / 秒杀 / Swagger |
+| 9 | 订单服务 | 构建自 `Dockerfile.order` | 8083 | 订单 / 秒杀消费 / Swagger |
+| 10 | 前端主应用 | 构建自 `frontend/base-app/Dockerfile` | 80 | Nginx 托管 Vue 主应用（含全局主题切换） |
+| 11 | 商品子应用 | 构建自 `frontend/product-app/Dockerfile` | 7100 | Nginx 托管 React 子应用（含暗黑模式适配） |
+| 12 | 订单子应用 | 构建自 `frontend/order-app/Dockerfile` | 7200 | Nginx 托管原生 TS 子应用（含暗黑模式适配） |
 
 ### 访问地址
 
 | 服务 | 地址 | 备注 |
 |------|------|------|
-| 前端主应用 | `http://服务器IP:80` | Nginx 托管，登录后自动加载子应用 |
+| 前端主应用 | `http://服务器IP:80` | Nginx 托管，登录后自动加载子应用，支持主题切换 |
 | 商品子应用 | `http://服务器IP:7100` | 由主应用 qiankun 加载，也可独立访问 |
 | 订单子应用 | `http://服务器IP:7200` | 由主应用 qiankun 加载，也可独立访问 |
 | API 网关 | `http://服务器IP:8080` | 统一 API 入口 |
+| Swagger API 文档 | `http://服务器IP:8080/swagger-ui/index.html` | 网关聚合所有微服务 API 文档，无需登录 |
 | Nacos 控制台 | `http://服务器IP:8848/nacos/` | 用户名 nacos / 密码 nacos |
 | RabbitMQ 管理界面 | `http://服务器IP:15672/` | 用户名 guest / 密码 guest |
 | Elasticsearch | `http://服务器IP:9200/` | 无认证 |
@@ -467,3 +509,5 @@ spring:
 - **前端微前端**：主应用（base-app）通过 qiankun 注册并加载商品子应用（product-app）和订单子应用（order-app），子应用可独立开发、独立部署、独立运行。
 - **图片验证码与短信频控**：均为进程内内存实现（重启后失效 / 重置），未做分布式持久化；如需多实例共享需替换为 Redis 存储方案。
 - **前端 Element Plus / Ant Design**：均采用完整引入方式（简单可靠）；生产环境可改用按需引入插件优化包体积。
+- **Swagger API 文档**：各微服务集成 `springdoc-openapi`（网关用 `webflux-ui`，业务服务用 `webmvc-ui`），网关聚合所有下游服务文档，Swagger 路径已加入鉴权白名单。
+- **全局主题切换**：默认暗黑模式，支持亮色/暗黑切换，主题偏好通过数据库持久化；Element Plus 通过 `class="dark"` + CSS 变量适配，Ant Design 通过 `ConfigProvider` 主题算法切换，原生 HTML 子应用通过 CSS 变量 + 主题感知颜色适配。
