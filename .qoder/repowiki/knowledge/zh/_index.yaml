@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-11-08T14:44:45Z"
+exported_at: "2026-11-08T15:43:56Z"
 modules:
     "":
-        dir_name: 电商全栈一体化编排根工程
-        title: 电商全栈一体化编排根工程
+        dir_name: 电商微服务一体化编排根工程
+        title: 电商微服务一体化编排根工程
         scope:
             - README.md
             - .gitignore
@@ -24,8 +24,8 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: 电商后端微服务聚合工程
-        title: 电商后端微服务聚合工程
+        dir_name: 电商微服务后端聚合工程
+        title: 电商微服务后端聚合工程
         scope:
             - backend/
         source_files: []

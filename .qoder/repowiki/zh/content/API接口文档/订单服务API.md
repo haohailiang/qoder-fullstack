@@ -8,13 +8,23 @@
 - [ProductClient.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java)
 - [SeckillOrderConsumer.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java)
 - [Order.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java)
+- [OrderStatus.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java)
+- [OrderStatusTypeHandler.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java)
 - [schema.sql](file://backend/ecommerce-order/src/main/resources/db/schema.sql)
+- [OrderMapper.xml](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml)
 - [Result.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java)
 - [BusinessException.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java)
 - [SeckillMessage.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/SeckillMessage.java)
 - [ProductController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java)
 - [SeckillController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java)
 </cite>
+
+## 更新摘要
+**变更内容**   
+- 引入了OrderStatus枚举替代魔法数字，增强了类型安全性
+- 新增OrderStatusTypeHandler进行MyBatis自动转换
+- 更新了订单状态管理接口的参数验证机制
+- 改进了代码可维护性和类型安全
 
 ## 目录
 1. [简介](#简介)
@@ -34,6 +44,7 @@
 - 秒杀订单消费接口：基于 RabbitMQ 的异步消息处理，完成秒杀下单。
 - 与商品服务的 OpenFeign 集成：库存扣减、商品信息校验。
 - 订单状态流转、秒杀异步处理流程、分布式事务处理的技术说明。
+- **新增**：基于枚举的类型安全的订单状态管理机制。
 
 ## 项目结构
 订单服务位于 backend/ecommerce-order，对外暴露 REST 接口；通过 OpenFeign 调用商品服务 ecommerce-product；通过 RabbitMQ 接收秒杀消息并落库。
@@ -48,19 +59,21 @@ ProductFeign --> ProductAPI["商品服务(ProductController.deductStock)"]
 ProductSeckill["商品服务秒杀(SeckillController)"] --> MQ["RabbitMQ"]
 MQ --> SeckillConsumer["订单服务消费者(SeckillOrderConsumer)"]
 SeckillConsumer --> DB["MySQL(orders表)"]
+DB --> TypeHandler["MyBatis类型处理器(OrderStatusTypeHandler)"]
 ```
 
 图表来源
-- [OrderController.java:16-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L16-L72)
-- [OrderServiceImpl.java:32-116](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L116)
+- [OrderController.java:17-88](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L17-L88)
+- [OrderServiceImpl.java:19-119](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L19-L119)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [ProductController.java:88-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L88-L95)
 - [SeckillController.java:57-122](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L57-L122)
 - [SeckillOrderConsumer.java:35-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L35-L67)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
 
 章节来源
-- [OrderController.java:16-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L16-L72)
-- [OrderServiceImpl.java:32-116](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L116)
+- [OrderController.java:17-88](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L17-L88)
+- [OrderServiceImpl.java:19-119](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L19-L119)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [ProductController.java:88-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L88-L95)
 - [SeckillController.java:57-122](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L57-L122)
@@ -73,14 +86,17 @@ SeckillConsumer --> DB["MySQL(orders表)"]
   - OpenFeign 客户端 ProductClient 调用商品服务扣减库存。
   - RabbitMQ 消费者 SeckillOrderConsumer 处理秒杀订单消息。
 - 数据模型：Order 实体对应 orders 表；统一响应 Result；业务异常 BusinessException；秒杀消息 SeckillMessage。
+- **新增**：OrderStatus 枚举定义了所有订单状态；OrderStatusTypeHandler 实现了 MyBatis 类型自动转换。
 
 章节来源
-- [OrderController.java:16-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L16-L72)
+- [OrderController.java:17-88](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L17-L88)
 - [OrderService.java:7-28](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/OrderService.java#L7-L28)
-- [OrderServiceImpl.java:18-116](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L18-L116)
+- [OrderServiceImpl.java:19-119](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L19-L119)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [SeckillOrderConsumer.java:21-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L21-L67)
-- [Order.java:10-41](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java#L10-L41)
+- [Order.java:11-35](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java#L11-L35)
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
 - [Result.java:8-63](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java#L8-L63)
 - [BusinessException.java:6-22](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L6-L22)
 - [SeckillMessage.java:10-25](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/SeckillMessage.java#L10-L25)
@@ -90,6 +106,7 @@ SeckillConsumer --> DB["MySQL(orders表)"]
 - 控制层负责参数校验、鉴权信息提取、统一响应封装。
 - 服务层编排业务逻辑，包含与商品服务的 Feign 调用和数据库操作。
 - 异步侧通过 RabbitMQ 解耦秒杀下单与订单落库。
+- **新增**：通过 MyBatis 类型处理器实现枚举与数据库字段的自动转换。
 
 ```mermaid
 classDiagram
@@ -128,18 +145,37 @@ class ProductClient {
 class SeckillOrderConsumer {
 +onMessage(message)
 }
+class OrderStatus {
++PENDING_PAYMENT
++PAID
++SHIPPED
++COMPLETED
++CANCELLED
++fromCode(code)
++getDescriptionByCode(code)
+}
+class OrderStatusTypeHandler {
++setNonNullParameter(ps, i, parameter, jdbcType)
++getNullableResult(rs, columnName)
++getNullableResult(rs, columnIndex)
++getNullableResult(cs, columnIndex)
+}
 OrderController --> OrderService : "调用"
 OrderServiceImpl ..|> OrderService : "实现"
 OrderServiceImpl --> ProductClient : "Feign调用"
+OrderServiceImpl --> OrderStatus : "使用"
+OrderStatusTypeHandler --> OrderStatus : "转换"
 SeckillOrderConsumer --> ProductClient : "Feign调用"
 ```
 
 图表来源
-- [OrderController.java:16-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L16-L72)
+- [OrderController.java:17-88](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L17-L88)
 - [OrderService.java:7-28](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/OrderService.java#L7-L28)
-- [OrderServiceImpl.java:18-116](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L18-L116)
+- [OrderServiceImpl.java:19-119](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L19-L119)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [SeckillOrderConsumer.java:21-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L21-L67)
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
 
 ## 接口规范
 通用约定
@@ -176,8 +212,8 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
   - { "code": 200, "message": "success", "data": { "id": 1, "orderNo": "ORD2025...", "userId": 1001, "productId": 1, "productName": "...", "quantity": 2, "totalAmount": 0, "status": 0, "address": "...", "remark": null, "createdDate": "...", "updatedDate": "..." } }
 
 章节来源
-- [OrderController.java:27-33](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L27-L33)
-- [OrderServiceImpl.java:32-60](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L60)
+- [OrderController.java:28-34](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L28-L34)
+- [OrderServiceImpl.java:33-61](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L33-L61)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [Result.java:8-63](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java#L8-L63)
 - [BusinessException.java:6-22](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L6-L22)
@@ -196,8 +232,8 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
   - { "code": 200, "message": "success", "data": [ {...}, {...} ] }
 
 章节来源
-- [OrderController.java:35-41](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L35-L41)
-- [OrderServiceImpl.java:62-65](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L62-L65)
+- [OrderController.java:36-42](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L36-L42)
+- [OrderServiceImpl.java:63-66](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L63-L66)
 
 #### 查询订单详情（按订单号）
 - 方法：GET
@@ -213,8 +249,8 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
   - { "code": 200, "message": "success", "data": { ... } }
 
 章节来源
-- [OrderController.java:43-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L43-L48)
-- [OrderServiceImpl.java:67-74](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L67-L74)
+- [OrderController.java:44-49](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L44-L49)
+- [OrderServiceImpl.java:68-75](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L68-L75)
 
 #### 查询所有订单（管理用）
 - 方法：GET
@@ -228,8 +264,8 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
   - { "code": 200, "message": "success", "data": [ {...}, {...} ] }
 
 章节来源
-- [OrderController.java:50-55](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L50-L55)
-- [OrderServiceImpl.java:107-110](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L107-L110)
+- [OrderController.java:51-56](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L51-L56)
+- [OrderServiceImpl.java:108-111](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L108-L111)
 
 #### 取消订单
 - 方法：POST
@@ -249,15 +285,17 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
   - { "code": 200, "message": "success", "data": null }
 
 章节来源
-- [OrderController.java:57-64](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L57-L64)
-- [OrderServiceImpl.java:85-98](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L85-L98)
+- [OrderController.java:58-65](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L58-L65)
+- [OrderServiceImpl.java:86-99](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L86-L99)
 
 #### 更新订单状态
 - 方法：PUT
 - URL：/orders/{orderId}/status
 - 路径参数：orderId（Long）
 - 查询参数：status（Integer）
+- **更新**：现在支持枚举验证，无效的状态值会返回错误
 - 成功响应：code=200，data=null
+- **新增**：失败场景包括无效状态码（code=400）
 
 调用示例
 - 请求
@@ -266,8 +304,9 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
   - { "code": 200, "message": "success", "data": null }
 
 章节来源
-- [OrderController.java:66-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L66-L72)
-- [OrderServiceImpl.java:100-105](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L100-L105)
+- [OrderController.java:67-78](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L67-L78)
+- [OrderServiceImpl.java:101-106](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L101-L106)
+- [OrderStatus.java:30-47](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L30-L47)
 
 ### 秒杀订单消费接口（RabbitMQ）
 - 类型：RabbitMQ 消费者监听
@@ -287,7 +326,7 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
 
 ### 订单创建流程
 - 控制器从请求头解析用户ID。
-- 生成订单号，设置默认状态为待支付。
+- 生成订单号，设置默认状态为待支付（使用枚举 OrderStatus.PENDING_PAYMENT）。
 - 通过 Feign 调用商品服务扣减库存。
 - 扣减成功后持久化订单。
 
@@ -302,6 +341,7 @@ participant DB as "MySQL"
 Client->>Controller : POST /orders
 Controller->>Service : createOrder(userId, order)
 Service->>Service : generateOrderNo()
+Service->>Service : setStatus(OrderStatus.PENDING_PAYMENT)
 Service->>Feign : deductStock(productId, quantity)
 Feign->>Product : POST /product/products/deduct-stock
 Product-->>Feign : Result<Boolean>
@@ -312,53 +352,56 @@ Controller-->>Client : Result<Order>
 ```
 
 图表来源
-- [OrderController.java:27-33](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L27-L33)
-- [OrderServiceImpl.java:32-60](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L60)
+- [OrderController.java:28-34](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L28-L34)
+- [OrderServiceImpl.java:33-61](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L33-L61)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [ProductController.java:88-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L88-L95)
 
 章节来源
-- [OrderController.java:27-33](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L27-L33)
-- [OrderServiceImpl.java:32-60](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L60)
+- [OrderController.java:28-34](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L28-L34)
+- [OrderServiceImpl.java:33-61](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L33-L61)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [ProductController.java:88-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L88-L95)
 
 ### 订单状态流转
+- **更新**：使用 OrderStatus 枚举管理订单状态，提供更好的类型安全性
 - 状态枚举：
-  - 0：待支付
-  - 1：已支付
-  - 2：已发货
-  - 3：已完成
-  - 4：已取消
-- 初始状态：创建时为待支付。
-- 取消：仅待支付可取消，更新为已取消。
+  - PENDING_PAYMENT(0, "待支付")
+  - PAID(1, "已支付")
+  - SHIPPED(2, "已发货")
+  - COMPLETED(3, "已完成")
+  - CANCELLED(4, "已取消")
+- 初始状态：创建时为 PENDING_PAYMENT。
+- 取消：仅 PENDING_PAYMENT 可取消，更新为 CANCELLED。
 - 更新：管理接口支持任意状态更新（用于后续流程如发货、完成）。
 
 ```mermaid
 flowchart TD
-Start(["创建订单"]) --> New["状态=0 待支付"]
+Start(["创建订单"]) --> New["状态=PENDING_PAYMENT 待支付"]
 New --> Cancel{"是否取消?"}
-Cancel --> |是| Canceled["状态=4 已取消"]
+Cancel --> |是| Canceled["状态=CANCELLED 已取消"]
 Cancel --> |否| Pay{"是否支付?"}
-Pay --> |是| Paid["状态=1 已支付"]
+Pay --> |是| Paid["状态=PAID 已支付"]
 Pay --> |否| New
 Paid --> Ship{"是否发货?"}
-Ship --> |是| Shipped["状态=2 已发货"]
+Ship --> |是| Shipped["状态=SHIPPED 已发货"]
 Ship --> |否| Paid
 Shipped --> Done{"是否完成?"}
-Done --> |是| Completed["状态=3 已完成"]
+Done --> |是| Completed["状态=COMPLETED 已完成"]
 Done --> |否| Shipped
 ```
 
 图表来源
-- [Order.java:26-34](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java#L26-L34)
-- [OrderServiceImpl.java:32-60](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L60)
-- [OrderServiceImpl.java:85-105](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L85-L105)
+- [OrderStatus.java:11-15](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L11-L15)
+- [OrderServiceImpl.java:39-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L39-L40)
+- [OrderServiceImpl.java:93-96](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L93-L96)
+- [OrderServiceImpl.java:102-106](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L102-L106)
 
 章节来源
-- [Order.java:26-34](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java#L26-L34)
-- [OrderServiceImpl.java:32-60](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L32-L60)
-- [OrderServiceImpl.java:85-105](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L85-L105)
+- [OrderStatus.java:11-15](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L11-L15)
+- [OrderServiceImpl.java:39-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L39-L40)
+- [OrderServiceImpl.java:93-96](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L93-L96)
+- [OrderServiceImpl.java:102-106](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L102-L106)
 
 ### 秒杀订单异步处理流程
 - 商品服务秒杀接口进行预扣减（Redis Lua），防重与时间校验。
@@ -410,19 +453,58 @@ Feign-->>OrderSvc : Boolean
 ```
 
 图表来源
-- [OrderServiceImpl.java:42-55](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L42-L55)
+- [OrderServiceImpl.java:43-56](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L43-L56)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [ProductController.java:88-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L88-L95)
 
 章节来源
-- [OrderServiceImpl.java:42-55](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L42-L55)
+- [OrderServiceImpl.java:43-56](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L43-L56)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [ProductController.java:88-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L88-L95)
+
+### 订单状态枚举与类型处理器机制
+**新增**：系统引入了类型安全的订单状态管理机制
+
+- **OrderStatus 枚举**：定义了所有可能的订单状态，提供了状态码映射和描述信息
+- **OrderStatusTypeHandler**：MyBatis 类型处理器，自动在数据库整数和 Java 枚举之间进行转换
+- **类型安全优势**：避免了魔法数字的使用，提高了代码的可读性和可维护性
+
+```mermaid
+classDiagram
+class OrderStatus {
++PENDING_PAYMENT(0, "待支付")
++PAID(1, "已支付")
++SHIPPED(2, "已发货")
++COMPLETED(3, "已完成")
++CANCELLED(4, "已取消")
++fromCode(int code) OrderStatus
++getDescriptionByCode(int code) String
+}
+class OrderStatusTypeHandler {
++setNonNullParameter(PreparedStatement, int, OrderStatus, JdbcType)
++getNullableResult(ResultSet, String) OrderStatus
++getNullableResult(ResultSet, int) OrderStatus
++getNullableResult(CallableStatement, int) OrderStatus
+}
+OrderStatusTypeHandler --> OrderStatus : "转换"
+```
+
+图表来源
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
+
+章节来源
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
+- [OrderMapper.xml:13](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml#L13)
+- [OrderMapper.xml:42](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml#L42)
+- [OrderMapper.xml:46](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml#L46)
 
 ## 依赖关系分析
 - 控制器依赖服务层，服务层依赖仓储与外部客户端。
 - 消费者依赖仓储与外部客户端。
 - 统一响应与异常在 common 模块中共享。
+- **新增**：OrderStatus 枚举被多个组件依赖，OrderStatusTypeHandler 被 MyBatis 框架使用。
 
 ```mermaid
 graph LR
@@ -435,34 +517,46 @@ SOC --> DB
 Common["common(Result/BusinessException)"] --> OC
 Common --> OSI
 Common --> SOC
+OSI --> OSEnum["OrderStatus"]
+OSEnum --> OSMapper["OrderMapper.xml"]
+OSMapper --> OTH["OrderStatusTypeHandler"]
+OTH --> DB
 ```
 
 图表来源
-- [OrderController.java:16-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L16-L72)
+- [OrderController.java:17-88](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L17-L88)
 - [OrderService.java:7-28](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/OrderService.java#L7-L28)
-- [OrderServiceImpl.java:18-116](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L18-L116)
+- [OrderServiceImpl.java:19-119](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L19-L119)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [SeckillOrderConsumer.java:21-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L21-L67)
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
+- [OrderMapper.xml:13](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml#L13)
 - [Result.java:8-63](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java#L8-L63)
 - [BusinessException.java:6-22](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L6-L22)
 
 章节来源
-- [OrderController.java:16-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L16-L72)
+- [OrderController.java:17-88](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L17-L88)
 - [OrderService.java:7-28](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/OrderService.java#L7-L28)
-- [OrderServiceImpl.java:18-116](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L18-L116)
+- [OrderServiceImpl.java:19-119](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L19-L119)
 - [ProductClient.java:11-19](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/client/ProductClient.java#L11-L19)
 - [SeckillOrderConsumer.java:21-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L21-L67)
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
+- [OrderMapper.xml:13](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml#L13)
 - [Result.java:8-63](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java#L8-L63)
 - [BusinessException.java:6-22](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L6-L22)
 
 ## 性能与扩展性
 - 秒杀场景通过 Redis Lua 预扣减库存，避免热点行竞争，提升吞吐。
 - 订单落库异步化，削峰填谷，降低主链路延迟。
+- **新增**：枚举类型提高了代码的可维护性，减少了状态管理的复杂性。
 - 建议：
   - 对高频查询增加缓存（如最近订单列表）。
   - 消费者端增加幂等与去重机制（基于 orderNo）。
   - 引入重试与死信队列，保障消息可靠性。
   - 分库分表策略预留（按 user_id 或 product_id 索引优化）。
+  - 考虑为订单状态添加索引以优化查询性能。
 
 [本节为通用指导，不涉及具体文件分析]
 
@@ -472,15 +566,17 @@ Common --> SOC
 - 订单不存在：核对 orderNo 或 orderId 是否正确。
 - 秒杀排队中：等待消费者处理完成，再查询订单获取最终结果。
 - 消费者失败：查看日志定位异常；检查 RabbitMQ 死信队列；必要时人工补偿。
+- **新增**：状态更新失败：检查传入的状态码是否在有效范围内（0-4），确认 OrderStatus.fromCode() 能正确解析状态值。
 
 章节来源
-- [OrderController.java:74-80](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L74-L80)
-- [OrderServiceImpl.java:42-55](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L42-L55)
-- [OrderServiceImpl.java:67-74](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L67-L74)
+- [OrderController.java:80-86](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L80-L86)
+- [OrderServiceImpl.java:43-56](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L43-L56)
+- [OrderServiceImpl.java:68-75](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L68-L75)
 - [SeckillOrderConsumer.java:62-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L62-L67)
+- [OrderStatus.java:30-47](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L30-L47)
 
 ## 结论
-订单服务提供了完整的订单管理能力，并通过 OpenFeign 与商品服务协作完成库存扣减；同时借助 RabbitMQ 实现了高并发秒杀下单的异步化处理。建议在现有基础上完善幂等、重试与补偿机制，进一步提升系统的健壮性与可观测性。
+订单服务提供了完整的订单管理能力，并通过 OpenFeign 与商品服务协作完成库存扣减；同时借助 RabbitMQ 实现了高并发秒杀下单的异步化处理。**新增的枚举类型机制显著提升了代码的类型安全性和可维护性**。建议在现有基础上完善幂等、重试与补偿机制，进一步提升系统的健壮性与可观测性。
 
 [本节为总结性内容，不涉及具体文件分析]
 
@@ -488,7 +584,11 @@ Common --> SOC
 
 ### 数据模型与表结构
 - 订单实体 Order 字段与 orders 表字段映射一致，包含唯一索引 order_no 及常用查询索引。
+- **新增**：status 字段现在使用 OrderStatus 枚举进行类型安全的管理，通过 OrderStatusTypeHandler 实现自动转换。
 
 章节来源
-- [Order.java:10-41](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java#L10-L41)
+- [Order.java:11-35](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java#L11-L35)
+- [OrderStatus.java:8-48](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L8-L48)
+- [OrderStatusTypeHandler.java:15-40](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatusTypeHandler.java#L15-L40)
+- [OrderMapper.xml:13](file://backend/ecommerce-order/src/main/resources/mapper/OrderMapper.xml#L13)
 - [schema.sql:6-23](file://backend/ecommerce-order/src/main/resources/db/schema.sql#L6-L23)

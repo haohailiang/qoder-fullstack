@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: ""
-title: 电商全栈一体化编排根工程
+title: 电商微服务一体化编排根工程
 scope:
     - README.md
     - .gitignore
