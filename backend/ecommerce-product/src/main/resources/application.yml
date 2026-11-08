@@ -60,3 +60,14 @@ jwt:
 logging:
   level:
     com.ecommerce.product: DEBUG
+
+# Springdoc OpenAPI 配置
+springdoc:
+  api-docs:
+    title: 商品服务 API
+    version: 1.0.0
+    description: 商品 CRUD、ES 搜索、秒杀库存管理等接口
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha

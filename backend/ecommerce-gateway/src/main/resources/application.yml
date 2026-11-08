@@ -66,6 +66,65 @@ spring:
           filters:
             - StripPrefix=1
 
+        # ---- Swagger UI & API Docs 路由 ----
+        # 用户服务 Swagger
+        - id: user-service-swagger-ui
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/user/swagger-ui/**
+          filters:
+            - StripPrefix=1
+        - id: user-service-api-docs
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/user/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        # 商品服务 Swagger
+        - id: product-service-swagger-ui
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/product/swagger-ui/**
+          filters:
+            - StripPrefix=1
+        - id: product-service-api-docs
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/product/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+        # 订单服务 Swagger
+        - id: order-service-swagger-ui
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/order/swagger-ui/**
+          filters:
+            - StripPrefix=1
+        - id: order-service-api-docs
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/order/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
 # JWT 配置（与用户服务保持一致，用于网关解析和校验 Token）
 jwt:
   secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
+
+# Springdoc OpenAPI 配置（网关自身）
+springdoc:
+  api-docs:
+    title: API 网关
+    version: 1.0.0
+    description: 电商平台 API 网关，路由转发至用户、商品、订单等微服务
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: 用户服务
+        url: /api/user/v3/api-docs
+      - name: 商品服务
+        url: /api/product/v3/api-docs
+      - name: 订单服务
+        url: /api/order/v3/api-docs

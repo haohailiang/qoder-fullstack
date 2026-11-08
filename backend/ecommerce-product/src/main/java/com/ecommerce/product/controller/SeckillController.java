@@ -7,6 +7,9 @@ import com.ecommerce.product.entity.Product;
 import com.ecommerce.product.security.TrustedAuthenticationFilter;
 import com.ecommerce.product.service.SeckillStockService;
 import com.ecommerce.product.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +25,7 @@ import static com.ecommerce.product.config.SeckillRabbitConfig.*;
 
 @RestController
 @RequestMapping("/products/seckill")
+@Tag(name = "秒杀管理", description = "秒杀库存管理、抢购等接口")
 public class SeckillController {
 
     private static final Logger log = LoggerFactory.getLogger(SeckillController.class);
@@ -42,8 +46,9 @@ public class SeckillController {
      * 初始化秒杀库存（管理接口，秒杀开始前调用）
      */
     @PostMapping("/init/{productId}")
-    public Result<Void> initStock(@PathVariable Long productId,
-                                  @RequestParam Integer stock) {
+    @Operation(summary = "初始化秒杀库存", description = "管理接口，秒杀开始前调用，初始化指定商品的秒杀库存")
+    public Result<Void> initStock(@Parameter(description = "商品 ID") @PathVariable Long productId,
+                                  @Parameter(description = "库存数量") @RequestParam Integer stock) {
         seckillStockService.initStock(productId, stock);
         log.info("秒杀库存初始化: productId={}, stock={}", productId, stock);
         return Result.success(null);
@@ -54,8 +59,9 @@ public class SeckillController {
      * POST /products/seckill/{productId}?quantity=1
      */
     @PostMapping("/{productId}")
-    public Result<Map<String, Object>> seckill(@PathVariable Long productId,
-                                                @RequestParam(defaultValue = "1") Integer quantity,
+    @Operation(summary = "秒杀抢购", description = "参与指定商品的秒杀活动，扣减库存并生成订单")
+    public Result<Map<String, Object>> seckill(@Parameter(description = "商品 ID") @PathVariable Long productId,
+                                                @Parameter(description = "购买数量") @RequestParam(defaultValue = "1") Integer quantity,
                                                 HttpServletRequest request) {
         // 1. 获取用户信息（从网关注入的请求头）
         Long userId = getUserIdFromHeader(request);
@@ -119,7 +125,8 @@ public class SeckillController {
      * 查询秒杀库存
      */
     @GetMapping("/stock/{productId}")
-    public Result<Integer> getSeckillStock(@PathVariable Long productId) {
+    @Operation(summary = "查询秒杀库存", description = "查询指定商品的秒杀剩余库存")
+    public Result<Integer> getSeckillStock(@Parameter(description = "商品 ID") @PathVariable Long productId) {
         Integer stock = seckillStockService.getStock(productId);
         return Result.success(stock);
     }

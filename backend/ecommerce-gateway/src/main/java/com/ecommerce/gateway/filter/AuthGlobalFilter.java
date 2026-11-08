@@ -56,6 +56,18 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/user/health"
     );
 
+    /** 白名单前缀：匹配这些前缀的路径不需要 JWT 认证（Swagger UI / OpenAPI 文档） */
+    private static final List<String> WHITE_PREFIX_LIST = List.of(
+            "/api/user/swagger-ui",
+            "/api/user/v3/api-docs",
+            "/api/product/swagger-ui",
+            "/api/product/v3/api-docs",
+            "/api/order/swagger-ui",
+            "/api/order/v3/api-docs",
+            "/swagger-ui",
+            "/v3/api-docs"
+    );
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
@@ -134,7 +146,10 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isWhiteListed(String path) {
-        return WHITE_LIST.stream().anyMatch(path::equals);
+        if (WHITE_LIST.stream().anyMatch(path::equals)) {
+            return true;
+        }
+        return WHITE_PREFIX_LIST.stream().anyMatch(path::startsWith);
     }
 
     private Mono<Void> writeErrorResponse(ServerWebExchange exchange, HttpStatus status, Result<Void> body) {

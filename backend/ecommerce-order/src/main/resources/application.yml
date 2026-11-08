@@ -65,3 +65,14 @@ spring.cloud.openfeign:
 logging:
   level:
     com.ecommerce.order: DEBUG
+
+# Springdoc OpenAPI 配置
+springdoc:
+  api-docs:
+    title: 订单服务 API
+    version: 1.0.0
+    description: 订单创建、查询、取消，调用商品服务扣减库存等接口
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha

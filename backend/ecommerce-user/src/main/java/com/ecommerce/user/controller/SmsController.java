@@ -3,6 +3,8 @@ package com.ecommerce.user.controller;
 import com.ecommerce.common.Result;
 import com.ecommerce.user.dto.SmsRecord;
 import com.ecommerce.user.service.SmsService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,6 +21,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/sms")
+@Tag(name = "短信服务", description = "短信发送记录查询接口")
 public class SmsController {
 
     private final SmsService smsService;
@@ -29,6 +32,7 @@ public class SmsController {
 
     /** 查询所有短信发送记录，按发送时间倒序（最新在前） */
     @GetMapping("/records")
+    @Operation(summary = "查询短信发送记录", description = "查询所有短信验证码发送记录，按发送时间倒序")
     public Result<List<SmsRecord>> records() {
         return Result.success(smsService.getRecords());
     }

@@ -84,3 +84,13 @@ sms:
   retry-backoff: linear
   rate-limit-seconds: 60
   code-expire-seconds: 300
+
+# Springdoc OpenAPI 配置
+springdoc:
+  api-docs:
+    title: 用户服务 API
+    description: 用户注册、登录、用户管理、验证码、短信等接口
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
