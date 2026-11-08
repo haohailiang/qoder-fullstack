@@ -5,6 +5,9 @@ import lombok.Data;
 
 /**
  * 登录请求体
+ * <p>
+ * 注意：captchaKey / captchaValue / smsCode 在 admin 用户登录时可为空，
+ * 具体校验逻辑在 {@link com.ecommerce.user.service.impl.AuthServiceImpl#login} 中按用户名区分。
  */
 @Data
 public class LoginRequest {
@@ -15,12 +18,12 @@ public class LoginRequest {
     @NotBlank(message = "密码不能为空")
     private String password;
 
-    @NotBlank(message = "验证码不能为空")
+    /** 图片验证码 key（admin 登录时可为空） */
     private String captchaKey;
 
-    @NotBlank(message = "请输入验证码")
+    /** 图片验证码值（admin 登录时可为空） */
     private String captchaValue;
 
-    @NotBlank(message = "短信验证码不能为空")
+    /** 短信验证码（admin 登录时可为空） */
     private String smsCode;
 }

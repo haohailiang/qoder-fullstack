@@ -35,6 +35,9 @@ public class AuthServiceImpl implements AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
+    /** 管理员用户名：admin 登录时跳过图片验证码和短信验证码校验，简化演示流程 */
+    private static final String ADMIN_USERNAME = "admin";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
@@ -83,16 +86,22 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        // 第一步：校验图片验证码（正确性 / 是否过期 / 是否已被使用）
-        captchaService.validate(request.getCaptchaKey(), request.getCaptchaValue());
+        boolean isAdmin = ADMIN_USERNAME.equalsIgnoreCase(request.getUsername());
+
+        // 第一步：校验图片验证码（admin 用户跳过此步骤）
+        if (!isAdmin) {
+            captchaService.validate(request.getCaptchaKey(), request.getCaptchaValue());
+        }
 
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException(401, "用户名或密码错误：认证标识不存在"));
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException(401, "用户名或密码错误：密码不正确");
         }
-        // 第二步：校验短信验证码（登录场景短信已发往该用户的手机号）
-        smsService.validateCode(user.getPhone(), request.getSmsCode());
+        // 第二步：校验短信验证码（admin 用户跳过此步骤）
+        if (!isAdmin) {
+            smsService.validateCode(user.getPhone(), request.getSmsCode());
+        }
         
         // 第三步：尝试获取分布式锁，防止同一账号并发登录导致会话状态错乱
         if (!redisSessionService.tryAcquireLoginLock(user.getId())) {

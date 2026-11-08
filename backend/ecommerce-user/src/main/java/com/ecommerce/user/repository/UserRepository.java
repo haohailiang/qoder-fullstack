@@ -79,6 +79,11 @@ public class UserRepository {
         userMapper.deleteById(id);
     }
 
+    /** 更新用户主题偏好（dark / light） */
+    public void updateThemePreference(Long id, String themePreference) {
+        userMapper.updateThemePreference(id, themePreference);
+    }
+
     /**
      * 读取当前登录用户标识（JWT 认证后写入 SecurityContext 的 username）；
      * 未认证、匿名访问或系统内部操作时返回 "system"。

@@ -35,6 +35,10 @@ public class DemoDataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        if (userRepository.findByUsername("admin").isEmpty()) {
+            userRepository.save(buildUser("admin", "系统管理员", "admin@ecommerce.com", "13800000000", 35));
+            log.info("已初始化管理员账号: admin");
+        }
         if (userRepository.findByUsername("zhangsan").isEmpty()) {
             userRepository.save(buildUser("zhangsan", "张三", "zhangsan@example.com", "13800000001", 25));
         }

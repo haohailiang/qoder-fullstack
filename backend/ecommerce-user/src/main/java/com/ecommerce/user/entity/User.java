@@ -55,4 +55,7 @@ public class User {
 
     /** 最后修改时间（服务端时间，每次新增/更新都会刷新） */
     private LocalDateTime lastModifiedDate;
+
+    /** 主题偏好：dark（暗黑模式）或 light（亮色模式），默认 dark */
+    private String themePreference;
 }

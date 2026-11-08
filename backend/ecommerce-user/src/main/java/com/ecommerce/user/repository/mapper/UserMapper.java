@@ -37,4 +37,7 @@ public interface UserMapper {
 
     /** 按主键删除用户 */
     int deleteById(@Param("id") Long id);
+
+    /** 更新用户主题偏好 */
+    int updateThemePreference(@Param("id") Long id, @Param("themePreference") String themePreference);
 }

@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_date    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     last_modified_by VARCHAR(100)   COMMENT '最后修改人',
     last_modified_date DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    theme_preference VARCHAR(10)    NOT NULL DEFAULT 'dark' COMMENT '主题偏好：dark/light',
     INDEX idx_username (username),
     INDEX idx_email (email),
     INDEX idx_phone (phone)
