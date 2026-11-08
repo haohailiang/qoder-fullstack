@@ -12,7 +12,8 @@ source_files:
     - backend/ecommerce-order/src/main/java/com/ecommerce/order/OrderApplication.java
     - backend/ecommerce-product/src/main/java/com/ecommerce/product/ProductApplication.java
     - backend/ecommerce-user/src/main/java/com/ecommerce/user/UserApplication.java
-    - backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SecurityConfig.java
+    - backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SecurityConfig.java
+    - backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SecurityConfig.java
     - backend/ecommerce-user/src/test/java/com/ecommerce/user/common/GlobalExceptionHandlerTest.java
 ---
 
@@ -65,7 +66,7 @@ source_files:
 
 ### 3.6 Security 配置中的错误响应
 
-`ecommerce-common/config/SecurityConfig.java` 在 `authorizeRequests` 中为所有业务服务统一配置了 `accessDeniedHandler` 与 `authenticationEntryPoint`，分别返回 `Result.error(403, "access denied")` 与 `Result.error(401, "unauthorized")`，绕过 Spring Security 默认的 HTML 错误页。
+`order/config/SecurityConfig.java` 与 `product/config/SecurityConfig.java` 在 `authorizeRequests` 中为 `/admin/**` 等路径配置了 `accessDeniedHandler` 与 `authenticationEntryPoint`，分别返回 `Result.error(403, "access denied")` 与 `Result.error(401, "unauthorized")`，绕过 Spring Security 默认的 HTML 错误页。
 
 ## 4. 观察到的约定与约束
 

@@ -170,7 +170,7 @@ demo-fullstack/
 - 创建数据库 `demo_fullstack`（utf8mb4）
 - `users` 表 — 用户数据（含审计字段 `created_by / created_date / last_modified_by / last_modified_date`，主题偏好 `theme_preference`）
 - `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`）
-- `orders` 表 — 订单数据（含状态流转 `0待支付 → 1已支付 → 2已发货 → 3已完成 → 4已取消`）
+- `orders` 表 — 订单数据（状态流转使用 `OrderStatus` 枚举：`0待支付 → 1已支付 → 2已发货 → 3已完成 → 4已取消`，MyBatis 通过自定义 TypeHandler 自动转换）
 - 演示数据 — 3 个用户（admin / zhangsan / lisi，密码均为 `123456`）+ 6 个商品（含 3 个秒杀商品）
 
 ```bash
@@ -330,7 +330,7 @@ npm run dev
 | GET | /api/order/orders/{orderNo} | 根据订单号查询订单 | JWT |
 | GET | /api/order/orders | 查询所有订单（管理用） | JWT |
 | POST | /api/order/orders/{orderId}/cancel | 取消订单 | JWT |
-| PUT | /api/order/orders/{orderId}/status | 更新订单状态 | JWT |
+| PUT | /api/order/orders/{orderId}/status | 更新订单状态（参数：0-4） | JWT |
 
 ## 统一响应结构
 

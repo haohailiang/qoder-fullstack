@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: backend
-title: 电商微服务后端（用户/商品/订单/网关）
+title: 电商后端微服务聚合工程
 scope:
     - backend/
 source_files: []

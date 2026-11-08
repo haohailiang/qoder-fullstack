@@ -3,7 +3,8 @@
 <cite>
 **本文引用的文件**   
 - [SeckillMessage.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/SeckillMessage.java)
-- [SeckillRabbitConfig.java（公共模块）](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java)
+- [SeckillRabbitConfig.java（商品服务）](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java)
+- [SeckillRabbitConfig.java（订单服务）](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java)
 - [SeckillOrderConsumer.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java)
 - [SeckillController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java)
 - [application.yml（商品服务）](file://backend/ecommerce-product/src/main/resources/application.yml)
@@ -61,8 +62,8 @@ OAppYml --> RMQ
 
 **图表来源**
 - [SeckillController.java:61-121](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L61-L121)
-- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L57)
-- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L51)
+- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L13-L57)
+- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java#L13-L51)
 - [SeckillOrderConsumer.java:35-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L35-L67)
 - [application.yml（商品服务）:35-42](file://backend/ecommerce-product/src/main/resources/application.yml#L35-L42)
 - [application.yml（订单服务）:26-39](file://backend/ecommerce-order/src/main/resources/application.yml#L26-L39)
@@ -70,8 +71,8 @@ OAppYml --> RMQ
 
 **章节来源**
 - [SeckillMessage.java:1-26](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/SeckillMessage.java#L1-L26)
-- [SeckillRabbitConfig.java（商品服务）:1-59](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L1-L59)
-- [SeckillRabbitConfig.java（订单服务）:1-53](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L1-L53)
+- [SeckillRabbitConfig.java（商品服务）:1-59](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L1-L59)
+- [SeckillRabbitConfig.java（订单服务）:1-53](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java#L1-L53)
 - [SeckillOrderConsumer.java:1-70](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L1-L70)
 - [SeckillController.java:1-149](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L1-L149)
 - [application.yml（商品服务）:1-74](file://backend/ecommerce-product/src/main/resources/application.yml#L1-L74)
@@ -94,9 +95,9 @@ OAppYml --> RMQ
 **章节来源**
 - [SeckillMessage.java:1-26](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/SeckillMessage.java#L1-L26)
 - [SeckillController.java:61-121](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L61-L121)
-- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L57)
+- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L13-L57)
 - [SeckillOrderConsumer.java:35-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L35-L67)
-- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L51)
+- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java#L13-L51)
 - [application.yml（商品服务）:35-42](file://backend/ecommerce-product/src/main/resources/application.yml#L35-L42)
 - [application.yml（订单服务）:26-39](file://backend/ecommerce-order/src/main/resources/application.yml#L26-L39)
 - [docker-compose-infra.yml:74-92](file://docker-compose-infra.yml#L74-L92)
@@ -129,8 +130,8 @@ Note over MQ,OrderSvc : 失败则进入死信队列 seckill.dlx.queue
 **图表来源**
 - [SeckillController.java:61-121](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L61-L121)
 - [SeckillOrderConsumer.java:35-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L35-L67)
-- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L57)
-- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L51)
+- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L13-L57)
+- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java#L13-L51)
 
 ## 详细组件分析
 
@@ -186,7 +187,7 @@ Confirm --> |是| ReturnQueuing["返回排队中状态"]
 
 **章节来源**
 - [SeckillController.java:61-121](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L61-L121)
-- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L57)
+- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L13-L57)
 - [application.yml（商品服务）:35-42](file://backend/ecommerce-product/src/main/resources/application.yml#L35-L42)
 
 ### 消费者实现与消息处理
@@ -238,12 +239,12 @@ DLX["seckill.dlx.exchange<br/>Direct"] --> DLQ["seckill.dlx.queue"]
 ```
 
 **图表来源**
-- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L57)
-- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L51)
+- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L13-L57)
+- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java#L13-L51)
 
 **章节来源**
-- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L57)
-- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/config/SeckillRabbitConfig.java#L13-L51)
+- [SeckillRabbitConfig.java（商品服务）:13-57](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/SeckillRabbitConfig.java#L13-L57)
+- [SeckillRabbitConfig.java（订单服务）:13-51](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/config/SeckillRabbitConfig.java#L13-L51)
 
 ## 依赖关系分析
 - 商品服务依赖：

@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 // ...
 private static final Logger log = LoggerFactory.getLogger(当前类.class);
 ```
-该模式在 GlobalExceptionHandler、AuthGlobalFilter、SeckillOrderConsumer、TrustedAuthenticationFilter（common 模块）、OrderServiceImpl、ProductServiceImpl、SeckillController 等文件中一致出现。
+该模式在 GlobalExceptionHandler、AuthGlobalFilter、SeckillOrderConsumer、TrustedAuthenticationFilter（order/product）、OrderServiceImpl、ProductServiceImpl、SeckillController 等文件中一致出现。
 
 ### 3.2 日志级别策略
 - 业务异常、认证失败、授权拒绝、Token 过期/无效等可预期错误 → `log.warn("...", e.getMessage())`。
