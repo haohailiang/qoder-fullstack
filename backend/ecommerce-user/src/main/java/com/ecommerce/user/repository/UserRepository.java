@@ -84,6 +84,11 @@ public class UserRepository {
         userMapper.updateThemePreference(id, themePreference);
     }
 
+    /** 更新用户语言偏好（zh / en） */
+    public void updateLanguagePreference(Long id, String languagePreference) {
+        userMapper.updateLanguagePreference(id, languagePreference);
+    }
+
     /**
      * 读取当前登录用户标识（JWT 认证后写入 SecurityContext 的 username）；
      * 未认证、匿名访问或系统内部操作时返回 "system"。

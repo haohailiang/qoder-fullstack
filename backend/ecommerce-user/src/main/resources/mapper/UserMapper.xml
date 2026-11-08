@@ -20,11 +20,13 @@
         <result property="lastModifiedBy" column="last_modified_by"/>
         <result property="lastModifiedDate" column="last_modified_date"/>
         <result property="themePreference" column="theme_preference"/>
+        <result property="languagePreference" column="language_preference"/>
     </resultMap>
 
     <sql id="BaseColumns">
         id, username, password, name, email, phone, age,
-        created_by, created_date, last_modified_by, last_modified_date, theme_preference
+        created_by, created_date, last_modified_by, last_modified_date,
+        theme_preference, language_preference
     </sql>
 
     <select id="selectAll" resultMap="UserResultMap">
@@ -62,10 +64,10 @@
             useGeneratedKeys="true" keyProperty="id">
         INSERT INTO users (username, password, name, email, phone, age,
                            created_by, created_date, last_modified_by, last_modified_date,
-                           theme_preference)
+                           theme_preference, language_preference)
         VALUES (#{username}, #{password}, #{name}, #{email}, #{phone}, #{age},
                 #{createdBy}, #{createdDate}, #{lastModifiedBy}, #{lastModifiedDate},
-                COALESCE(#{themePreference}, 'dark'))
+                COALESCE(#{themePreference}, 'dark'), COALESCE(#{languagePreference}, 'zh'))
     </insert>
 
     <!-- 更新时不覆盖 created_by / created_date，仅刷新 last_modified_by / last_modified_date -->
@@ -89,6 +91,12 @@
     <update id="updateThemePreference">
         UPDATE users
         SET theme_preference = #{themePreference}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateLanguagePreference">
+        UPDATE users
+        SET language_preference = #{languagePreference}
         WHERE id = #{id}
     </update>
 

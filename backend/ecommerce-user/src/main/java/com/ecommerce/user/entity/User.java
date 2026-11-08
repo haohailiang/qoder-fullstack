@@ -58,4 +58,7 @@ public class User {
 
     /** 主题偏好：dark（暗黑模式）或 light（亮色模式），默认 dark */
     private String themePreference;
+
+    /** 语言偏好：zh（中文）或 en（英文），默认 zh */
+    private String languagePreference;
 }

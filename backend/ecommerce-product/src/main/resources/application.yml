@@ -65,7 +65,7 @@ logging:
 springdoc:
   api-docs:
     title: 商品服务 API
-    version: 1.0.0
+    version: OPENAPI_3_0
     description: 商品 CRUD、ES 搜索、秒杀库存管理等接口
   swagger-ui:
     path: /swagger-ui.html

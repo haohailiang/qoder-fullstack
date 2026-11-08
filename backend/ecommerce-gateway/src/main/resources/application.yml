@@ -117,7 +117,7 @@ jwt:
 springdoc:
   api-docs:
     title: API 网关
-    version: 1.0.0
+    version: OPENAPI_3_0
     description: 电商平台 API 网关，路由转发至用户、商品、订单等微服务
   swagger-ui:
     path: /swagger-ui.html

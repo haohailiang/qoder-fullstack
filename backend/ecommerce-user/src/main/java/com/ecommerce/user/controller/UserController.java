@@ -106,6 +106,30 @@ public class UserController {
         return Result.success();
     }
 
+    /** 获取当前登录用户的语言偏好 */
+    @GetMapping("/language")
+    @Operation(summary = "获取语言偏好", description = "获取当前登录用户的语言偏好设置（zh/en）")
+    public Result<Map<String, String>> getLanguage(HttpServletRequest request) {
+        Long userId = getUserIdFromHeader(request);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new com.ecommerce.common.BusinessException(404, "用户不存在"));
+        String language = user.getLanguagePreference() != null ? user.getLanguagePreference() : "zh";
+        return Result.success(Map.of("language", language));
+    }
+
+    /** 更新当前登录用户的语言偏好 */
+    @PutMapping("/language")
+    @Operation(summary = "更新语言偏好", description = "更新当前登录用户的语言偏好设置（zh/en）")
+    public Result<Void> updateLanguage(@RequestBody Map<String, String> body, HttpServletRequest request) {
+        Long userId = getUserIdFromHeader(request);
+        String language = body.get("language");
+        if (language == null || (!language.equals("zh") && !language.equals("en"))) {
+            throw new com.ecommerce.common.BusinessException(400, "语言值无效，仅支持 zh 或 en");
+        }
+        userRepository.updateLanguagePreference(userId, language);
+        return Result.success();
+    }
+
     private Long getUserIdFromHeader(HttpServletRequest request) {
         String userIdStr = request.getHeader(TrustedAuthenticationFilter.HEADER_USER_ID);
         if (userIdStr == null) {

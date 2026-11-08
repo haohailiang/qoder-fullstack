@@ -40,4 +40,7 @@ public interface UserMapper {
 
     /** 更新用户主题偏好 */
     int updateThemePreference(@Param("id") Long id, @Param("themePreference") String themePreference);
+
+    /** 更新用户语言偏好 */
+    int updateLanguagePreference(@Param("id") Long id, @Param("languagePreference") String languagePreference);
 }
