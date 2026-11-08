@@ -1,0 +1,71 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ecommerce-gateway
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 192.168.204.128:8848
+    gateway:
+      # 全局默认过滤器：开启跨域感知
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+      # 路由规则：按服务前缀分发
+      routes:
+        # ---- 用户服务 ----
+        - id: user-service-auth
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/user/auth/**
+          filters:
+            - StripPrefix=1
+
+        - id: user-service-users
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/user/users/**
+          filters:
+            - StripPrefix=1
+
+        - id: user-service-sms
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/user/sms/**
+          filters:
+            - StripPrefix=1
+
+        - id: user-service-health
+          uri: http://localhost:8081
+          predicates:
+            - Path=/api/user/health
+          filters:
+            - StripPrefix=1
+
+        # ---- 商品服务 ----
+        - id: product-service
+          uri: http://localhost:8082
+          predicates:
+            - Path=/api/product/**
+          filters:
+            - StripPrefix=1
+
+        # ---- 订单服务 ----
+        - id: order-service
+          uri: http://localhost:8083
+          predicates:
+            - Path=/api/order/**
+          filters:
+            - StripPrefix=1
+
+# JWT 配置（与用户服务保持一致，用于网关解析和校验 Token）
+jwt:
+  secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
