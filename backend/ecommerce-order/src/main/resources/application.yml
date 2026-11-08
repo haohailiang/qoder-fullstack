@@ -1,0 +1,67 @@
+server:
+  port: 8083
+  servlet:
+    context-path: /order
+
+spring:
+  application:
+    name: ecommerce-order
+  datasource:
+    url: jdbc:mysql://192.168.204.128:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: 192.168.204.128
+      port: 6379
+      password:
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+  # RabbitMQ 配置
+  rabbitmq:
+    host: 192.168.204.128
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 1
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 3000
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: 192.168.204.128:8848
+
+# MyBatis 配置
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ecommerce.order.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# JWT 配置
+jwt:
+  secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
+
+# OpenFeign 配置
+spring.cloud.openfeign:
+  client:
+    config:
+      ecommerce-product:
+        connect-timeout: 5000
+        read-timeout: 10000
+
+logging:
+  level:
+    com.ecommerce.order: DEBUG
