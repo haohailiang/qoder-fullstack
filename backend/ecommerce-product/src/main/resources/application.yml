@@ -7,13 +7,13 @@ spring:
   application:
     name: ecommerce-product
   datasource:
-    url: jdbc:mysql://192.168.204.128:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://192.168.178.100:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
-      host: 192.168.204.128
+      host: 192.168.178.100
       port: 6379
       password:
       timeout: 5000ms
@@ -27,13 +27,13 @@ spring:
       repositories:
         enabled: true
   elasticsearch:
-    uris: http://192.168.204.128:9200
+    uris: http://192.168.178.100:9200
     enabled: true
     username:
     password:
   # RabbitMQ 配置
   rabbitmq:
-    host: 192.168.204.128
+    host: 192.168.178.100
     port: 5672
     username: guest
     password: guest
@@ -44,7 +44,7 @@ spring:
     nacos:
       discovery:
         enabled: true
-        server-addr: 192.168.204.128:8848
+        server-addr: 192.168.178.100:8848
 
 # MyBatis 配置
 mybatis:

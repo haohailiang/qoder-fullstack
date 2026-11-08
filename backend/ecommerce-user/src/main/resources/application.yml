@@ -9,7 +9,7 @@ spring:
     name: ecommerce-user
   datasource:
     # MySQL 连接配置：本地开发前请先按 README「数据库初始化」小节创建 demo_fullstack 库并执行 db/schema.sql
-    url: jdbc:mysql://192.168.204.128:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://192.168.178.100:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     # 占位示例值，本地开发请替换为自己的 MySQL 密码，不要将真实密码提交到仓库
     password: root
@@ -17,7 +17,7 @@ spring:
   # Redis 配置：用于存储用户会话Token，实现单设备登录（互踢/挤下线）机制
   data:
     redis:
-      host: 192.168.204.128
+      host: 192.168.178.100
       port: 6379
       password:  # 无密码
       timeout: 5000ms
@@ -37,7 +37,7 @@ spring:
     nacos:
       discovery:
         enabled: true
-        server-addr: 192.168.204.128:8848
+        server-addr: 192.168.178.100:8848
 
 # MyBatis 配置：SQL 统一写在 classpath:mapper/*.xml；
 # map-underscore-to-camel-case 作为兜底，用户表下划线字段主要依赖 UserMapper.xml 中的 resultMap 显式映射
