@@ -1,0 +1,15 @@
+schema_version: 1
+module_path: ""
+title: 电商全栈微服务工程（根编排）
+scope:
+    - README.md
+    - .gitignore
+    - docker-compose.yml
+    - docker-compose-infra.yml
+    - package.json
+    - package-lock.json
+    - vm-ssh.js
+    - init-sql/
+source_files: []
+depends_on: []
+related_to: []

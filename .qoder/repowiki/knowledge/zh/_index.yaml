@@ -1,0 +1,45 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: main
+nodes_managed: true
+exported_at: "2026-11-08T12:46:21Z"
+modules:
+    "":
+        dir_name: 电商全栈微服务工程（根编排）
+        title: 电商全栈微服务工程（根编排）
+        scope:
+            - README.md
+            - .gitignore
+            - docker-compose.yml
+            - docker-compose-infra.yml
+            - package.json
+            - package-lock.json
+            - vm-ssh.js
+            - init-sql/
+        source_files: []
+        children:
+            - backend
+            - frontend
+        depends_on: []
+        related_to: []
+    backend:
+        dir_name: 电商微服务后端（Spring Cloud + Nacos）
+        title: 电商微服务后端（Spring Cloud + Nacos）
+        scope:
+            - backend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: frontend
+    frontend:
+        dir_name: 微前端前端应用集合（Vue 主应用 + React_原生子应用）
+        title: 微前端前端应用集合（Vue 主应用 + React/原生子应用）
+        scope:
+            - frontend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend
