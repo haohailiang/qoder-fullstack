@@ -3,7 +3,7 @@ package com.ecommerce.user.controller;
 import com.ecommerce.common.Result;
 import com.ecommerce.user.entity.User;
 import com.ecommerce.user.repository.UserRepository;
-import com.ecommerce.user.security.TrustedAuthenticationFilter;
+import com.ecommerce.common.security.TrustedAuthenticationFilter;
 import com.ecommerce.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

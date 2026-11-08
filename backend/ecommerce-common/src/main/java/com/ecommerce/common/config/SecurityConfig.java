@@ -1,7 +1,7 @@
-package com.ecommerce.user.config;
+package com.ecommerce.common.config;
 
 import com.ecommerce.common.Result;
-import com.ecommerce.user.security.TrustedAuthenticationFilter;
+import com.ecommerce.common.security.TrustedAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
@@ -12,16 +12,16 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.io.IOException;
 
 /**
- * User service security config.
- * Auth is handled by the gateway; this service trusts gateway-provided headers.
+ * 业务服务统一安全配置。
+ *
+ * <p>网关已完成 JWT 校验，各业务服务信任网关请求头，因此放行所有请求，
+ * 仅通过 {@link TrustedAuthenticationFilter} 从请求头提取用户身份写入 SecurityContext。
  */
 @Configuration
 @EnableWebSecurity
@@ -34,11 +34,6 @@ public class SecurityConfig {
                           ObjectMapper objectMapper) {
         this.trustedAuthenticationFilter = trustedAuthenticationFilter;
         this.objectMapper = objectMapper;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 
     @Bean
@@ -66,6 +61,6 @@ public class SecurityConfig {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        objectMapper.writeValue(response.getWriter(), body);
+        response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }

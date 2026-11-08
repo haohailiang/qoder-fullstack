@@ -4,7 +4,7 @@ import com.ecommerce.common.BusinessException;
 import com.ecommerce.common.Result;
 import com.ecommerce.common.SeckillMessage;
 import com.ecommerce.product.entity.Product;
-import com.ecommerce.product.security.TrustedAuthenticationFilter;
+import com.ecommerce.common.security.TrustedAuthenticationFilter;
 import com.ecommerce.product.service.SeckillStockService;
 import com.ecommerce.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.ecommerce.product.config.SeckillRabbitConfig.*;
+import static com.ecommerce.common.config.SeckillRabbitConfig.*;
 
 @RestController
 @RequestMapping("/products/seckill")

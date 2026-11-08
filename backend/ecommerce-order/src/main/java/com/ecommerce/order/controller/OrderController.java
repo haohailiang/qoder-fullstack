@@ -2,7 +2,7 @@ package com.ecommerce.order.controller;
 
 import com.ecommerce.common.Result;
 import com.ecommerce.order.entity.Order;
-import com.ecommerce.order.security.TrustedAuthenticationFilter;
+import com.ecommerce.common.security.TrustedAuthenticationFilter;
 import com.ecommerce.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

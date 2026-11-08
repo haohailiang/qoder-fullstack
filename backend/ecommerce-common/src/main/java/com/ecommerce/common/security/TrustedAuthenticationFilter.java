@@ -1,4 +1,4 @@
-package com.ecommerce.order.security;
+package com.ecommerce.common.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,6 +15,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * 可信认证过滤器：从网关传入的请求头中提取用户信息并设置到 SecurityContext。
+ *
+ * <p>网关（ecommerce-gateway）已完成 JWT 签名/有效期校验及 Redis 会话校验，
+ * 各业务服务信任网关传入的 X-User-Id 和 X-User-Name 请求头。
+ */
 @Component
 public class TrustedAuthenticationFilter extends OncePerRequestFilter {
 

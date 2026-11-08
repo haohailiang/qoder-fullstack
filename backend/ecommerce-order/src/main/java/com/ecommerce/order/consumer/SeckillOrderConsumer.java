@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import static com.ecommerce.order.config.SeckillRabbitConfig.SECKILL_QUEUE;
+import static com.ecommerce.common.config.SeckillRabbitConfig.SECKILL_QUEUE;
 
 /**
  * 秒杀订单消费者：监听秒杀队列，异步创建订单

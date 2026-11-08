@@ -1,11 +1,14 @@
-package com.ecommerce.product.config;
+package com.ecommerce.common.config;
 
 import org.springframework.amqp.core.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * RabbitMQ 秒杀队列配置
+ * RabbitMQ 秒杀队列统一配置
+ * <p>
+ * 定义秒杀场景所需的交换机、队列、绑定关系及死信队列，
+ * 由商品服务（生产者）和订单服务（消费者）共同依赖。
  */
 @Configuration
 public class SeckillRabbitConfig {
@@ -16,24 +19,6 @@ public class SeckillRabbitConfig {
     public static final String SECKILL_DLX_EXCHANGE = "seckill.dlx.exchange";
     public static final String SECKILL_DLX_QUEUE = "seckill.dlx.queue";
     public static final String SECKILL_DLX_ROUTING_KEY = "seckill.dlx";
-
-    /** 死信交换机 */
-    @Bean
-    public DirectExchange seckillDlxExchange() {
-        return new DirectExchange(SECKILL_DLX_EXCHANGE, true, false);
-    }
-
-    /** 死信队列 */
-    @Bean
-    public Queue seckillDlxQueue() {
-        return QueueBuilder.durable(SECKILL_DLX_QUEUE).build();
-    }
-
-    /** 死信队列绑定到死信交换机 */
-    @Bean
-    public Binding seckillDlxBinding(Queue seckillDlxQueue, DirectExchange seckillDlxExchange) {
-        return BindingBuilder.bind(seckillDlxQueue).to(seckillDlxExchange).with(SECKILL_DLX_ROUTING_KEY);
-    }
 
     /** 秒杀交换机（Direct 类型） */
     @Bean
@@ -54,5 +39,23 @@ public class SeckillRabbitConfig {
     @Bean
     public Binding seckillBinding(Queue seckillQueue, DirectExchange seckillExchange) {
         return BindingBuilder.bind(seckillQueue).to(seckillExchange).with(SECKILL_ROUTING_KEY);
+    }
+
+    /** 死信交换机 */
+    @Bean
+    public DirectExchange seckillDlxExchange() {
+        return new DirectExchange(SECKILL_DLX_EXCHANGE, true, false);
+    }
+
+    /** 死信队列 */
+    @Bean
+    public Queue seckillDlxQueue() {
+        return QueueBuilder.durable(SECKILL_DLX_QUEUE).build();
+    }
+
+    /** 死信队列绑定到死信交换机 */
+    @Bean
+    public Binding seckillDlxBinding(Queue seckillDlxQueue, DirectExchange seckillDlxExchange) {
+        return BindingBuilder.bind(seckillDlxQueue).to(seckillDlxExchange).with(SECKILL_DLX_ROUTING_KEY);
     }
 }
