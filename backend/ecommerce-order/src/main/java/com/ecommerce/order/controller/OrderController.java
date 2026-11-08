@@ -2,6 +2,7 @@ package com.ecommerce.order.controller;
 
 import com.ecommerce.common.Result;
 import com.ecommerce.order.entity.Order;
+import com.ecommerce.order.entity.enums.OrderStatus;
 import com.ecommerce.common.security.TrustedAuthenticationFilter;
 import com.ecommerce.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,9 +66,14 @@ public class OrderController {
 
     /** 更新订单状态 */
     @PutMapping("/{orderId}/status")
-    @Operation(summary = "更新订单状态", description = "管理接口，更新指定订单的状态")
-    public Result<Void> updateStatus(@Parameter(description = "订单 ID") @PathVariable Long orderId, @Parameter(description = "目标状态") @RequestParam Integer status) {
-        orderService.updateOrderStatus(orderId, status);
+    @Operation(summary = "更新订单状态", description = "管理接口，更新指定订单的状态。状态值：0-待支付，1-已支付，2-已发货，3-已完成，4-已取消")
+    public Result<Void> updateStatus(@Parameter(description = "订单 ID") @PathVariable Long orderId,
+                                     @Parameter(description = "目标状态（0-4）") @RequestParam Integer status) {
+        OrderStatus orderStatus = OrderStatus.fromCode(status);
+        if (orderStatus == null) {
+            throw new com.ecommerce.common.BusinessException(400, "无效的订单状态值: " + status);
+        }
+        orderService.updateOrderStatus(orderId, orderStatus);
         return Result.success(null);
     }
 

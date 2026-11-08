@@ -1,6 +1,7 @@
 package com.ecommerce.order.service;
 
 import com.ecommerce.order.entity.Order;
+import com.ecommerce.order.entity.enums.OrderStatus;
 
 import java.util.List;
 
@@ -22,7 +23,7 @@ public interface OrderService {
     void cancelOrder(Long orderId, Long userId);
 
     /** 更新订单状态 */
-    void updateOrderStatus(Long orderId, Integer status);
+    void updateOrderStatus(Long orderId, OrderStatus status);
 
     /** 查询所有订单（管理用） */
     List<Order> getAllOrders();

@@ -3,6 +3,7 @@ package com.ecommerce.order.service.impl;
 import com.ecommerce.common.BusinessException;
 import com.ecommerce.order.client.ProductClient;
 import com.ecommerce.order.entity.Order;
+import com.ecommerce.order.entity.enums.OrderStatus;
 import com.ecommerce.order.repository.OrderRepository;
 import com.ecommerce.order.service.OrderService;
 import org.slf4j.Logger;
@@ -35,7 +36,7 @@ public class OrderServiceImpl implements OrderService {
         String orderNo = generateOrderNo();
         order.setOrderNo(orderNo);
         order.setUserId(userId);
-        order.setStatus(0); // 待支付
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setCreatedDate(LocalDateTime.now());
         order.setUpdatedDate(LocalDateTime.now());
 
@@ -89,19 +90,19 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getUserId().equals(userId)) {
             throw new BusinessException(403, "无权操作此订单");
         }
-        if (order.getStatus() != 0) {
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new BusinessException(400, "当前订单状态不可取消");
         }
-        orderRepository.updateStatus(orderId, 4); // 4=已取消
+        orderRepository.updateStatus(orderId, OrderStatus.CANCELLED);
         log.info("订单已取消: orderId={}, orderNo={}", orderId, order.getOrderNo());
         // TODO: Phase 3 通过 MQ 通知商品服务恢复库存
     }
 
     @Override
-    public void updateOrderStatus(Long orderId, Integer status) {
+    public void updateOrderStatus(Long orderId, OrderStatus status) {
         getOrderById(orderId);
         orderRepository.updateStatus(orderId, status);
-        log.info("订单状态更新: orderId={}, newStatus={}", orderId, status);
+        log.info("订单状态更新: orderId={}, newStatus={}", orderId, status.getDescription());
     }
 
     @Override

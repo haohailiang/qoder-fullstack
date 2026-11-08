@@ -1,5 +1,6 @@
 package com.ecommerce.order.entity;
 
+import com.ecommerce.order.entity.enums.OrderStatus;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,15 +24,8 @@ public class Order {
     private Integer quantity;
     /** 订单总金额 */
     private BigDecimal totalAmount;
-    /**
-     * 订单状态：
-     * 0 - 待支付
-     * 1 - 已支付
-     * 2 - 已发货
-     * 3 - 已完成
-     * 4 - 已取消
-     */
-    private Integer status;
+    /** 订单状态 */
+    private OrderStatus status;
     /** 收货地址 */
     private String address;
     /** 备注 */

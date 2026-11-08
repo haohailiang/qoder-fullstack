@@ -3,6 +3,7 @@ package com.ecommerce.order.consumer;
 import com.ecommerce.common.SeckillMessage;
 import com.ecommerce.order.client.ProductClient;
 import com.ecommerce.order.entity.Order;
+import com.ecommerce.order.entity.enums.OrderStatus;
 import com.ecommerce.order.repository.OrderRepository;
 import com.ecommerce.order.service.OrderService;
 import org.slf4j.Logger;
@@ -50,7 +51,7 @@ public class SeckillOrderConsumer {
             order.setProductName("秒杀商品-" + message.getProductId());
             order.setQuantity(message.getQuantity());
             order.setTotalAmount(BigDecimal.ZERO); // 秒杀价格由商品服务计算
-            order.setStatus(1); // 已支付（秒杀直接标记已支付）
+            order.setStatus(OrderStatus.PAID); // 已支付（秒杀直接标记已支付）
             order.setAddress("");
             order.setRemark("秒杀订单");
             order.setCreatedDate(LocalDateTime.now());

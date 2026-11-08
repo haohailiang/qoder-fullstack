@@ -1,6 +1,7 @@
 package com.ecommerce.order.repository.mapper;
 
 import com.ecommerce.order.entity.Order;
+import com.ecommerce.order.entity.enums.OrderStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -17,7 +18,7 @@ public interface OrderMapper {
 
     int insert(Order order);
 
-    int updateStatus(@Param("id") Long id, @Param("status") Integer status);
+    int updateStatus(@Param("id") Long id, @Param("status") OrderStatus status);
 
     List<Order> selectAll();
 }

@@ -1,6 +1,7 @@
 package com.ecommerce.order.repository;
 
 import com.ecommerce.order.entity.Order;
+import com.ecommerce.order.entity.enums.OrderStatus;
 import com.ecommerce.order.repository.mapper.OrderMapper;
 import org.springframework.stereotype.Repository;
 
@@ -32,7 +33,7 @@ public class OrderRepository {
         return order;
     }
 
-    public int updateStatus(Long id, Integer status) {
+    public int updateStatus(Long id, OrderStatus status) {
         return orderMapper.updateStatus(id, status);
     }
 

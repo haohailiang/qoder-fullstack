@@ -10,7 +10,7 @@
         <result property="productName" column="product_name"/>
         <result property="quantity" column="quantity"/>
         <result property="totalAmount" column="total_amount"/>
-        <result property="status" column="status"/>
+        <result property="status" column="status" typeHandler="com.ecommerce.order.entity.enums.OrderStatusTypeHandler"/>
         <result property="address" column="address"/>
         <result property="remark" column="remark"/>
         <result property="createdDate" column="created_date"/>
@@ -39,11 +39,11 @@
         INSERT INTO orders (order_no, user_id, product_id, product_name, quantity, total_amount,
                             status, address, remark, created_date, updated_date)
         VALUES (#{orderNo}, #{userId}, #{productId}, #{productName}, #{quantity}, #{totalAmount},
-                #{status}, #{address}, #{remark}, #{createdDate}, #{updatedDate})
+                #{status,typeHandler=com.ecommerce.order.entity.enums.OrderStatusTypeHandler}, #{address}, #{remark}, #{createdDate}, #{updatedDate})
     </insert>
 
     <update id="updateStatus">
-        UPDATE orders SET status = #{status}, updated_date = NOW() WHERE id = #{id}
+        UPDATE orders SET status = #{status,typeHandler=com.ecommerce.order.entity.enums.OrderStatusTypeHandler}, updated_date = NOW() WHERE id = #{id}
     </update>
 
     <select id="selectAll" resultMap="OrderResultMap">
