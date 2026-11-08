@@ -3,6 +3,9 @@ import { onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getCaptcha, register, sendSmsCode } from '@/api/auth'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 /** 与后端 sms.rate-limit-seconds 保持一致的倒计时秒数，防止重复发送 */
 const SMS_COUNTDOWN_SECONDS = 60
@@ -51,9 +54,9 @@ function startCountdown() {
 
 function validateConfirmPassword(_rule: unknown, value: string, callback: (error?: Error) => void) {
   if (!value) {
-    callback(new Error('请再次输入密码'))
+    callback(new Error(t('register.confirmPasswordRequired')))
   } else if (value !== form.password) {
-    callback(new Error('确认密码与密码不一致'))
+    callback(new Error(t('register.confirmPasswordMismatch')))
   } else {
     callback()
   }
@@ -61,26 +64,26 @@ function validateConfirmPassword(_rule: unknown, value: string, callback: (error
 
 const rules: FormRules = {
   username: [
-    { required: true, message: '请输入认证标识（用户名）', trigger: 'blur' },
-    { min: 3, max: 32, message: '认证标识长度需在 3-32 个字符之间', trigger: 'blur' },
+    { required: true, message: t('register.usernameRequired'), trigger: 'blur' },
+    { min: 3, max: 32, message: t('register.usernameLength'), trigger: 'blur' },
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 64, message: '密码长度需在 6-64 个字符之间', trigger: 'blur' },
+    { required: true, message: t('register.passwordRequired'), trigger: 'blur' },
+    { min: 6, max: 64, message: t('register.passwordLength'), trigger: 'blur' },
   ],
   confirmPassword: [{ required: true, validator: validateConfirmPassword, trigger: 'blur' }],
-  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  name: [{ required: true, message: t('register.nameRequired'), trigger: 'blur' }],
   email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] },
+    { required: true, message: t('register.emailRequired'), trigger: 'blur' },
+    { type: 'email', message: t('register.emailInvalid'), trigger: ['blur', 'change'] },
   ],
   phone: [
-    { required: true, message: '请输入手机号', trigger: 'blur' },
-    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: ['blur', 'change'] },
+    { required: true, message: t('register.phoneRequired'), trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: t('register.phoneInvalid'), trigger: ['blur', 'change'] },
   ],
-  age: [{ required: true, message: '请输入年龄', trigger: 'blur' }],
-  captchaValue: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
-  smsCode: [{ required: true, message: '请输入短信验证码', trigger: 'blur' }],
+  age: [{ required: true, message: t('register.ageRequired'), trigger: 'blur' }],
+  captchaValue: [{ required: true, message: t('register.captchaRequired'), trigger: 'blur' }],
+  smsCode: [{ required: true, message: t('register.smsCodeRequired'), trigger: 'blur' }],
 }
 
 async function refreshCaptcha() {
@@ -101,11 +104,11 @@ async function refreshCaptcha() {
 async function handleSendSmsCode() {
   if (countdown.value > 0 || sending.value) return
   if (!/^1[3-9]\d{9}$/.test(form.phone)) {
-    ElMessage.warning('请先输入正确的手机号')
+    ElMessage.warning(t('register.enterCorrectPhone'))
     return
   }
   if (!form.captchaValue) {
-    ElMessage.warning('请先输入图片验证码')
+    ElMessage.warning(t('register.enterCaptcha'))
     return
   }
   sending.value = true
@@ -115,7 +118,7 @@ async function handleSendSmsCode() {
       captchaKey: captchaKey.value,
       captchaValue: form.captchaValue,
     })
-    ElMessage.success('短信验证码已发送')
+    ElMessage.success(t('register.smsSent'))
     startCountdown()
     // 图片验证码一次性使用，发送成功后自动刷新
     await refreshCaptcha()
@@ -135,10 +138,10 @@ async function handleRegister() {
   loading.value = true
   try {
     await register({ ...form, captchaKey: captchaKey.value })
-    ElMessage.success('注册成功，请登录')
+    ElMessage.success(t('register.registerSuccess'))
     router.push('/login')
   } catch {
-    // 错误提示已在 axios 响应拦截器中统一处理（如“认证标识已存在”“验证码错误或已过期”）
+    // 错误提示已在 axios 响应拦截器中统一处理（如"认证标识已存在""验证码错误或已过期"）
     // 验证码为一次性使用，失败后自动刷新，允许用户重新输入
     await refreshCaptcha()
   } finally {
@@ -161,78 +164,78 @@ onUnmounted(() => {
     <el-card shadow="always" class="auth-card">
       <template #header>
         <div class="auth-header">
-          <span class="auth-title">用户注册</span>
+          <span class="auth-title">{{ t('register.title') }}</span>
           <el-link type="primary" :underline="false" @click="router.push('/login')">
-            已有账号？去登录
+            {{ t('register.goLogin') }}
           </el-link>
         </div>
       </template>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
-        <el-form-item label="认证标识" prop="username">
-          <el-input v-model="form.username" placeholder="登录用的用户名，3-32 个字符" />
+        <el-form-item :label="t('register.username')" prop="username">
+          <el-input v-model="form.username" :placeholder="t('register.usernamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="form.password" type="password" placeholder="至少 6 位" show-password />
+        <el-form-item :label="t('register.password')" prop="password">
+          <el-input v-model="form.password" type="password" :placeholder="t('register.passwordPlaceholder')" show-password />
         </el-form-item>
-        <el-form-item label="确认密码" prop="confirmPassword">
+        <el-form-item :label="t('register.confirmPassword')" prop="confirmPassword">
           <el-input
             v-model="form.confirmPassword"
             type="password"
-            placeholder="请再次输入密码"
+            :placeholder="t('register.confirmPasswordPlaceholder')"
             show-password
           />
         </el-form-item>
-        <el-form-item label="姓名" prop="name">
-          <el-input v-model="form.name" placeholder="请输入姓名" />
+        <el-form-item :label="t('register.name')" prop="name">
+          <el-input v-model="form.name" :placeholder="t('register.namePlaceholder')" />
         </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="请输入邮箱" />
+        <el-form-item :label="t('register.email')" prop="email">
+          <el-input v-model="form.email" :placeholder="t('register.emailPlaceholder')" />
         </el-form-item>
-        <el-form-item label="手机号" prop="phone">
-          <el-input v-model="form.phone" placeholder="用于接收短信验证码" />
+        <el-form-item :label="t('register.phone')" prop="phone">
+          <el-input v-model="form.phone" :placeholder="t('register.phonePlaceholder')" />
         </el-form-item>
-        <el-form-item label="年龄" prop="age">
+        <el-form-item :label="t('register.age')" prop="age">
           <el-input-number v-model="form.age" :min="0" :max="150" />
         </el-form-item>
-        <el-form-item label="验证码" prop="captchaValue">
+        <el-form-item :label="t('register.captcha')" prop="captchaValue">
           <div class="captcha-row">
-            <el-input v-model="form.captchaValue" placeholder="请输入验证码" />
+            <el-input v-model="form.captchaValue" :placeholder="t('register.captchaPlaceholder')" />
             <el-image
               v-if="captchaImage"
               :src="captchaImage"
               class="captcha-image"
-              alt="点击刷新验证码"
+              :alt="t('login.captchaAlt')"
               fit="fill"
               @click="refreshCaptcha"
             />
             <el-link v-else type="primary" :underline="false" @click="refreshCaptcha">
-              获取验证码
+              {{ t('login.getCaptcha') }}
             </el-link>
           </div>
         </el-form-item>
-        <el-form-item label="短信验证码" prop="smsCode">
+        <el-form-item :label="t('register.smsCode')" prop="smsCode">
           <div class="sms-row">
-            <el-input v-model="form.smsCode" placeholder="请输入短信验证码" />
+            <el-input v-model="form.smsCode" :placeholder="t('register.smsCodePlaceholder')" />
             <el-button
               class="sms-send-btn"
               :disabled="countdown > 0"
               :loading="sending"
               @click="handleSendSmsCode"
             >
-              {{ countdown > 0 ? `重新发送(${countdown}s)` : '发送验证码' }}
+              {{ countdown > 0 ? t('register.resend', { seconds: countdown }) : t('register.sendSms') }}
             </el-button>
           </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" class="auth-submit" :loading="loading" @click="handleRegister">
-            注册
+            {{ t('register.submit') }}
           </el-button>
         </el-form-item>
       </el-form>
 
-      <div class="auth-tip">先输入手机号与图片验证码点「发送验证码」（演示短信默认关闭，验证码可在用户管理页查看）</div>
-      <div class="auth-tip">点击图片可刷新验证码</div>
+      <div class="auth-tip">{{ t('register.tipSms') }}</div>
+      <div class="auth-tip">{{ t('register.tipRefresh') }}</div>
     </el-card>
   </div>
 </template>

@@ -2,6 +2,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { clearAuth, getToken } from '@/utils/auth'
+import i18n from '@/i18n'
 
 /** 后端统一响应结构 */
 export interface ApiResult<T = unknown> {
@@ -51,8 +52,8 @@ request.interceptors.response.use(
   (response) => {
     const result = response.data as ApiResult
     if (result.code !== 200) {
-      ElMessage.error(result.message || '请求失败')
-      return Promise.reject(new Error(result.message || '请求失败'))
+      ElMessage.error(result.message || i18n.global.t('common.requestFailed'))
+      return Promise.reject(new Error(result.message || i18n.global.t('common.requestFailed')))
     }
     return result.data as unknown as typeof response
   },
@@ -66,15 +67,15 @@ request.interceptors.response.use(
       
       // 业务码 40101 表示账号在其他设备登录，已被迫下线
       if (code === 40101) {
-        handleKickOut(message || '您的账号已在其他设备登录，您已被迫下线')
+        handleKickOut(message || i18n.global.t('common.kickedOut'))
         return Promise.reject(error)
       }
       
       // 普通的 Token 无效/过期/未授权
-      handleAuthFailure(message || (status === 401 ? '登录已失效，请重新登录' : '未授权访问，请先登录'))
+      handleAuthFailure(message || (status === 401 ? i18n.global.t('common.loginExpired') : i18n.global.t('common.unauthorized')))
       return Promise.reject(error)
     }
-    ElMessage.error(error.message || '网络错误，请稍后重试')
+    ElMessage.error(error.message || i18n.global.t('common.networkError'))
     return Promise.reject(error)
   },
 )

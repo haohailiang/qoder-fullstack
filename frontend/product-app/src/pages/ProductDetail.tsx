@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Card, Button, Tag, Space, InputNumber, message, Descriptions, Divider } from 'antd'
+import { Card, Button, Tag, Space, InputNumber, message, Divider } from 'antd'
 import { ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useParams, useNavigate } from 'react-router-dom'
 
@@ -20,6 +21,7 @@ interface Product {
 }
 
 function ProductDetail() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [product, setProduct] = useState<Product | null>(null)
@@ -43,7 +45,7 @@ function ProductDetail() {
         setProduct(response.data.data)
       }
     } catch (error) {
-      message.error('获取商品详情失败')
+      message.error(t('product.detailFailed'))
     }
   }
 
@@ -65,11 +67,11 @@ function ProductDetail() {
         }
       )
       if (response.data.code === 200) {
-        message.success('下单成功！')
+        message.success(t('product.buySuccess'))
         navigate('/order/my')
       }
     } catch (error: any) {
-      message.error(error?.response?.data?.message || '下单失败')
+      message.error(error?.response?.data?.message || t('product.buyFailed'))
     } finally {
       setLoading(false)
     }
@@ -89,11 +91,11 @@ function ProductDetail() {
       )
       if (response.data.code === 200) {
         const result = response.data.data
-        message.success(result.message || '抢购成功，排队中...')
+        message.success(result.message || t('product.seckillSuccess'))
         navigate(`/order/detail/${result.orderNo}`)
       }
     } catch (error: any) {
-      message.error(error?.response?.data?.message || '抢购失败')
+      message.error(error?.response?.data?.message || t('product.seckillFailed'))
     } finally {
       setLoading(false)
     }
@@ -138,12 +140,12 @@ function ProductDetail() {
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 24, marginBottom: 12 }}>
               {product.name}
-              {product.isSeckill === 1 && <Tag color="red" style={{ marginLeft: 8 }}>秒杀</Tag>}
+              {product.isSeckill === 1 && <Tag color="red" style={{ marginLeft: 8 }}>{t('product.seckill')}</Tag>}
             </h1>
             <p style={{ color: 'var(--ant-color-text-secondary, #666)', marginBottom: 16 }}>{product.description}</p>
             <Divider />
             <div style={{ marginBottom: 16 }}>
-              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>价格:</span>
+              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>{t('product.price')}:</span>
               {isSeckillActive ? (
                 <Space>
                   <span style={{ color: 'var(--ant-color-error, #f5222d)', fontSize: 28, fontWeight: 'bold' }}>
@@ -160,16 +162,16 @@ function ProductDetail() {
               )}
             </div>
             <div style={{ marginBottom: 16 }}>
-              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>库存:</span>
+              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>{t('product.stock')}:</span>
               <span>{product.stock}</span>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>分类:</span>
-              <Tag>{product.category || '未分类'}</Tag>
+              <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>{t('product.category')}:</span>
+              <Tag>{product.category || t('product.uncategorized')}</Tag>
             </div>
             <Divider />
             <Space>
-              <span>数量:</span>
+              <span>{t('product.quantity')}:</span>
               <InputNumber min={1} max={product.stock} value={quantity} onChange={(v) => setQuantity(v || 1)} />
             </Space>
             <div style={{ marginTop: 24 }}>
@@ -182,7 +184,7 @@ function ProductDetail() {
                   onClick={handleSeckill}
                   loading={loading}
                 >
-                  立即抢购
+                  {t('product.seckillNow')}
                 </Button>
               ) : (
                 <Button
@@ -192,11 +194,11 @@ function ProductDetail() {
                   onClick={handleBuy}
                   loading={loading}
                 >
-                  立即购买
+                  {t('product.buyNow')}
                 </Button>
               )}
               <Button size="large" onClick={() => navigate(-1)} style={{ marginLeft: 12 }}>
-                返回
+                {t('product.back')}
               </Button>
             </div>
           </div>

@@ -38,6 +38,14 @@ renderWithQiankun({
         appInstance.render()
       }
     }
+    // 接收基座应用的语言状态
+    if (props?.lang) {
+      localStorage.setItem('demo_lang', props.lang)
+      // 重新渲染以应用新语言
+      if (appInstance) {
+        appInstance.render()
+      }
+    }
   },
 })
 

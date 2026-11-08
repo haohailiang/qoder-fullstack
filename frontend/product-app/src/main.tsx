@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { renderWithQiankun, qiankunWindow } from 'vite-plugin-qiankun/dist/helper'
+import i18n from './i18n'
 
 // 判断是否在 qiankun 环境中运行
 function render(props: any = {}) {
@@ -42,6 +43,13 @@ renderWithQiankun({
       localStorage.setItem('demo_theme', props.theme)
       // 触发 storage 事件让 App 组件重新读取
       window.dispatchEvent(new Event('storage'))
+    }
+    // 接收基座应用的语言状态
+    if (props?.lang) {
+      localStorage.setItem('demo_lang', props.lang)
+      if (i18n.language !== props.lang) {
+        i18n.changeLanguage(props.lang)
+      }
     }
   },
 })

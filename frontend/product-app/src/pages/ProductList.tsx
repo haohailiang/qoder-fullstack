@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Card, Input, Select, Button, List, Tag, Space, InputNumber, message } from 'antd'
+import { Card, Input, Select, Button, List, Tag, Space, message } from 'antd'
 import { SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 
@@ -18,6 +19,7 @@ interface Product {
 }
 
 function ProductList() {
+  const { t } = useTranslation()
   const [products, setProducts] = useState<Product[]>([])
   const [keyword, setKeyword] = useState('')
   const [category, setCategory] = useState<string | undefined>(undefined)
@@ -44,7 +46,7 @@ function ProductList() {
         setProducts(response.data.data || [])
       }
     } catch (error) {
-      message.error('获取商品列表失败')
+      message.error(t('product.fetchFailed'))
     } finally {
       setLoading(false)
     }
@@ -65,10 +67,10 @@ function ProductList() {
   return (
     <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <Card title="商品中心" style={{ marginBottom: 16 }}>
+        <Card title={t('product.title')} style={{ marginBottom: 16 }}>
         <Space wrap>
           <Input
-            placeholder="搜索商品名称或描述"
+            placeholder={t('product.searchPlaceholder')}
             prefix={<SearchOutlined />}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -76,20 +78,20 @@ function ProductList() {
             onPressEnter={handleSearch}
           />
           <Select
-            placeholder="选择分类"
+            placeholder={t('product.categoryPlaceholder')}
             value={category}
             onChange={setCategory}
             style={{ width: 150 }}
             allowClear
             options={[
-              { label: '电子产品', value: 'electronics' },
-              { label: '服装', value: 'clothing' },
-              { label: '食品', value: 'food' },
-              { label: '图书', value: 'books' },
+              { label: t('product.categoryElectronics'), value: 'electronics' },
+              { label: t('product.categoryClothing'), value: 'clothing' },
+              { label: t('product.categoryFood'), value: 'food' },
+              { label: t('product.categoryBooks'), value: 'books' },
             ]}
           />
           <Button type="primary" onClick={handleSearch}>
-            搜索
+            {t('product.search')}
           </Button>
         </Space>
       </Card>
@@ -117,7 +119,7 @@ function ProductList() {
               }
               actions={[
                 <Button type="link" onClick={() => handleDetail(item.id)}>
-                  查看详情
+                  {t('product.viewDetail')}
                 </Button>,
               ]}
             >
@@ -125,7 +127,7 @@ function ProductList() {
                 title={
                   <Space>
                     {item.name}
-                    {item.isSeckill === 1 && <Tag color="red">秒杀</Tag>}
+                    {item.isSeckill === 1 && <Tag color="red">{t('product.seckill')}</Tag>}
                   </Space>
                 }
                 description={item.description?.substring(0, 50) + (item.description?.length > 50 ? '...' : '')}
@@ -140,7 +142,7 @@ function ProductList() {
                   </span>
                 )}
                 <span style={{ float: 'right', color: 'var(--ant-color-text-tertiary, #999)' }}>
-                  库存: {item.stock}
+                  {t('product.stock')}: {item.stock}
                 </span>
               </div>
             </Card>

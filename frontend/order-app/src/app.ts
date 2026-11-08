@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { t } from './i18n'
 
 interface Order {
   id: number
@@ -46,18 +47,18 @@ export class OrderApp {
       <div style="min-height: 100vh; padding: 24px; background: ${pageBg};">
         <div style="max-width: 1200px; margin: 0 auto;">
           <div style="background: ${bgColor}; border-radius: 8px; padding: 24px; margin-bottom: 16px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
-            <h2 style="margin: 0 0 16px 0; color: ${textColor};">订单管理</h2>
+            <h2 style="margin: 0 0 16px 0; color: ${textColor};">${t('order.title')}</h2>
             <div style="display: flex; gap: 12px; margin-bottom: 0;">
               <button id="btn-my-orders" style="padding: 8px 16px; background: ${btnPrimaryBg}; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
-                我的订单
+                ${t('order.myOrders')}
               </button>
               <button id="btn-all-orders" style="padding: 8px 16px; background: ${btnDefaultBg}; color: ${btnDefaultText}; border: 1px solid ${btnDefaultBorder}; border-radius: 4px; cursor: pointer;">
-                全部订单
+                ${t('order.allOrders')}
               </button>
             </div>
           </div>
           <div id="order-content" style="background: ${bgColor}; border-radius: 8px; padding: 24px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
-            <div style="text-align: center; color: ${secondaryText}; padding: 40px;">加载中...</div>
+            <div style="text-align: center; color: ${secondaryText}; padding: 40px;">${t('order.loading')}</div>
           </div>
         </div>
       </div>
@@ -109,7 +110,7 @@ export class OrderApp {
         this.renderOrderList()
       }
     } catch (error) {
-      this.renderError('获取订单列表失败')
+      this.renderError(t('order.fetchFailed'))
     } finally {
       this.loading = false
     }
@@ -127,7 +128,7 @@ export class OrderApp {
         this.renderOrderList()
       }
     } catch (error) {
-      this.renderError('获取订单列表失败')
+      this.renderError(t('order.fetchFailed'))
     } finally {
       this.loading = false
     }
@@ -144,33 +145,33 @@ export class OrderApp {
     const headerBg = isDark ? '#2a2a2a' : '#fafafa'
 
     if (this.orders.length === 0) {
-      content.innerHTML = `<div style="text-align: center; color: ${secondaryText}; padding: 40px;">暂无订单数据</div>`
+      content.innerHTML = `<div style="text-align: center; color: ${secondaryText}; padding: 40px;">${t('order.empty')}</div>`
       return
     }
 
-    const statusMap: Record<number, { text: string; color: string }> = {
-      0: { text: '待支付', color: '#faad14' },
-      1: { text: '已支付', color: '#52c41a' },
-      2: { text: '已发货', color: '#1890ff' },
-      3: { text: '已完成', color: '#52c41a' },
-      4: { text: '已取消', color: '#999' },
+    const statusMap: Record<number, { textKey: string; color: string }> = {
+      0: { textKey: 'order.statusPending', color: '#faad14' },
+      1: { textKey: 'order.statusPaid', color: '#52c41a' },
+      2: { textKey: 'order.statusShipped', color: '#1890ff' },
+      3: { textKey: 'order.statusCompleted', color: '#52c41a' },
+      4: { textKey: 'order.statusCancelled', color: '#999' },
     }
 
     content.innerHTML = `
       <table style="width: 100%; border-collapse: collapse; color: ${textColor};">
         <thead>
           <tr style="background: ${headerBg}; border-bottom: 1px solid ${borderColor};">
-            <th style="padding: 12px; text-align: left;">订单号</th>
-            <th style="padding: 12px; text-align: left;">商品</th>
-            <th style="padding: 12px; text-align: center;">数量</th>
-            <th style="padding: 12px; text-align: right;">金额</th>
-            <th style="padding: 12px; text-align: center;">状态</th>
-            <th style="padding: 12px; text-align: center;">操作</th>
+            <th style="padding: 12px; text-align: left;">${t('order.colOrderNo')}</th>
+            <th style="padding: 12px; text-align: left;">${t('order.colProduct')}</th>
+            <th style="padding: 12px; text-align: center;">${t('order.colQuantity')}</th>
+            <th style="padding: 12px; text-align: right;">${t('order.colAmount')}</th>
+            <th style="padding: 12px; text-align: center;">${t('order.colStatus')}</th>
+            <th style="padding: 12px; text-align: center;">${t('order.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           ${this.orders.map(order => {
-            const status = statusMap[order.status] || { text: '未知', color: '#999' }
+            const status = statusMap[order.status] || { textKey: 'order.statusUnknown', color: '#999' }
             return `
               <tr style="border-bottom: 1px solid ${borderColor};">
                 <td style="padding: 12px;">${order.orderNo}</td>
@@ -179,16 +180,16 @@ export class OrderApp {
                 <td style="padding: 12px; text-align: right;">¥${order.totalAmount}</td>
                 <td style="padding: 12px; text-align: center;">
                   <span style="color: ${status.color}; padding: 2px 8px; background: ${status.color}15; border-radius: 4px;">
-                    ${status.text}
+                    ${t(status.textKey)}
                   </span>
                 </td>
                 <td style="padding: 12px; text-align: center;">
                   <button class="btn-detail" data-id="${order.id}" style="color: #1890ff; background: none; border: none; cursor: pointer;">
-                    详情
+                    ${t('order.detail')}
                   </button>
                   ${order.status === 0 ? `
                     <button class="btn-cancel" data-id="${order.id}" style="color: #ff4d4f; background: none; border: none; cursor: pointer; margin-left: 8px;">
-                      取消
+                      ${t('order.cancel')}
                     </button>
                   ` : ''}
                 </td>
@@ -230,32 +231,36 @@ export class OrderApp {
     const btnDefaultBorder = isDark ? '#555' : '#d9d9d9'
 
     const statusMap: Record<number, string> = {
-      0: '待支付', 1: '已支付', 2: '已发货', 3: '已完成', 4: '已取消',
+      0: t('order.statusPending'),
+      1: t('order.statusPaid'),
+      2: t('order.statusShipped'),
+      3: t('order.statusCompleted'),
+      4: t('order.statusCancelled'),
     }
 
     content.innerHTML = `
       <div style="color: ${textColor};">
         <button id="btn-back" style="margin-bottom: 16px; padding: 6px 12px; background: ${btnDefaultBg}; color: ${textColor}; border: 1px solid ${btnDefaultBorder}; border-radius: 4px; cursor: pointer;">
-          ← 返回列表
+          ${t('order.backToList')}
         </button>
-        <h3 style="margin-bottom: 16px;">订单详情</h3>
+        <h3 style="margin-bottom: 16px;">${t('order.orderDetail')}</h3>
         <div style="display: grid; grid-template-columns: 120px 1fr; gap: 12px;">
-          <span style="color: ${secondaryText};">订单号:</span>
+          <span style="color: ${secondaryText};">${t('order.detailOrderNo')}</span>
           <span>${order.orderNo}</span>
-          <span style="color: ${secondaryText};">商品名称:</span>
+          <span style="color: ${secondaryText};">${t('order.detailProduct')}</span>
           <span>${order.productName || '-'}</span>
-          <span style="color: ${secondaryText};">购买数量:</span>
+          <span style="color: ${secondaryText};">${t('order.detailQuantity')}</span>
           <span>${order.quantity}</span>
-          <span style="color: ${secondaryText};">订单金额:</span>
+          <span style="color: ${secondaryText};">${t('order.detailAmount')}</span>
           <span style="color: #f5222d; font-weight: bold;">¥${order.totalAmount}</span>
-          <span style="color: ${secondaryText};">订单状态:</span>
-          <span>${statusMap[order.status] || '未知'}</span>
-          <span style="color: ${secondaryText};">收货地址:</span>
+          <span style="color: ${secondaryText};">${t('order.detailStatus')}</span>
+          <span>${statusMap[order.status] || t('order.statusUnknown')}</span>
+          <span style="color: ${secondaryText};">${t('order.detailAddress')}</span>
           <span>${order.address || '-'}</span>
-          <span style="color: ${secondaryText};">备注:</span>
+          <span style="color: ${secondaryText};">${t('order.detailRemark')}</span>
           <span>${order.remark || '-'}</span>
-          <span style="color: ${secondaryText};">创建时间:</span>
-          <span>${order.createdDate ? new Date(order.createdDate).toLocaleString('zh-CN') : '-'}</span>
+          <span style="color: ${secondaryText};">${t('order.detailCreated')}</span>
+          <span>${order.createdDate ? new Date(order.createdDate).toLocaleString() : '-'}</span>
         </div>
       </div>
     `
@@ -265,7 +270,7 @@ export class OrderApp {
   }
 
   private async cancelOrder(id: number) {
-    if (!confirm('确定要取消此订单吗？')) return
+    if (!confirm(t('order.confirmCancel'))) return
 
     try {
       const token = this.getToken()
@@ -273,11 +278,11 @@ export class OrderApp {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (response.data.code === 200) {
-        alert('订单已取消')
+        alert(t('order.cancelSuccess'))
         await this.loadOrders()
       }
     } catch (error) {
-      alert('取消订单失败')
+      alert(t('order.cancelFailed'))
     }
   }
 

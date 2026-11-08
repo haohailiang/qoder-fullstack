@@ -1,6 +1,7 @@
 import { registerMicroApps, start, initGlobalState, MicroAppStateActions } from 'qiankun'
 import { getToken, currentUserRef } from '@/utils/auth'
 import { getTheme, themeRef } from '@/utils/theme'
+import { getLang, langRef } from '@/utils/lang'
 import { watch } from 'vue'
 
 // 全局状态管理器
@@ -8,6 +9,7 @@ const initialState = {
   token: getToken(),
   user: currentUserRef.value,
   theme: getTheme(),
+  lang: getLang(),
 }
 
 export const globalActions: MicroAppStateActions = initGlobalState(initialState)
@@ -22,6 +24,11 @@ watch(themeRef, (newTheme) => {
   globalActions.setGlobalState({ theme: newTheme })
 })
 
+// 监听语言变化，同步到子应用
+watch(langRef, (newLang) => {
+  globalActions.setGlobalState({ lang: newLang })
+})
+
 // 子应用配置
 const apps = [
   {
@@ -33,6 +40,7 @@ const apps = [
       getToken,
       globalActions,
       getTheme,
+      getLang,
     },
   },
   {
@@ -44,6 +52,7 @@ const apps = [
       getToken,
       globalActions,
       getTheme,
+      getLang,
     },
   },
 ]

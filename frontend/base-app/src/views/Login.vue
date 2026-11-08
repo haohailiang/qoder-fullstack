@@ -6,6 +6,10 @@ import { Lock, Message, Picture, User } from '@element-plus/icons-vue'
 import { getCaptcha, login, sendSmsCode } from '@/api/auth'
 import { setAuth } from '@/utils/auth'
 import { setTheme, type ThemeMode } from '@/utils/theme'
+import { useI18n } from 'vue-i18n'
+import { setLang, type Lang } from '@/utils/lang'
+
+const { t } = useI18n()
 
 /** 与后端 sms.rate-limit-seconds 保持一致的倒计时秒数，防止重复发送 */
 const SMS_COUNTDOWN_SECONDS = 60
@@ -55,16 +59,16 @@ function startCountdown() {
 
 /** 表单校验规则：admin 用户无需验证码和短信，动态移除对应必填校验 */
 const rules = computed<FormRules>(() => ({
-  username: [{ required: true, message: '请输入认证标识（用户名）', trigger: 'blur' }],
+  username: [{ required: true, message: t('login.usernameRequired'), trigger: 'blur' }],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度至少 6 位', trigger: 'blur' },
+    { required: true, message: t('login.passwordRequired'), trigger: 'blur' },
+    { min: 6, message: t('login.passwordMin'), trigger: 'blur' },
   ],
   ...(isAdmin.value
     ? {}
     : {
-        captchaValue: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
-        smsCode: [{ required: true, message: '请输入短信验证码', trigger: 'blur' }],
+        captchaValue: [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }],
+        smsCode: [{ required: true, message: t('login.smsCodeRequired'), trigger: 'blur' }],
       }),
 }))
 
@@ -94,11 +98,11 @@ async function refreshCaptcha() {
 async function handleSendSmsCode() {
   if (countdown.value > 0 || sending.value) return
   if (!form.username) {
-    ElMessage.warning('请先输入认证标识（用户名）')
+    ElMessage.warning(t('login.enterUsername'))
     return
   }
   if (!form.captchaValue) {
-    ElMessage.warning('请先输入图片验证码')
+    ElMessage.warning(t('login.enterCaptcha'))
     return
   }
   sending.value = true
@@ -108,7 +112,7 @@ async function handleSendSmsCode() {
       captchaKey: captchaKey.value,
       captchaValue: form.captchaValue,
     })
-    ElMessage.success('短信验证码已发送')
+    ElMessage.success(t('login.smsSent'))
     startCountdown()
     // 图片验证码一次性使用，发送成功后自动刷新
     await refreshCaptcha()
@@ -138,7 +142,11 @@ async function handleLogin() {
     if (result.user.themePreference) {
       await setTheme(result.user.themePreference as ThemeMode)
     }
-    ElMessage.success('登录成功')
+    // 登录成功后从用户数据中读取语言偏好并应用
+    if (result.user.languagePreference) {
+      await setLang(result.user.languagePreference as Lang)
+    }
+    ElMessage.success(t('login.loginSuccess'))
     // 支持路由守卫记录的 redirect 参数，默认跳用户管理页
     const redirect = route.query.redirect as string | undefined
     router.push(redirect || '/users')
@@ -168,9 +176,9 @@ onUnmounted(() => {
     <el-card shadow="always" class="auth-card">
       <template #header>
         <div class="auth-header">
-          <span class="auth-title">用户登录</span>
+          <span class="auth-title">{{ t('login.title') }}</span>
           <el-link type="primary" :underline="false" @click="router.push('/register')">
-            还没有账号？去注册
+            {{ t('login.goRegister') }}
           </el-link>
         </div>
       </template>
@@ -179,7 +187,7 @@ onUnmounted(() => {
         <el-form-item prop="username">
           <el-input
             v-model="form.username"
-            placeholder="认证标识（用户名）"
+            :placeholder="t('login.usernamePlaceholder')"
             :prefix-icon="User"
             clearable
           />
@@ -188,7 +196,7 @@ onUnmounted(() => {
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="密码"
+            :placeholder="t('login.passwordPlaceholder')"
             :prefix-icon="Lock"
             show-password
           />
@@ -197,7 +205,7 @@ onUnmounted(() => {
           <div class="captcha-row">
             <el-input
               v-model="form.captchaValue"
-              placeholder="验证码"
+              :placeholder="t('login.captchaPlaceholder')"
               :prefix-icon="Picture"
               @keyup.enter="handleLogin"
             />
@@ -205,12 +213,12 @@ onUnmounted(() => {
               v-if="captchaImage"
               :src="captchaImage"
               class="captcha-image"
-              alt="点击刷新验证码"
+              :alt="t('login.captchaAlt')"
               fit="fill"
               @click="refreshCaptcha"
             />
             <el-link v-else type="primary" :underline="false" @click="refreshCaptcha">
-              获取验证码
+              {{ t('login.getCaptcha') }}
             </el-link>
           </div>
         </el-form-item>
@@ -218,7 +226,7 @@ onUnmounted(() => {
           <div class="sms-row">
             <el-input
               v-model="form.smsCode"
-              placeholder="短信验证码"
+              :placeholder="t('login.smsCodePlaceholder')"
               :prefix-icon="Message"
               @keyup.enter="handleLogin"
             />
@@ -228,21 +236,21 @@ onUnmounted(() => {
               :loading="sending"
               @click="handleSendSmsCode"
             >
-              {{ countdown > 0 ? `重新发送(${countdown}s)` : '发送短信验证码' }}
+              {{ countdown > 0 ? t('login.resend', { seconds: countdown }) : t('login.sendSms') }}
             </el-button>
           </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" class="auth-submit" :loading="loading" @click="handleLogin">
-            登录
+            {{ t('login.submit') }}
           </el-button>
         </el-form-item>
       </el-form>
 
-      <div class="auth-tip">管理员账号：admin / 123456（无需验证码，直接登录）</div>
-      <div class="auth-tip">演示账号：zhangsan / 123456（或 lisi / 123456）</div>
-      <div class="auth-tip" v-if="!isAdmin">先输入图片验证码点「发送短信验证码」（演示短信默认关闭，验证码可在用户管理页查看）</div>
-      <div class="auth-tip" v-if="!isAdmin">点击图片可刷新验证码</div>
+      <div class="auth-tip">{{ t('login.tipAdmin') }}</div>
+      <div class="auth-tip">{{ t('login.tipDemo') }}</div>
+      <div class="auth-tip" v-if="!isAdmin">{{ t('login.tipSms') }}</div>
+      <div class="auth-tip" v-if="!isAdmin">{{ t('login.tipRefresh') }}</div>
     </el-card>
   </div>
 </template>

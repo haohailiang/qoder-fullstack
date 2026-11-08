@@ -12,6 +12,8 @@ export interface User {
   age: number
   /** 主题偏好：dark（暗黑模式）或 light（亮色模式），登录后由后端返回 */
   themePreference?: string
+  /** 语言偏好：zh（中文）或 en（英文），登录后由后端返回 */
+  languagePreference?: string
 }
 
 /** 查询用户列表 */

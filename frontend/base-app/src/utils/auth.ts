@@ -26,6 +26,8 @@ export interface AuthUserInfo {
   age: number
   /** 主题偏好：dark（暗黑模式）或 light（亮色模式） */
   themePreference?: string
+  /** 语言偏好：zh（中文）或 en（英文） */
+  languagePreference?: string
 }
 
 function readStoredUser(): AuthUserInfo | null {
