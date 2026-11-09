@@ -17,6 +17,7 @@ modules:
             - package-lock.json
             - vm-ssh.js
             - init-sql/
+            - frontend/e2e/
         source_files: []
         children:
             - backend

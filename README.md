@@ -10,7 +10,7 @@
   - `ecommerce-order` — 订单服务（订单 CRUD / 秒杀订单异步消费 / OpenFeign 调用商品服务）
 - **frontend/**：基于 qiankun 微前端框架，拆分为 3 个子应用
   - `base-app` — Vue 3 + TypeScript + Vite + Element Plus，主应用（登录 / 注册 / 用户管理 / 子应用容器 / 全局主题切换）
-  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀 / 暗黑模式适配）
+  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀 / 暗黑模式适配 / 用户行为埋点）
   - `order-app` — 原生 TypeScript + Vite + Axios，订单子应用（我的订单 / 全部订单 / 订单详情 / 暗黑模式适配）
 
 ## 架构概览
@@ -77,7 +77,8 @@ demo-fullstack/
 │   │       │   ├── entity/                   # User 实体（含审计字段 + 主题偏好字段）
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
 │   │       │   ├── config/                   # UserSecurityConfig（PasswordEncoder）
-│   │       │   └── security/                 # JWT 工具与认证过滤器
+│   │       │   ├── security/                 # JWT 工具与认证过滤器
+│   │       │   └── test/                     # JUnit 5 单元测试（9 个测试类）
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8081，context-path /user
 │   │           ├── db/schema.sql             # MySQL 建表 SQL（users 表）
@@ -91,6 +92,7 @@ demo-fullstack/
 │   │       │   ├── repository/               # MyBatis Mapper 访问层
 │   │       │   ├── elasticsearch/            # ES 商品文档与 Repository
 │   │       │   ├── config/                   # Redis / ES 配置
+│   │       │   └── test/                     # JUnit 5 单元测试（4 个测试类）
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8082，context-path /product
 │   │           ├── db/schema.sql             # 商品表建表 SQL
@@ -106,6 +108,7 @@ demo-fullstack/
 │   │       │   ├── client/                   # ProductClient（OpenFeign 调用商品服务）
 │   │       │   ├── consumer/                 # SeckillOrderConsumer（RabbitMQ 秒杀消息消费者）
 │   │       │   ├── config/                   # 无（安全配置已由 common 模块统一提供）
+│   │       │   └── test/                     # JUnit 5 单元测试（5 个测试类）
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8083，context-path /order
 │   │           ├── db/schema.sql             # 订单表建表 SQL
@@ -123,32 +126,52 @@ demo-fullstack/
 │   │   │   ├── api/                          # axios 封装 + 认证 / 用户 / 短信接口
 │   │   │   ├── router/                       # vue-router（含子应用路由占位）
 │   │   │   ├── utils/                        # 令牌与登录用户状态管理 + 主题管理 (theme.ts)
+│   │   │   ├── __tests__/                    # Vitest 单元测试（api / router / utils）
 │   │   │   └── views/
 │   │   │       ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证 + 登录后同步主题）
 │   │   │       ├── Register.vue              # 注册页（手机号 + 图片验证码 + 短信验证码两步验证）
 │   │   │       ├── UserManage.vue            # 用户管理页面（增删改查 + 短信发送记录查看）
 │   │   │       └── SubAppPlaceholder.vue     # 子应用容器占位组件
 │   │   ├── vite.config.ts                    # Vite 配置（/api 代理到网关 8080）
+│   │   ├── vitest.config.ts                  # Vitest 单元测试配置
 │   │   └── package.json
 │   ├── product-app/                          # 商品子应用（React 18 + Ant Design）
 │   │   ├── src/
 │   │   │   ├── main.tsx                      # 入口（qiankun 生命周期导出 + 独立运行支持 + 主题同步）
 │   │   │   ├── App.tsx                       # 根组件（React Router + Ant Design ConfigProvider 暗黑/亮色主题）
+│   │   │   ├── utils/
+│   │   │   │   └── tracker.ts                # 前端埋点工具（页面访问 / 商品曝光 / 交互点击）
+│   │   │   ├── __tests__/                    # Vitest 单元测试（utils/tracker）
 │   │   │   └── pages/
-│   │   │       ├── ProductList.tsx           # 商品列表页
+│   │   │       ├── ProductList.tsx           # 商品列表页（含 IntersectionObserver 曝光埋点）
 │   │   │       └── ProductDetail.tsx         # 商品详情页（含秒杀入口）
 │   │   ├── vite.config.ts                    # Vite 配置（端口 7100，/api 代理到网关 8080）
+│   │   ├── vitest.config.ts                  # Vitest 单元测试配置
 │   │   └── package.json
-│   └── order-app/                            # 订单子应用（原生 TypeScript）
-│       ├── src/
-│       │   ├── main.ts                       # 入口（qiankun 生命周期导出 + 独立运行支持 + 主题同步）
-│       │   └── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消 / 暗黑模式颜色适配）
-│       ├── vite.config.ts                    # Vite 配置（端口 7200，/api 代理到网关 8080）
+│   ├── order-app/                            # 订单子应用（原生 TypeScript）
+│   │   ├── src/
+│   │   │   ├── main.ts                       # 入口（qiankun 生命周期导出 + 独立运行支持 + 主题同步）
+│   │   │   └── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消 / 暗黑模式颜色适配）
+│   │   ├── __tests__/                        # Vitest 单元测试（app / i18n）
+│   │   ├── vite.config.ts                    # Vite 配置（端口 7200，/api 代理到网关 8080）
+│   │   ├── vitest.config.ts                  # Vitest 单元测试配置
+│   │   └── package.json
+│   └── e2e/                                  # Playwright 端到端测试
+│       ├── fixtures/test-data.ts             # 测试数据夹具
+│       ├── helpers.ts                        # 通用测试辅助工具
+│       ├── mocks/                            # MSW 接口 Mock（auth / order / product / user）
+│       ├── login.spec.ts                     # 登录流程 E2E 测试
+│       ├── product-search.spec.ts            # 商品搜索 E2E 测试
+│       ├── order-flow.spec.ts                # 订单流程 E2E 测试
+│       ├── micro-frontend.spec.ts            # 微前端加载 E2E 测试
+│       ├── theme-sync.spec.ts                # 主题同步 E2E 测试
+│       ├── playwright.config.ts              # Playwright 配置（自动启动三个子应用 dev server）
 │       └── package.json
 ├── init-sql/
 │   └── 01-init-database.sql                  # 数据库初始化脚本（建库 + 建表 + 演示数据）
 ├── docker-compose.yml                        # 全栈 Docker 编排（基础设施 + 后端微服务 + 前端子应用）
 ├── docker-compose-infra.yml                  # 仅基础设施 Docker 编排（MySQL / Redis / Nacos / RabbitMQ / ES）
+├── package.json                              # 根 package.json（npm workspaces 统一管理前端测试脚本）
 └── vm-ssh.js                                 # 远程服务器 SSH 工具脚本
 ```
 
@@ -252,6 +275,8 @@ cd frontend/product-app && npm install
 cd frontend/order-app && npm install
 ```
 
+> 也可在 `frontend/` 根目录使用 npm workspaces 统一安装：`npm install`（需先在根 `package.json` 中配置 workspaces）
+
 ### 2. 启动子应用（先启动子应用，再启动主应用）
 
 ```bash
@@ -279,6 +304,75 @@ npm run dev
 - 主应用访问地址：http://localhost:5173
 - 开发代理：各子应用均将 `/api` 前缀请求转发到 `http://localhost:8080`（API 网关）
 - 微前端：主应用通过 qiankun 注册商品 / 订单子应用，路由 `/product/**` 和 `/order/**` 自动加载对应子应用
+
+## 测试
+
+项目已建立覆盖前后端的完整测试体系，包含单元测试与端到端测试。
+
+### 前端单元测试（Vitest）
+
+三个前端子应用均集成 Vitest 测试框架，配合各技术栈的测试工具：
+
+| 子应用 | 测试工具 | 测试目录 |
+|--------|---------|----------|
+| base-app | Vitest + @vue/test-utils + jsdom | `frontend/base-app/src/__tests__/` |
+| product-app | Vitest + @testing-library/react + jsdom | `frontend/product-app/src/__tests__/` |
+| order-app | Vitest + jsdom | `frontend/order-app/src/__tests__/` |
+
+运行命令：
+
+```bash
+# 运行所有子应用的单元测试
+npm run test:unit
+
+# 运行单个子应用的单元测试
+npm run test:unit:base      # base-app
+npm run test:unit:product   # product-app
+npm run test:unit:order     # order-app
+
+# 监听模式（开发时推荐）
+cd frontend/base-app && npm run test:watch
+```
+
+### 端到端测试（Playwright）
+
+`frontend/e2e/` 目录提供基于 Playwright 的 E2E 测试，覆盖核心业务流程：
+
+| 测试文件 | 覆盖场景 |
+|---------|----------|
+| `login.spec.ts` | 登录流程（验证码 → 短信 → JWT） |
+| `product-search.spec.ts` | 商品搜索与列表展示 |
+| `order-flow.spec.ts` | 订单创建与状态流转 |
+| `micro-frontend.spec.ts` | qiankun 子应用加载与切换 |
+| `theme-sync.spec.ts` | 全局主题同步（暗黑/亮色） |
+
+运行命令：
+
+```bash
+# 运行 E2E 测试（自动启动三个子应用 dev server）
+npm run test:e2e
+
+# 打开 Playwright UI 模式（可视化调试）
+npm run test:e2e:ui
+```
+
+### 后端单元测试（JUnit 5）
+
+三个业务微服务均提供 JUnit 5 单元测试，覆盖 controller、service、repository、entity 各层：
+
+| 微服务 | 测试类数量 | 主要测试内容 |
+|--------|-----------|--------------|
+| ecommerce-user | 9 个测试类 | 认证控制器、用户控制器、验证码/短信服务、全局异常处理 |
+| ecommerce-product | 4 个测试类 | 商品控制器、商品服务、秒杀库存服务、仓储层 |
+| ecommerce-order | 5 个测试类 | 订单控制器、订单服务、订单状态枚举、Feign 客户端、仓储层 |
+
+运行命令：
+
+```bash
+cd backend
+./mvnw test                           # 运行所有模块测试
+./mvnw test -pl ecommerce-user        # 运行单个模块测试
+```
 
 ## API 一览
 
@@ -514,3 +608,6 @@ spring:
 - **前端 Element Plus / Ant Design**：均采用完整引入方式（简单可靠）；生产环境可改用按需引入插件优化包体积。
 - **Swagger API 文档**：各微服务集成 `springdoc-openapi`（网关用 `webflux-ui`，业务服务用 `webmvc-ui`），网关聚合所有下游服务文档，Swagger 路径已加入鉴权白名单。
 - **全局主题切换**：默认暗黑模式，支持亮色/暗黑切换，主题偏好通过数据库持久化；Element Plus 通过 `class="dark"` + CSS 变量适配，Ant Design 通过 `ConfigProvider` 主题算法切换，原生 HTML 子应用通过 CSS 变量 + 主题感知颜色适配。
+- **前端测试体系**：三个子应用均使用 Vitest 进行单元测试，E2E 测试使用 Playwright 覆盖登录、商品搜索、订单流程、微前端加载、主题同步等核心场景；根 `package.json` 提供统一测试脚本（`test:unit` / `test:e2e` / `test:all`）。
+- **后端测试体系**：三个业务微服务均提供 JUnit 5 单元测试，覆盖 controller / service / repository / entity 各层，使用 Mockito 隔离依赖。
+- **前端埋点**：product-app 内置 `tracker.ts` 埋点工具，支持页面访问（PageView）、商品曝光（ItemExpose，基于 IntersectionObserver）、交互点击（Click）三类事件，上报批处理异步发送，异常静默捕获。

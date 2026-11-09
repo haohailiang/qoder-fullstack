@@ -8,6 +8,7 @@
 - [package.json](file://frontend/product-app/package.json)
 - [ProductList.tsx](file://frontend/product-app/src/pages/ProductList.tsx)
 - [ProductDetail.tsx](file://frontend/product-app/src/pages/ProductDetail.tsx)
+- [tracker.ts](file://frontend/product-app/src/utils/tracker.ts)
 - [i18n/index.ts](file://frontend/product-app/src/i18n/index.ts)
 - [i18n/zh.ts](file://frontend/product-app/src/i18n/zh.ts)
 - [i18n/en.ts](file://frontend/product-app/src/i18n/en.ts)
@@ -21,6 +22,8 @@
 - 添加了完整的中英文翻译资源文件
 - 完善了微前端环境下的语言状态同步机制
 - 更新了所有页面组件以使用新的国际化系统
+- **新增** 内置 `src/utils/tracker.ts` 前端埋点工具，支持页面访问、商品曝光、交互点击三类事件
+- **新增** 商品列表页集成 IntersectionObserver 实现商品曝光埋点，并添加页面访问与点击埋点
 
 ## 目录
 1. [简介](#简介)
@@ -47,12 +50,15 @@
 product-app 是一个独立的 Vite + React 工程，作为 qiankun 子应用运行。关键目录与职责如下：
 - src/main.tsx：qiankun 生命周期入口，负责渲染 App 与处理 update 时的主题/语言同步
 - src/App.tsx：React 根组件，提供 Ant Design 主题与语言上下文，定义 /list 与 /detail/:id 路由
-- src/pages/ProductList.tsx：商品列表页，支持关键词与分类筛选，调用后端搜索接口
+- src/pages/ProductList.tsx：商品列表页，支持关键词与分类筛选，调用后端搜索接口，集成曝光埋点
 - src/pages/ProductDetail.tsx：商品详情页，展示详情、价格、库存，支持普通购买与秒杀下单
+- src/utils/tracker.ts：前端埋点工具，支持 PageView / ItemExpose / Click 三类事件，异步批处理上报
 - src/i18n/index.ts：i18next 初始化与语言持久化
 - src/i18n/zh.ts：中文翻译资源文件
 - src/i18n/en.ts：英文翻译资源文件
+- src/__tests__/：Vitest 单元测试文件
 - vite.config.ts：qiankun 插件、开发代理、别名等构建配置
+- vitest.config.ts：Vitest 单元测试配置
 - package.json：依赖声明，包含 react、antd、axios、react-router-dom、i18next 等
 
 ```mermaid
@@ -247,12 +253,18 @@ DynamicSwitch --> AntDLocale["Ant Design语言包切换"]
 - 筛选与展示
   - 提供关键词输入框与分类下拉框，点击搜索按钮或回车触发查询
   - 使用 Ant Design List 网格布局展示商品卡片，显示名称、描述摘要、价格（含秒杀价）、库存
-  - 点击"查看详情"跳转到 /detail/:id
+  - 每个商品卡片通过 `data-product-id`、`data-product-name`、`data-is-seckill` 属性标记，供埋点采集
+  - 点击“查看详情”触发 Click 埋点后跳转到 /detail/:id
   - 所有界面文本使用 t() 函数进行国际化
+- 埋点集成
+  - 页面首次加载完成后触发 PageView 埋点，携带商品数量信息
+  - 通过 IntersectionObserver 监听商品卡片可视区域，当卡片 50% 以上进入视口时触发 ItemExpose 埋点
+  - 使用 `exposedSet` (Set 结构) 记录已曝光商品 ID，避免重复上报
+  - 点击“查看详情”时触发 Click 埋点，记录商品 ID 与操作类型
 - 分页处理
   - 当前实现为全量拉取并前端展示，未实现服务端分页；如需分页，可在 params 中增加 page/size 字段，并在后端配合分页接口
 
-**更新** 所有用户可见文本已替换为国际化键值，支持中英文切换。
+**更新** 所有用户可见文本已替换为国际化键值，支持中英文切换。新增 IntersectionObserver 曝光埋点与页面/点击埋点集成。
 
 ```mermaid
 flowchart TD
@@ -275,7 +287,28 @@ ClickDetail --> Navigate["navigate('/detail/:id')"]
 - [ProductList.tsx:67-151](file://frontend/product-app/src/pages/ProductList.tsx#L67-L151)
 
 **章节来源**
-- [ProductList.tsx:1-158](file://frontend/product-app/src/pages/ProductList.tsx#L1-L158)
+- [ProductList.tsx:1-220](file://frontend/product-app/src/pages/ProductList.tsx#L1-L220)
+
+### 埋点工具(tracker.ts)
+product-app 内置 `src/utils/tracker.ts` 前端埋点工具，所有上报均为异步非阻塞，异常静默捕获，不影响业务逻辑。
+
+- 类型定义
+  - `TrackContext`：埋点事件公共上下文，包含 timestamp、userId、pageName、platform
+  - `TrackPayload`：完整事件载荷，包含 eventName、properties、context
+- 上下文采集
+  - `buildContext(pageName)` 从 localStorage 获取 `demo_token` 作为 userId，组装当前时间戳、页面名称、平台标识
+- 上报通道
+  - `enqueue(payload)` 将事件推入队列，100ms 内微任务批处理合并发送
+  - 开发环境下通过 `console.debug` 输出日志，生产环境可替换为 `navigator.sendBeacon` 或 Fetch 上报
+- 对外 API
+  - `trackEvent(eventName, properties, pageName)`：触发一条埋点事件
+  - `trackPageView(pageName, extra?)`：页面访问埋点
+  - `trackItemExpose(productId, productName, isSeckill, extra?)`：商品曝光埋点
+  - `trackClick(productId, actionType, extra?)`：交互点击埋点
+
+**章节来源**
+- [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
+- [ProductList.tsx:55-100](file://frontend/product-app/src/pages/ProductList.tsx#L55-L100)
 
 ### 商品详情页(ProductDetail)
 - 数据获取与展示

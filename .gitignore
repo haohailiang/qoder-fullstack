@@ -24,3 +24,8 @@ Thumbs.db
 
 # Environment
 *.local
+
+# Test artifacts
+**/test-results/
+**/playwright-report/
+**/coverage/
