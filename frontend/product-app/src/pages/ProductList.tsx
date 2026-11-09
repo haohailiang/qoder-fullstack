@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Card, Input, Select, Button, List, Tag, Space, message } from 'antd'
 import { SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+import { trackPageView, trackItemExpose, trackClick } from '../utils/tracker'
 
 interface Product {
   id: number
@@ -25,6 +26,8 @@ function ProductList() {
   const [category, setCategory] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const listRef = useRef<HTMLDivElement>(null)
+  const exposedSet = useRef<Set<number>>(new Set())
 
   const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
   const pageBg = isDark ? '#141414' : '#f5f5f5'
@@ -52,20 +55,76 @@ function ProductList() {
     }
   }
 
+  // ---------- 商品曝光：IntersectionObserver ----------
+  const observeExposure = useCallback(() => {
+    if (!listRef.current) return
+    const cards = listRef.current.querySelectorAll<HTMLElement>('[data-product-id]')
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return
+          const el = entry.target as HTMLElement
+          const id = Number(el.dataset.productId)
+          if (exposedSet.current.has(id)) return
+          exposedSet.current.add(id)
+          try {
+            trackItemExpose(
+              id,
+              el.dataset.productName || '',
+              el.dataset.isSeckill === '1',
+            )
+          } catch {
+            // 埋点异常静默忽略
+          }
+        })
+      },
+      { threshold: 0.5 },
+    )
+    cards.forEach((card) => observer.observe(card))
+    // 组件卸载时断开观察
+    return () => observer.disconnect()
+  }, [])
+
   useEffect(() => {
     fetchProducts()
   }, [])
+
+  // 商品列表更新后重新绑定曝光观察
+  useEffect(() => {
+    if (!loading && products.length > 0) {
+      const cleanup = observeExposure()
+      return cleanup
+    }
+  }, [loading, products, observeExposure])
+
+  // ---------- 页面访问埋点 ----------
+  useEffect(() => {
+    if (!loading && products.length >= 0) {
+      try {
+        trackPageView('ProductList', { productCount: products.length })
+      } catch {
+        // 静默
+      }
+    }
+    // 仅在首次加载完成时触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   const handleSearch = () => {
     fetchProducts()
   }
 
   const handleDetail = (id: number) => {
+    try {
+      trackClick(id, 'viewDetail')
+    } catch {
+      // 埋点异常不影响业务
+    }
     navigate(`/detail/${id}`)
   }
 
   return (
-    <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
+    <div ref={listRef} style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <Card title={t('product.title')} style={{ marginBottom: 16 }}>
         <Space wrap>
@@ -104,6 +163,9 @@ function ProductList() {
           <List.Item>
             <Card
               hoverable
+              data-product-id={item.id}
+              data-product-name={item.name}
+              data-is-seckill={item.isSeckill}
               cover={
                 <div
                   style={{
