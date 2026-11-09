@@ -3,7 +3,7 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-11-08T15:43:56Z"
+exported_at: "2026-11-09T08:01:32Z"
 modules:
     "":
         dir_name: 电商微服务一体化编排根工程
@@ -17,7 +17,6 @@ modules:
             - package-lock.json
             - vm-ssh.js
             - init-sql/
-            - frontend/e2e/
         source_files: []
         children:
             - backend
@@ -25,8 +24,8 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: 电商微服务后端聚合工程
-        title: 电商微服务后端聚合工程
+        dir_name: 电商后端微服务聚合工程
+        title: 电商后端微服务聚合工程
         scope:
             - backend/
         source_files: []
@@ -35,8 +34,8 @@ modules:
         related_to:
             - path: frontend
     frontend:
-        dir_name: 基于 qiankun 的微前端前端工程
-        title: 基于 qiankun 的微前端前端工程
+        dir_name: 微前端前端工程（Vue3 主应用 + React_原生 JS 子应用）
+        title: 微前端前端工程（Vue3 主应用 + React/原生 JS 子应用）
         scope:
             - frontend/
         source_files: []

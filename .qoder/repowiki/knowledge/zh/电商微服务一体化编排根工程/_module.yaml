@@ -10,7 +10,6 @@ scope:
     - package-lock.json
     - vm-ssh.js
     - init-sql/
-    - frontend/e2e/
 source_files: []
 depends_on: []
 related_to: []

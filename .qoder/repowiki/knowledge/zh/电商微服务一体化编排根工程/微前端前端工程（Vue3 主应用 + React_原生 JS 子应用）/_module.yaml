@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: frontend
-title: 基于 qiankun 的微前端前端工程
+title: 微前端前端工程（Vue3 主应用 + React/原生 JS 子应用）
 scope:
     - frontend/
 source_files: []

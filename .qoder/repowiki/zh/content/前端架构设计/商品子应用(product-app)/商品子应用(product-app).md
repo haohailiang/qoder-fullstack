@@ -9,6 +9,7 @@
 - [ProductList.tsx](file://frontend/product-app/src/pages/ProductList.tsx)
 - [ProductDetail.tsx](file://frontend/product-app/src/pages/ProductDetail.tsx)
 - [tracker.ts](file://frontend/product-app/src/utils/tracker.ts)
+- [tracker.spec.ts](file://frontend/product-app/src/__tests__/unit/utils/tracker.spec.ts)
 - [i18n/index.ts](file://frontend/product-app/src/i18n/index.ts)
 - [i18n/zh.ts](file://frontend/product-app/src/i18n/zh.ts)
 - [i18n/en.ts](file://frontend/product-app/src/i18n/en.ts)
@@ -18,12 +19,11 @@
 ## 更新摘要
 **变更内容**   
 - 增强了商品子应用的国际化功能，集成了完整的 react-i18next 解决方案
+- **新增** 实现了 sophisticated 用户行为追踪系统，包含页面访问、商品曝光和用户点击埋点
 - 实现了 Ant Design 组件库的语言包动态切换支持
 - 添加了完整的中英文翻译资源文件
 - 完善了微前端环境下的语言状态同步机制
 - 更新了所有页面组件以使用新的国际化系统
-- **新增** 内置 `src/utils/tracker.ts` 前端埋点工具，支持页面访问、商品曝光、交互点击三类事件
-- **新增** 商品列表页集成 IntersectionObserver 实现商品曝光埋点，并添加页面访问与点击埋点
 
 ## 目录
 1. [简介](#简介)
@@ -41,32 +41,32 @@
 - 应用初始化、路由配置、国际化与主题适配
 - 商品列表页的数据获取、筛选展示逻辑
 - 商品详情页的信息展示、图片占位、购买与秒杀流程
+- **新增** 用户行为追踪系统，包括页面访问、商品曝光和用户点击埋点
 - 与主应用的通信机制、状态同步（主题/语言）
 - 在微前端环境下的特殊配置与优化策略
 
-**更新** 本次更新重点增强了国际化功能，实现了完整的 react-i18next 集成和 Ant Design 语言包动态切换。
+**更新** 本次更新重点增强了国际化功能，实现了完整的 react-i18next 集成和 Ant Design 语言包动态切换，同时新增了 sophisticated 的用户行为追踪系统。
 
 ## 项目结构
 product-app 是一个独立的 Vite + React 工程，作为 qiankun 子应用运行。关键目录与职责如下：
 - src/main.tsx：qiankun 生命周期入口，负责渲染 App 与处理 update 时的主题/语言同步
 - src/App.tsx：React 根组件，提供 Ant Design 主题与语言上下文，定义 /list 与 /detail/:id 路由
-- src/pages/ProductList.tsx：商品列表页，支持关键词与分类筛选，调用后端搜索接口，集成曝光埋点
+- src/pages/ProductList.tsx：商品列表页，支持关键词与分类筛选，调用后端搜索接口，集成用户行为追踪
 - src/pages/ProductDetail.tsx：商品详情页，展示详情、价格、库存，支持普通购买与秒杀下单
-- src/utils/tracker.ts：前端埋点工具，支持 PageView / ItemExpose / Click 三类事件，异步批处理上报
+- **src/utils/tracker.ts：用户行为追踪工具，提供页面访问、商品曝光、用户点击埋点功能**
 - src/i18n/index.ts：i18next 初始化与语言持久化
 - src/i18n/zh.ts：中文翻译资源文件
 - src/i18n/en.ts：英文翻译资源文件
-- src/__tests__/：Vitest 单元测试文件
 - vite.config.ts：qiankun 插件、开发代理、别名等构建配置
-- vitest.config.ts：Vitest 单元测试配置
 - package.json：依赖声明，包含 react、antd、axios、react-router-dom、i18next 等
 
 ```mermaid
 graph TB
 subgraph "product-app"
 M["main.tsx<br/>qiankun 生命周期"] --> A["App.tsx<br/>路由/主题/语言"]
-A --> L["pages/ProductList.tsx<br/>商品列表"]
+A --> L["pages/ProductList.tsx<br/>商品列表 + 行为追踪"]
 A --> D["pages/ProductDetail.tsx<br/>商品详情"]
+L --> T["utils/tracker.ts<br/>用户行为追踪"]
 A --> I18N["i18n/index.ts<br/>国际化配置"]
 I18N --> ZH["i18n/zh.ts<br/>中文翻译"]
 I18N --> EN["i18n/en.ts<br/>英文翻译"]
@@ -80,7 +80,7 @@ B --> M
 **图表来源**
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
 - [App.tsx:55-69](file://frontend/product-app/src/App.tsx#L55-L69)
-- [i18n/index.ts:16-26](file://frontend/product-app/src/i18n/index.ts#L16-L26)
+- [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
 - [micro/index.ts:32-45](file://frontend/base-app/src/micro/index.ts#L32-L45)
 
 **章节来源**
@@ -100,12 +100,18 @@ B --> M
   - i18n/index.ts 初始化 i18next，从 localStorage 读取语言，fallback 为中文
   - App.tsx 监听 i18n 语言变化，动态设置 antd 的 locale（zh_CN/en_US）
   - 所有页面组件使用 useTranslation hook 访问翻译文本
+- **用户行为追踪**
+  - tracker.ts 提供统一的埋点接口，支持页面访问、商品曝光、用户点击等事件
+  - 使用 IntersectionObserver 实现商品曝光检测
+  - 支持 navigator.sendBeacon 进行异步非阻塞上报
+  - 内置批量发送机制，100ms 内的事件合并上报
 
-**更新** 新增了完整的国际化支持，包括中英文翻译资源和 Ant Design 语言包动态切换。
+**更新** 新增了完整的国际化支持和 sophisticated 的用户行为追踪系统，包括中英文翻译资源和 Ant Design 语言包动态切换。
 
 **章节来源**
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
 - [App.tsx:13-70](file://frontend/product-app/src/App.tsx#L13-L70)
+- [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
 - [i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
 
 ## 架构总览
@@ -117,7 +123,7 @@ participant Base as "基座(base-app)"
 participant QK as "qiankun"
 participant Prod as "product-app(main.tsx)"
 participant App as "App.tsx"
-participant I18N as "i18n"
+participant Tracker as "tracker.ts"
 participant API as "后端API"
 Base->>QK : registerMicroApps({ name : 'product-app', entry, activeRule : '/product' })
 QK->>Prod : bootstrap()
@@ -127,9 +133,10 @@ Note over Prod,App : 首次挂载完成
 Base->>QK : setGlobalState({theme, lang})
 QK->>Prod : update(props={theme, lang})
 Prod->>Prod : 写入localStorage并触发storage事件
-Prod->>I18N : i18n.changeLanguage(props.lang)
-I18N-->>App : languageChanged 事件
-App->>App : 更新antd locale
+Prod->>App : i18n.changeLanguage(props.lang)
+App->>Tracker : trackPageView('ProductList')
+Tracker->>Tracker : IntersectionObserver 监听商品曝光
+Tracker->>Tracker : navigator.sendBeacon 异步上报
 App->>API : GET /api/product/products/search
 API-->>App : 返回商品列表
 ```
@@ -139,7 +146,7 @@ API-->>App : 返回商品列表
 - [micro/index.ts:22-30](file://frontend/base-app/src/micro/index.ts#L22-L30)
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
 - [App.tsx:55-69](file://frontend/product-app/src/App.tsx#L55-L69)
-- [i18n/index.ts:16-26](file://frontend/product-app/src/i18n/index.ts#L16-L26)
+- [tracker.ts:55-74](file://frontend/product-app/src/utils/tracker.ts#L55-L74)
 
 ## 详细组件分析
 
@@ -245,6 +252,46 @@ DynamicSwitch --> AntDLocale["Ant Design语言包切换"]
 - [main.tsx:47-53](file://frontend/product-app/src/main.tsx#L47-L53)
 - [App.tsx:43-53](file://frontend/product-app/src/App.tsx#L43-L53)
 
+### 用户行为追踪系统(tracker)
+- 核心功能
+  - trackEvent：通用埋点函数，支持自定义事件名称和业务属性
+  - trackPageView：页面访问埋点，记录页面名称和额外属性
+  - trackItemExpose：商品曝光埋点，使用 IntersectionObserver 检测商品可见性
+  - trackClick：用户交互点击埋点，记录商品ID和操作类型
+- 技术实现
+  - 上下文采集：自动获取userId（从localStorage）、时间戳、页面名称、平台标识
+  - 批量上报：100ms内的多个事件合并为一次发送，减少网络请求
+  - 异步非阻塞：使用 setTimeout 和 navigator.sendBeacon 确保不影响业务逻辑
+  - 异常静默捕获：所有埋点操作都有try-catch保护，确保不影响用户体验
+- 集成方式
+  - ProductList.tsx 已集成完整的埋点功能，包括页面访问、商品曝光和用户点击
+  - 使用 data-* 属性标记商品元素，便于 IntersectionObserver 检测
+  - 支持扩展更多埋点场景和业务属性
+
+**新增** sophisticated 的用户行为追踪系统，提供完整的埋点解决方案。
+
+```mermaid
+flowchart TD
+UserAction["用户操作"] --> TrackEvent["trackEvent<br/>通用埋点"]
+TrackEvent --> BuildContext["buildContext<br/>构建上下文"]
+BuildContext --> Enqueue["enqueue<br/>批量队列"]
+Enqueue --> FlushTimer["setTimeout 100ms"]
+FlushTimer --> SendBeacon["navigator.sendBeacon<br/>异步上报"]
+SendBeacon --> ConsoleDebug["console.debug<br/>开发环境日志"]
+PageView["页面访问"] --> TrackPageView["trackPageView"]
+ItemVisible["商品可见"] --> TrackItemExpose["trackItemExpose"]
+UserClick["用户点击"] --> TrackClick["trackClick"]
+```
+
+**图表来源**
+- [tracker.ts:26-42](file://frontend/product-app/src/utils/tracker.ts#L26-L42)
+- [tracker.ts:55-74](file://frontend/product-app/src/utils/tracker.ts#L55-L74)
+- [tracker.ts:85-134](file://frontend/product-app/src/utils/tracker.ts#L85-L134)
+
+**章节来源**
+- [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
+- [tracker.spec.ts:1-196](file://frontend/product-app/src/__tests__/unit/utils/tracker.spec.ts#L1-L196)
+
 ### 商品列表页(ProductList)
 - 数据获取
   - 组件挂载后调用 fetchProducts，请求 /api/product/products/search，携带 keyword/category 参数
@@ -253,18 +300,17 @@ DynamicSwitch --> AntDLocale["Ant Design语言包切换"]
 - 筛选与展示
   - 提供关键词输入框与分类下拉框，点击搜索按钮或回车触发查询
   - 使用 Ant Design List 网格布局展示商品卡片，显示名称、描述摘要、价格（含秒杀价）、库存
-  - 每个商品卡片通过 `data-product-id`、`data-product-name`、`data-is-seckill` 属性标记，供埋点采集
-  - 点击“查看详情”触发 Click 埋点后跳转到 /detail/:id
+  - 点击"查看详情"跳转到 /detail/:id
   - 所有界面文本使用 t() 函数进行国际化
-- 埋点集成
-  - 页面首次加载完成后触发 PageView 埋点，携带商品数量信息
-  - 通过 IntersectionObserver 监听商品卡片可视区域，当卡片 50% 以上进入视口时触发 ItemExpose 埋点
-  - 使用 `exposedSet` (Set 结构) 记录已曝光商品 ID，避免重复上报
-  - 点击“查看详情”时触发 Click 埋点，记录商品 ID 与操作类型
 - 分页处理
   - 当前实现为全量拉取并前端展示，未实现服务端分页；如需分页，可在 params 中增加 page/size 字段，并在后端配合分页接口
+- **用户行为追踪集成**
+  - 页面加载完成后调用 trackPageView 记录页面访问
+  - 使用 IntersectionObserver 监听商品卡片可见性，触发 trackItemExpose
+  - 用户点击"查看详情"时调用 trackClick 记录交互行为
+  - 所有埋点操作都有异常保护，不影响正常业务流程
 
-**更新** 所有用户可见文本已替换为国际化键值，支持中英文切换。新增 IntersectionObserver 曝光埋点与页面/点击埋点集成。
+**更新** 所有用户可见文本已替换为国际化键值，支持中英文切换，并集成了完整的用户行为追踪功能。
 
 ```mermaid
 flowchart TD
@@ -273,42 +319,26 @@ Init --> Fetch["GET /api/product/products/search(params)"]
 Fetch --> Resp{"响应code=200?"}
 Resp --> |是| SetData["setProducts(data.data)"]
 Resp --> |否| ShowError["message.error(t('product.fetchFailed'))"]
-SetData --> Render["渲染商品网格(国际化文本)"]
+SetData --> TrackPage["trackPageView('ProductList')"]
+TrackPage --> Render["渲染商品网格(国际化文本)"]
 ShowError --> Render
+Render --> Observe["IntersectionObserver监听商品曝光"]
+Observe --> Expose["trackItemExpose(商品可见)"]
 Render --> ClickSearch["点击搜索/回车"]
 ClickSearch --> Fetch
 Render --> ClickDetail["点击查看详情"]
-ClickDetail --> Navigate["navigate('/detail/:id')"]
+ClickDetail --> TrackClick["trackClick(viewDetail)"]
+TrackClick --> Navigate["navigate('/detail/:id')"]
 ```
 
 **图表来源**
-- [ProductList.tsx:32-57](file://frontend/product-app/src/pages/ProductList.tsx#L32-L57)
-- [ProductList.tsx:59-65](file://frontend/product-app/src/pages/ProductList.tsx#L59-L65)
-- [ProductList.tsx:67-151](file://frontend/product-app/src/pages/ProductList.tsx#L67-L151)
+- [ProductList.tsx:35-56](file://frontend/product-app/src/pages/ProductList.tsx#L35-L56)
+- [ProductList.tsx:58-86](file://frontend/product-app/src/pages/ProductList.tsx#L58-L86)
+- [ProductList.tsx:100-111](file://frontend/product-app/src/pages/ProductList.tsx#L100-L111)
+- [ProductList.tsx:117-124](file://frontend/product-app/src/pages/ProductList.tsx#L117-L124)
 
 **章节来源**
 - [ProductList.tsx:1-220](file://frontend/product-app/src/pages/ProductList.tsx#L1-L220)
-
-### 埋点工具(tracker.ts)
-product-app 内置 `src/utils/tracker.ts` 前端埋点工具，所有上报均为异步非阻塞，异常静默捕获，不影响业务逻辑。
-
-- 类型定义
-  - `TrackContext`：埋点事件公共上下文，包含 timestamp、userId、pageName、platform
-  - `TrackPayload`：完整事件载荷，包含 eventName、properties、context
-- 上下文采集
-  - `buildContext(pageName)` 从 localStorage 获取 `demo_token` 作为 userId，组装当前时间戳、页面名称、平台标识
-- 上报通道
-  - `enqueue(payload)` 将事件推入队列，100ms 内微任务批处理合并发送
-  - 开发环境下通过 `console.debug` 输出日志，生产环境可替换为 `navigator.sendBeacon` 或 Fetch 上报
-- 对外 API
-  - `trackEvent(eventName, properties, pageName)`：触发一条埋点事件
-  - `trackPageView(pageName, extra?)`：页面访问埋点
-  - `trackItemExpose(productId, productName, isSeckill, extra?)`：商品曝光埋点
-  - `trackClick(productId, actionType, extra?)`：交互点击埋点
-
-**章节来源**
-- [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
-- [ProductList.tsx:55-100](file://frontend/product-app/src/pages/ProductList.tsx#L55-L100)
 
 ### 商品详情页(ProductDetail)
 - 数据获取与展示
@@ -382,6 +412,7 @@ V["vite.config.ts"] --> VP["@vitejs/plugin-react"]
 V --> QP["vite-plugin-qiankun"]
 BA["base-app micro/index.ts"] --> Q["qiankun"]
 Q --> PA["product-app(main.tsx)"]
+PA --> TR["product-app tracker.ts"]
 ```
 
 **图表来源**
@@ -408,8 +439,13 @@ Q --> PA["product-app(main.tsx)"]
 - 国际化优化
   - 翻译资源按需加载，避免不必要的 bundle 体积增长
   - 使用 useMemo 缓存翻译结果，提升渲染性能
+- **用户行为追踪优化**
+  - 批量上报机制：100ms内的事件合并发送，减少网络请求次数
+  - 异步非阻塞：使用 setTimeout 和 navigator.sendBeacon 确保不影响业务逻辑
+  - IntersectionObserver 高效监听：只监听可见的商品元素，避免全量监听的性能开销
+  - 异常静默捕获：所有埋点操作都有try-catch保护，确保不影响用户体验
 
-**更新** 新增了国际化相关的性能优化建议。
+**更新** 新增了国际化相关的性能优化建议和用户行为追踪的性能优化策略。
 
 [本节为通用指导，不直接分析具体文件]
 
@@ -429,14 +465,21 @@ Q --> PA["product-app(main.tsx)"]
   - 检查组件中是否正确使用了 useTranslation hook
   - 验证翻译键是否存在于 zh.ts 和 en.ts 文件中
   - 确认 Ant Design 语言包是否正确切换
+- **用户行为追踪问题**
+  - 检查 tracker.ts 是否正确导入和使用
+  - 确认 IntersectionObserver 是否正确绑定到商品元素
+  - 验证 data-product-id、data-product-name 等属性是否正确设置
+  - 检查浏览器控制台是否有 [tracker] 开头的调试日志
+  - 确认 navigator.sendBeacon 是否被浏览器支持
 
-**更新** 新增了国际化相关的故障排查指南。
+**更新** 新增了国际化相关的故障排查指南和用户行为追踪问题的排查方法。
 
 **章节来源**
 - [micro/index.ts:62-71](file://frontend/base-app/src/micro/index.ts#L62-L71)
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
 - [App.tsx:20-50](file://frontend/product-app/src/App.tsx#L20-L50)
 - [vite.config.ts:6-24](file://frontend/product-app/vite.config.ts#L6-L24)
+- [tracker.ts:65-71](file://frontend/product-app/src/utils/tracker.ts#L65-L71)
 
 ## 结论
 product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与基座 base-app 协作，实现了微前端环境下的商品列表与详情功能。其特点包括：
@@ -445,8 +488,9 @@ product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与
 - 通过 localStorage 与 i18n 事件实现主题/语言的跨应用同步
 - 简洁的商品数据获取与展示逻辑
 - **新增** 完整的国际化支持，包括中英文翻译资源和 Ant Design 语言包动态切换
+- **新增** sophisticated 的用户行为追踪系统，支持页面访问、商品曝光和用户点击埋点
 
-**更新** 本次更新显著增强了应用的国际化能力，提供了更好的多语言用户体验。
+**更新** 本次更新显著增强了应用的国际化能力和用户行为追踪能力，提供了更好的多语言用户体验和数据收集能力。
 
 后续可扩展点：
 - 列表页引入服务端分页与缓存
@@ -455,3 +499,6 @@ product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与
 - 在 qiankun 模式下恢复 HMR 体验（需评估兼容性）
 - 扩展更多语言支持（如日语、韩语等）
 - 实现翻译资源的动态加载和懒加载优化
+- **为 ProductDetail.tsx 添加用户行为追踪功能**
+- **扩展更多埋点场景和业务属性**
+- **实现埋点数据的可视化分析和报表展示**
