@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
@@ -20,8 +23,12 @@
   "devDependencies": {
     "@types/node": "^22.7.5",
     "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/test-utils": "^2.5.1",
+    "jsdom": "^31.0.0",
+    "msw": "^2.15.0",
     "typescript": "~5.6.3",
     "vite": "^5.4.9",
+    "vitest": "^2.1.9",
     "vue-tsc": "^2.1.6"
   }
 }

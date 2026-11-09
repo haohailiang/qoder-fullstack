@@ -1,4 +1,13 @@
 {
+  "scripts": {
+    "test:unit": "npm run test --workspace=frontend/base-app --workspace=frontend/product-app --workspace=frontend/order-app",
+    "test:unit:base": "npm run test --workspace=frontend/base-app",
+    "test:unit:product": "npm run test --workspace=frontend/product-app",
+    "test:unit:order": "npm run test --workspace=frontend/order-app",
+    "test:e2e": "npx playwright test --config=frontend/e2e/playwright.config.ts",
+    "test:e2e:ui": "npx playwright test --config=frontend/e2e/playwright.config.ts --ui",
+    "test:all": "npm run test:unit && npm run test:e2e"
+  },
   "devDependencies": {
     "ssh2": "^1.17.0"
   }
