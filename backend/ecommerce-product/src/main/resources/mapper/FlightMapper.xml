@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecommerce.product.repository.mapper.FlightMapper">
+
+    <resultMap id="FlightResultMap" type="com.ecommerce.product.entity.Flight">
+        <id property="id" column="id"/>
+        <result property="productId" column="product_id"/>
+        <result property="departureCity" column="departure_city"/>
+        <result property="arrivalCity" column="arrival_city"/>
+        <result property="departureLng" column="departure_lng"/>
+        <result property="departureLat" column="departure_lat"/>
+        <result property="arrivalLng" column="arrival_lng"/>
+        <result property="arrivalLat" column="arrival_lat"/>
+        <result property="flightNumber" column="flight_number"/>
+        <result property="duration" column="duration"/>
+        <result property="frequency" column="frequency"/>
+        <result property="routeCoordinates" column="route_coordinates"/>
+        <result property="createdDate" column="created_date"/>
+        <result property="lastModifiedDate" column="last_modified_date"/>
+        <!-- 关联商品字段 -->
+        <result property="productName" column="product_name"/>
+        <result property="productDescription" column="product_description"/>
+        <result property="productPrice" column="product_price"/>
+        <result property="productStock" column="product_stock"/>
+        <result property="productImageUrl" column="product_image_url"/>
+        <result property="productStatus" column="product_status"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        f.id, f.product_id, f.departure_city, f.arrival_city,
+        f.departure_lng, f.departure_lat, f.arrival_lng, f.arrival_lat,
+        f.flight_number, f.duration, f.frequency, f.route_coordinates,
+        f.created_date, f.last_modified_date
+    </sql>
+
+    <sql id="JoinColumns">
+        <include refid="BaseColumns"/>,
+        p.name AS product_name, p.description AS product_description,
+        p.price AS product_price, p.stock AS product_stock,
+        p.image_url AS product_image_url, p.status AS product_status
+    </sql>
+
+    <select id="selectAll" resultMap="FlightResultMap">
+        SELECT <include refid="JoinColumns"/>
+        FROM flights f
+        INNER JOIN products p ON f.product_id = p.id
+        ORDER BY f.id
+    </select>
+
+    <select id="selectById" parameterType="long" resultMap="FlightResultMap">
+        SELECT <include refid="JoinColumns"/>
+        FROM flights f
+        INNER JOIN products p ON f.product_id = p.id
+        WHERE f.id = #{id}
+    </select>
+
+    <select id="search" resultMap="FlightResultMap">
+        SELECT <include refid="JoinColumns"/>
+        FROM flights f
+        INNER JOIN products p ON f.product_id = p.id
+        WHERE p.status = 1
+        <if test="departureCity != null and departureCity != ''">
+            AND f.departure_city = #{departureCity}
+        </if>
+        <if test="arrivalCity != null and arrivalCity != ''">
+            AND f.arrival_city = #{arrivalCity}
+        </if>
+        ORDER BY f.id
+    </select>
+
+    <select id="selectFrequencyData" resultMap="FlightResultMap">
+        SELECT <include refid="JoinColumns"/>
+        FROM flights f
+        INNER JOIN products p ON f.product_id = p.id
+        WHERE p.status = 1
+        ORDER BY f.frequency DESC
+    </select>
+
+    <insert id="insert" parameterType="com.ecommerce.product.entity.Flight"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO flights (product_id, departure_city, arrival_city,
+                             departure_lng, departure_lat, arrival_lng, arrival_lat,
+                             flight_number, duration, frequency, route_coordinates)
+        VALUES (#{productId}, #{departureCity}, #{arrivalCity},
+                #{departureLng}, #{departureLat}, #{arrivalLng}, #{arrivalLat},
+                #{flightNumber}, #{duration}, #{frequency}, #{routeCoordinates})
+    </insert>
+
+    <update id="updateById" parameterType="com.ecommerce.product.entity.Flight">
+        UPDATE flights
+        SET departure_city = #{departureCity}, arrival_city = #{arrivalCity},
+            departure_lng = #{departureLng}, departure_lat = #{departureLat},
+            arrival_lng = #{arrivalLng}, arrival_lat = #{arrivalLat},
+            flight_number = #{flightNumber}, duration = #{duration},
+            frequency = #{frequency}, route_coordinates = #{routeCoordinates}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM flights WHERE id = #{id}
+    </delete>
+</mapper>

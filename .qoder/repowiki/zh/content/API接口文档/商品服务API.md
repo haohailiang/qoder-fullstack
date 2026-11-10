@@ -3,6 +3,10 @@
 <cite>
 **本文引用的文件**   
 - [ProductController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java)
+- [FlightController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FlightController.java)
+- [FlightService.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/FlightService.java)
+- [FlightServiceImpl.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/FlightServiceImpl.java)
+- [Flight.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Flight.java)
 - [SeckillController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java)
 - [ProductService.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/ProductService.java)
 - [ProductServiceImpl.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/ProductServiceImpl.java)
@@ -35,6 +39,7 @@
 - 商品管理接口（CRUD、分类查询、ES 同步）
 - 商品搜索接口（基于 Elasticsearch 的多条件检索）
 - 秒杀接口（Redis Lua 原子预扣减 + RabbitMQ 异步下单）
+- 航班管理接口（机票商品 CRUD、城市筛选、航线频率统计）
 
 目标读者包括后端开发者、前端集成人员以及运维人员。文档从系统架构到具体接口定义、错误码、调用示例进行分层说明，帮助快速理解并正确集成。
 
@@ -231,6 +236,49 @@ SOC-->>Client : 最终订单结果(可轮询)
 - [ProductServiceImpl.java:112-145](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/ProductServiceImpl.java#L112-L145)
 - [ProductDocument.java:17-55](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/elasticsearch/ProductDocument.java#L17-L55)
 - [ProductElasticsearchRepository.java:10-18](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/elasticsearch/ProductElasticsearchRepository.java#L10-L18)
+
+### 航班管理接口（机票商品）
+航班接口位于 FlightController，统一前缀 `/flights`，返回均为 `Result<T>`；查询与统计会 JOIN products 表以补充商品展示字段。
+- 查询全部航班
+  - 方法：GET
+  - 路径：/flights
+  - 响应：Result<List<Flight>>
+- 查询航班详情
+  - 方法：GET
+  - 路径：/flights/{id}
+  - 路径参数：id(Long)；不存在时抛 BusinessException(code=404)
+  - 响应：Result<Flight>
+- 按城市筛选航班
+  - 方法：GET
+  - 路径：/flights/search
+  - 查询参数：departureCity(String，可选)、arrivalCity(String，可选)；仅返回上架商品（p.status=1）的航线
+  - 响应：Result<List<Flight>>
+- 城市间航班频率统计
+  - 方法：GET
+  - 路径：/flights/frequency
+  - 说明：返回 flights 原始列表与映射后的 cityFrequency（含 from/to/坐标/frequency/flightNumber/duration/routeCoordinates 及商品信息），供 Admin 飞线图使用
+  - 响应：Result<Map<String,Object>>
+- 创建航班
+  - 方法：POST
+  - 路径：/flights
+  - 请求体：Flight（需关联 productId）；服务层写入 createdDate
+  - 响应：Result<Flight>
+- 更新航班
+  - 方法：PUT
+  - 路径：/flights/{id}
+  - 路径参数：id(Long)；先校验存在（不存在抛 404），再用已存在主键覆盖后保存
+  - 响应：Result<Flight>
+- 删除航班
+  - 方法：DELETE
+  - 路径：/flights/{id}
+  - 路径参数：id(Long)；删除前先校验存在
+  - 响应：Result<Void>
+
+章节来源
+- [FlightController.java:15-78](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FlightController.java#L15-L78)
+- [FlightService.java:8-24](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/FlightService.java#L8-L24)
+- [FlightServiceImpl.java:26-96](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/FlightServiceImpl.java#L26-L96)
+- [Flight.java:11-38](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Flight.java#L11-L38)
 
 ### 秒杀接口（高并发库存处理）
 - 初始化秒杀库存（管理接口）

@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getToken } from '@/utils/auth'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL || '/'),
   routes: [
     {
       path: '/',
@@ -25,6 +25,12 @@ const router = createRouter({
       name: 'users',
       component: () => import('@/views/UserManage.vue'),
       meta: { requiresAuth: true },
+    },
+    {
+      path: '/admin/flights',
+      name: 'flightMap',
+      component: () => import('@/views/FlightMap.vue'),
+      meta: { requiresAuth: true, adminOnly: true },
     },
     // 商品子应用路由（由 qiankun 加载 React 子应用处理）
     {

@@ -78,8 +78,46 @@ registerMicroApps(apps, {
   }],
 })
 
+/**
+ * 保护 window.history.state 不被子应用覆盖。
+ *
+ * 子应用（如 product-app）的 BrowserRouter 调用 history.replaceState/pushState 时
+ * 传入 React Router 内部 state 格式 {usr, key}，覆盖 vue-router 的 {back, current,
+ * forward, position, scroll} 格式。后续 base-app router.push 读取 history.state 时
+ * 发现 currentState.current === undefined，拼接出非法 URL。
+ *
+ * 此 patch 在调用原生方法前将 vue-router 关键字段合并进 state 参数，
+ * 保证 history.state 始终保留 base-app 所需的状态结构。
+ */
+function protectHistoryState() {
+  const originalReplaceState = window.history.replaceState.bind(window.history)
+  const originalPushState = window.history.pushState.bind(window.history)
+
+  window.history.replaceState = function (state: any, title: string, url?: string | URL | null) {
+    // 如果传入的 state 缺少 vue-router 的 current 字段，从已有 state 继承
+    if (state && typeof state === 'object' && state.current === undefined) {
+      const existing = window.history.state
+      if (existing && existing.current !== undefined) {
+        state = { ...state, current: existing.current, back: existing.back, forward: existing.forward, position: existing.position }
+      }
+    }
+    originalReplaceState(state, title, url as any)
+  }
+
+  window.history.pushState = function (state: any, title: string, url?: string | URL | null) {
+    if (state && typeof state === 'object' && state.current === undefined) {
+      const existing = window.history.state
+      if (existing && existing.current !== undefined) {
+        state = { ...state, current: existing.current, back: existing.back, forward: existing.forward, position: existing.position }
+      }
+    }
+    originalPushState(state, title, url as any)
+  }
+}
+
 // 启动 qiankun
 export function startQiankun() {
+  protectHistoryState()
   start({
     sandbox: {
       experimentalStyleIsolation: true, // 开启样式隔离

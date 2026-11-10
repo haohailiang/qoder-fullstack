@@ -75,6 +75,27 @@ CREATE TABLE IF NOT EXISTS orders (
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
+-- 航班表（机票商品特有字段）
+CREATE TABLE IF NOT EXISTS flights (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id          BIGINT          NOT NULL COMMENT '关联商品ID',
+    departure_city      VARCHAR(100)    NOT NULL COMMENT '出发城市',
+    arrival_city        VARCHAR(100)    NOT NULL COMMENT '落地城市',
+    departure_lng       DECIMAL(10,4)   NOT NULL COMMENT '出发城市经度',
+    departure_lat       DECIMAL(10,4)   NOT NULL COMMENT '出发城市纬度',
+    arrival_lng         DECIMAL(10,4)   NOT NULL COMMENT '落地城市经度',
+    arrival_lat         DECIMAL(10,4)   NOT NULL COMMENT '落地城市纬度',
+    flight_number       VARCHAR(50)     COMMENT '航班号',
+    duration            INT             COMMENT '飞行时长(分钟)',
+    frequency           INT             NOT NULL DEFAULT 1 COMMENT '每周航班频率',
+    route_coordinates   JSON            COMMENT '途经城市坐标 [{name,lng,lat}]',
+    created_date        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    last_modified_date  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    INDEX idx_product_id (product_id),
+    INDEX idx_departure_city (departure_city),
+    INDEX idx_arrival_city (arrival_city)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='航班表';
+
 -- 插入演示数据
 INSERT INTO users (username, password, name, email, phone, age) VALUES
 ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '管理员', 'admin@ecommerce.com', '13800000001', 30),
@@ -88,3 +109,25 @@ INSERT INTO products (name, description, price, stock, category, status, is_seck
 ('优衣库联名T恤', '设计师联名款纯棉T恤', 99.00, 2000, 'clothing', 1, 1, 49.00, '2026-01-01 00:00:00', '2026-12-31 23:59:59'),
 ('Java编程思想', '经典Java入门书籍', 109.00, 300, 'books', 1, 0, NULL, NULL, NULL),
 ('有机坚果礼盒', '精选混合坚果 1kg 装', 128.00, 800, 'food', 1, 1, 68.00, '2026-01-01 00:00:00', '2026-12-31 23:59:59');
+
+-- 插入机票商品（category = 'flight'）
+INSERT INTO products (name, description, price, stock, category, status, is_seckill, seckill_price, seckill_start_time, seckill_end_time) VALUES
+('北京→上海 机票', '北京首都国际机场至上海虹桥国际机场，CA1234 航班', 1280.00, 100, 'flight', 1, 0, NULL, NULL, NULL),
+('广州→成都 机票', '广州白云国际机场至成都双流国际机场，CZ3456 航班', 980.00, 80, 'flight', 1, 0, NULL, NULL, NULL),
+('深圳→北京 机票', '深圳宝安国际机场至北京首都国际机场，MU5678 航班', 1580.00, 60, 'flight', 1, 0, NULL, NULL, NULL),
+('上海→广州 机票', '上海虹桥国际机场至广州白云国际机场，MU9012 航班', 1180.00, 90, 'flight', 1, 0, NULL, NULL, NULL),
+('成都→上海 机票', '成都双流国际机场至上海虹桥国际机场，CA3456 航班', 1380.00, 70, 'flight', 1, 0, NULL, NULL, NULL),
+('北京→广州 机票', '北京首都国际机场至广州白云国际机场，CZ5678 航班', 1680.00, 50, 'flight', 1, 0, NULL, NULL, NULL),
+('上海→成都 机票', '上海虹桥国际机场至成都双流国际机场，MU7890 航班', 1480.00, 65, 'flight', 1, 0, NULL, NULL, NULL),
+('深圳→上海 机票', '深圳宝安国际机场至上海虹桥国际机场，CA9012 航班', 1280.00, 85, 'flight', 1, 0, NULL, NULL, NULL);
+
+-- 插入航班数据（关联上面插入的机票商品，product_id 从 7 开始）
+INSERT INTO flights (product_id, departure_city, arrival_city, departure_lng, departure_lat, arrival_lng, arrival_lat, flight_number, duration, frequency, route_coordinates) VALUES
+(7,  '北京', '上海', 116.4074, 39.9042, 121.4737, 31.2304, 'CA1234', 135, 28, '[{"name":"济南","lng":117.0009,"lat":36.6758}]'),
+(8,  '广州', '成都', 113.2644, 23.1291, 104.0668, 30.5728, 'CZ3456', 150, 21, '[{"name":"重庆","lng":106.5516,"lat":29.5630}]'),
+(9,  '深圳', '北京', 114.0579, 22.5431, 116.4074, 39.9042, 'MU5678', 180, 14, '[{"name":"武汉","lng":114.3054,"lat":30.5931}]'),
+(10, '上海', '广州', 121.4737, 31.2304, 113.2644, 23.1291, 'MU9012', 150, 21, '[{"name":"厦门","lng":118.0894,"lat":24.4798}]'),
+(11, '成都', '上海', 104.0668, 30.5728, 121.4737, 31.2304, 'CA3456', 165, 14, '[{"name":"武汉","lng":114.3054,"lat":30.5931}]'),
+(12, '北京', '广州', 116.4074, 39.9042, 113.2644, 23.1291, 'CZ5678', 195, 7,  '[{"name":"长沙","lng":112.9388,"lat":28.2282}]'),
+(13, '上海', '成都', 121.4737, 31.2304, 104.0668, 30.5728, 'MU7890', 180, 14, '[{"name":"重庆","lng":106.5516,"lat":29.5630}]'),
+(14, '深圳', '上海', 114.0579, 22.5431, 121.4737, 31.2304, 'CA9012', 150, 21, '[{"name":"杭州","lng":120.1551,"lat":30.2741}]');

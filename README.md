@@ -6,11 +6,11 @@
   - `ecommerce-common` — 公共模块（统一响应 Result / 业务异常 / 全局异常处理 / 秒杀消息体）
   - `ecommerce-gateway` — API 网关（Spring Cloud Gateway，JWT 全局鉴权，按路径路由到下游微服务，聚合 Swagger 文档）
   - `ecommerce-user` — 用户服务（注册 / 登录 / 图片验证码 / 短信验证码 / 用户 CRUD / 会话管理 / 主题偏好）
-  - `ecommerce-product` — 商品服务（商品 CRUD / Elasticsearch 搜索 / 秒杀库存预扣 / Lua 脚本）
+  - `ecommerce-product` — 商品服务（商品 CRUD / Elasticsearch 搜索 / 秒杀库存预扣 / Lua 脚本 / 机票航班 CRUD 与航线频率统计）
   - `ecommerce-order` — 订单服务（订单 CRUD / 秒杀订单异步消费 / OpenFeign 调用商品服务）
 - **frontend/**：基于 qiankun 微前端框架，拆分为 3 个子应用
-  - `base-app` — Vue 3 + TypeScript + Vite + Element Plus，主应用（登录 / 注册 / 用户管理 / 子应用容器 / 全局主题切换）
-  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀 / 暗黑模式适配 / 用户行为埋点）
+  - `base-app` — Vue 3 + TypeScript + Vite + Element Plus，主应用（登录 / 注册 / 用户管理 / 子应用容器 / 全局主题切换 / Admin 航线频率地图）
+  - `product-app` — React 18 + TypeScript + Vite + Ant Design，商品子应用（商品列表 / 商品详情 / 秒杀 / 暗黑模式适配 / 用户行为埋点 / 机票详情 2D·3D 航线可视化）
   - `order-app` — 原生 TypeScript + Vite + Axios，订单子应用（我的订单 / 全部订单 / 订单详情 / 暗黑模式适配）
 
 ## 架构概览
@@ -86,18 +86,18 @@ demo-fullstack/
 │   ├── ecommerce-product/                    # 商品微服务
 │   │   └── src/main/
 │   │       ├── java/com/ecommerce/product/
-│   │       │   ├── controller/               # ProductController / SeckillController（含 OpenAPI 注解）
-│   │       │   ├── service/                  # 商品 / 秒杀库存 / ES 搜索服务
-│   │       │   ├── entity/                   # Product 实体
-│   │       │   ├── repository/               # MyBatis Mapper 访问层
+│   │       │   ├── controller/               # ProductController / SeckillController / FlightController（含 OpenAPI 注解）
+│   │       │   ├── service/                  # 商品 / 秒杀库存 / ES 搜索 / 航班（FlightService）服务
+│   │       │   ├── entity/                   # Product、Flight 实体
+│   │       │   ├── repository/               # MyBatis Mapper 访问层（含 FlightRepository / FlightMapper）
 │   │       │   ├── elasticsearch/            # ES 商品文档与 Repository
 │   │       │   ├── config/                   # Redis / ES 配置
-│   │       │   └── test/                     # JUnit 5 单元测试（4 个测试类）
+│   │       │   └── test/                     # JUnit 5 单元测试（7 个测试类：商品 4 + 航班 3）
 │   │       └── resources/
 │   │           ├── application.yml           # 端口 8082，context-path /product
-│   │           ├── db/schema.sql             # 商品表建表 SQL
+│   │           ├── db/schema.sql             # 商品表 + 航班表（flights）建表 SQL
 │   │           ├── lua/seckill.lua           # Redis Lua 秒杀库存预扣脚本
-│   │           └── mapper/ProductMapper.xml  # 商品表 SQL
+│   │           └── mapper/                   # ProductMapper.xml、FlightMapper.xml（JOIN products）
 │   ├── ecommerce-order/                      # 订单微服务
 │   │   └── src/main/
 │   │       ├── java/com/ecommerce/order/
@@ -123,14 +123,15 @@ demo-fullstack/
 │   │   │   ├── main.ts                       # 入口（注册 Element Plus、路由、qiankun 启动、主题初始化）
 │   │   │   ├── App.vue                       # 根组件（布局 + 子应用容器 + 主题切换按钮）
 │   │   │   ├── micro/index.ts                # qiankun 子应用注册与全局状态管理
-│   │   │   ├── api/                          # axios 封装 + 认证 / 用户 / 短信接口
+│   │   │   ├── api/                          # axios 封装 + 认证 / 用户 / 短信 / 航班接口（flight.ts）
 │   │   │   ├── router/                       # vue-router（含子应用路由占位）
 │   │   │   ├── utils/                        # 令牌与登录用户状态管理 + 主题管理 (theme.ts)
-│   │   │   ├── __tests__/                    # Vitest 单元测试（api / router / utils）
+│   │   │   ├── __tests__/                    # Vitest 单元测试（api（含 flight）/ router / utils）
 │   │   │   └── views/
 │   │   │       ├── Login.vue                 # 登录页（图片验证码 + 短信验证码两步验证 + 登录后同步主题）
 │   │   │       ├── Register.vue              # 注册页（手机号 + 图片验证码 + 短信验证码两步验证）
 │   │   │       ├── UserManage.vue            # 用户管理页面（增删改查 + 短信发送记录查看）
+│   │   │       ├── FlightMap.vue             # Admin 航线频率地图（ECharts 飞线图 + 城市筛选）
 │   │   │       └── SubAppPlaceholder.vue     # 子应用容器占位组件
 │   │   ├── vite.config.ts                    # Vite 配置（/api 代理到网关 8080）
 │   │   ├── vitest.config.ts                  # Vitest 单元测试配置
@@ -141,10 +142,13 @@ demo-fullstack/
 │   │   │   ├── App.tsx                       # 根组件（React Router + Ant Design ConfigProvider 暗黑/亮色主题）
 │   │   │   ├── utils/
 │   │   │   │   └── tracker.ts                # 前端埋点工具（页面访问 / 商品曝光 / 交互点击）
-│   │   │   ├── __tests__/                    # Vitest 单元测试（utils/tracker）
+│   │   │   ├── __tests__/                    # Vitest 单元测试（utils/tracker、pages/ProductList）
+│   │   │   ├── components/                   # 航线可视化组件（FlightMap2D/3D、FlightInfoPanel、FlightAnimationController）
+│   │   │   ├── public/models/plane.glb       # Cesium 3D 飞机模型
 │   │   │   └── pages/
-│   │   │       ├── ProductList.tsx           # 商品列表页（含 IntersectionObserver 曝光埋点）
-│   │   │       └── ProductDetail.tsx         # 商品详情页（含秒杀入口）
+│   │   │       ├── ProductList.tsx           # 商品列表页（含 IntersectionObserver 曝光埋点 + 机票分类入口）
+│   │   │       ├── ProductDetail.tsx         # 商品详情页（含秒杀入口）
+│   │   │       └── FlightDetail.tsx          # 机票详情页（2D/3D 地图切换 + 飞机视角动画）
 │   │   ├── vite.config.ts                    # Vite 配置（端口 7100，/api 代理到网关 8080）
 │   │   ├── vitest.config.ts                  # Vitest 单元测试配置
 │   │   └── package.json
@@ -159,9 +163,10 @@ demo-fullstack/
 │   └── e2e/                                  # Playwright 端到端测试
 │       ├── fixtures/test-data.ts             # 测试数据夹具
 │       ├── helpers.ts                        # 通用测试辅助工具
-│       ├── mocks/                            # MSW 接口 Mock（auth / order / product / user）
+│       ├── mocks/                            # 接口 Mock（auth / order / product / user / flight）
 │       ├── login.spec.ts                     # 登录流程 E2E 测试
 │       ├── product-search.spec.ts            # 商品搜索 E2E 测试
+│       ├── flight-flow.spec.ts               # 机票浏览与详情 E2E 测试
 │       ├── order-flow.spec.ts                # 订单流程 E2E 测试
 │       ├── micro-frontend.spec.ts            # 微前端加载 E2E 测试
 │       ├── theme-sync.spec.ts                # 主题同步 E2E 测试
@@ -192,9 +197,10 @@ demo-fullstack/
 
 - 创建数据库 `demo_fullstack`（utf8mb4）
 - `users` 表 — 用户数据（含审计字段 `created_by / created_date / last_modified_by / last_modified_date`，主题偏好 `theme_preference`）
-- `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`）
+- `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`；机票类商品 `category = 'flight'`）
+- `flights` 表 — 航班数据（机票商品特有字段：`product_id`、`departure_city / arrival_city`、经纬度、`flight_number`、`duration`、`frequency`、`route_coordinates` JSON，通过 `product_id` 关联 `products`）
 - `orders` 表 — 订单数据（状态流转使用 `OrderStatus` 枚举：`0待支付 → 1已支付 → 2已发货 → 3已完成 → 4已取消`，MyBatis 通过自定义 TypeHandler 自动转换）
-- 演示数据 — 3 个用户（admin / zhangsan / lisi，密码均为 `123456`）+ 6 个商品（含 3 个秒杀商品）
+- 演示数据 — 3 个用户（admin / zhangsan / lisi，密码均为 `123456`）+ 6 个普通商品（含 3 个秒杀商品）+ 8 个机票商品及对应 8 条航班数据
 
 ```bash
 # 方式一：Docker 部署时自动执行（挂载 init-sql 目录到 /docker-entrypoint-initdb.d）
@@ -342,6 +348,7 @@ cd frontend/base-app && npm run test:watch
 |---------|----------|
 | `login.spec.ts` | 登录流程（验证码 → 短信 → JWT） |
 | `product-search.spec.ts` | 商品搜索与列表展示 |
+| `flight-flow.spec.ts` | 机票浏览与航线详情跳转链路 |
 | `order-flow.spec.ts` | 订单创建与状态流转 |
 | `micro-frontend.spec.ts` | qiankun 子应用加载与切换 |
 | `theme-sync.spec.ts` | 全局主题同步（暗黑/亮色） |
@@ -363,7 +370,7 @@ npm run test:e2e:ui
 | 微服务 | 测试类数量 | 主要测试内容 |
 |--------|-----------|--------------|
 | ecommerce-user | 9 个测试类 | 认证控制器、用户控制器、验证码/短信服务、全局异常处理 |
-| ecommerce-product | 4 个测试类 | 商品控制器、商品服务、秒杀库存服务、仓储层 |
+| ecommerce-product | 7 个测试类 | 商品控制器、商品服务、秒杀库存服务、仓储层；航班 FlightController/Service/Repository |
 | ecommerce-order | 5 个测试类 | 订单控制器、订单服务、订单状态枚举、Feign 客户端、仓储层 |
 
 运行命令：
@@ -414,6 +421,13 @@ cd backend
 | POST | /api/product/products/seckill/init/{productId} | 初始化秒杀库存（ Redis 预加载） | JWT |
 | POST | /api/product/products/seckill/{productId} | 秒杀抢购（Lua 预扣 + MQ 异步下单） | JWT |
 | GET | /api/product/products/seckill/stock/{productId} | 查询秒杀库存 | JWT |
+| GET | /api/product/flights | 查询全部航班（含关联商品信息） | JWT |
+| GET | /api/product/flights/{id} | 根据 ID 查询航班详情 | JWT |
+| GET | /api/product/flights/search | 按出发/落地城市筛选航班 | JWT |
+| GET | /api/product/flights/frequency | 城市间航班频率统计（供飞线图） | JWT |
+| POST | /api/product/flights | 创建航班 | JWT |
+| PUT | /api/product/flights/{id} | 更新航班 | JWT |
+| DELETE | /api/product/flights/{id} | 删除航班 | JWT |
 
 ### 订单服务（/api/order/**）
 
@@ -611,3 +625,4 @@ spring:
 - **前端测试体系**：三个子应用均使用 Vitest 进行单元测试，E2E 测试使用 Playwright 覆盖登录、商品搜索、订单流程、微前端加载、主题同步等核心场景；根 `package.json` 提供统一测试脚本（`test:unit` / `test:e2e` / `test:all`）。
 - **后端测试体系**：三个业务微服务均提供 JUnit 5 单元测试，覆盖 controller / service / repository / entity 各层，使用 Mockito 隔离依赖。
 - **前端埋点**：product-app 内置 `tracker.ts` 埋点工具，支持页面访问（PageView）、商品曝光（ItemExpose，基于 IntersectionObserver）、交互点击（Click）三类事件，上报批处理异步发送，异常静默捕获。
+- **机票商品与航线可视化**：新增 `flight` 类商品类型与 `flights` 表，后端提供航班 CRUD 及 `/flights/frequency` 频率统计接口；Admin 端（base-app）以 ECharts 飞线图展示城市间航线频率；用户端（product-app）机票详情页支持 2D（ECharts）/3D（Cesium）地图切换、飞机视角飞行动画与实时飞行信息面板（依赖 echarts、cesium、vite-plugin-cesium）。

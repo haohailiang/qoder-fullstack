@@ -9,6 +9,8 @@
 - [request.ts（请求封装）](file://frontend/base-app/src/api/request.ts)
 - [user.ts（用户接口）](file://frontend/base-app/src/api/user.ts)
 - [sms.ts（短信记录接口）](file://frontend/base-app/src/api/sms.ts)
+- [flight.ts（航班接口）](file://frontend/base-app/src/api/flight.ts)
+- [FlightMap.vue](file://frontend/base-app/src/views/FlightMap.vue)
 - [Login.vue](file://frontend/base-app/src/views/Login.vue)
 - [Register.vue](file://frontend/base-app/src/views/Register.vue)
 - [UserManage.vue](file://frontend/base-app/src/views/UserManage.vue)
@@ -31,6 +33,7 @@
 - 实现了 Element Plus 动态语言切换功能
 - 完善了子应用（product-app、order-app）的国际化配置
 - 优化了语言状态管理和同步机制
+- **新增** Admin 航线频率飞线图页面 FlightMap.vue（基于 ECharts 飞线图 + 中国地图），配套航班 API `api/flight.ts` 与受保护路由 `/admin/flights`（requiresAuth + adminOnly），支持按出发/落地城市筛选
 
 ## 目录
 1. [简介](#简介)
@@ -104,6 +107,7 @@ O --> |"HTTP"| 网关["后端网关(8080)"]
 - 认证接口 auth.ts：登录、注册、验证码、短信验证码、当前用户、登出等 API 类型与调用。
 - 用户接口 user.ts：用户 CRUD 接口类型与调用。
 - 短信记录接口 sms.ts：查询短信发送记录。
+- 航班接口 flight.ts：封装 `/product/flights/frequency`、`/product/flights/search`、`/product/flights` 三个只读接口及 `CityFrequency`/`FrequencyData` 类型，供 Admin 飞线图使用。
 - 工具模块：
   - utils/auth.ts：token 与用户信息的响应式状态与持久化。
   - utils/theme.ts：主题模式 dark/light 的读取、切换、应用到 <html>、与后端同步。
@@ -122,6 +126,8 @@ O --> |"HTTP"| 网关["后端网关(8080)"]
 - [auth.ts:1-87](file://frontend/base-app/src/api/auth.ts#L1-L87)
 - [user.ts:1-43](file://frontend/base-app/src/api/user.ts#L1-L43)
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
+- [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
+- [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
 - [utils/auth.ts:1-60](file://frontend/base-app/src/utils/auth.ts#L1-L60)
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
@@ -272,6 +278,42 @@ Records["加载短信记录"] --> RecordTable["渲染记录表格"]
 - [UserManage.vue:1-255](file://frontend/base-app/src/views/UserManage.vue#L1-L255)
 - [user.ts:1-43](file://frontend/base-app/src/api/user.ts#L1-L43)
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
+
+### 航线频率飞线图（FlightMap）
+面向管理员的数据可视化页面，路由 `/admin/flights`（`requiresAuth` + `adminOnly`），用于展示各城市间航线的航班频率。
+- 数据获取
+  - 通过 `flight.ts` 的 `getFlightFrequency()` 调用 GET /api/product/flights/frequency，取响应体 `cityFrequency` 列表
+  - 每条 `CityFrequency` 含出发/落地城市、经纬度、frequency、flightNumber、duration 及关联商品信息
+- 可视化
+  - 基于 ECharts 飞线图（lines + effect）叠加中国地图，按频率最大值归一化飞线粗细与颜色
+  - 内置中国主要城市坐标表（cityCoords），避免额外地理编码请求
+- 交互筛选
+  - 从数据中提取出发/落地城市下拉选项，`departureCity`/`arrivalCity` 变更时通过 computed `filteredData` 实时重绘
+  - 加载失败统一 `ElMessage.error(t('flightMap.loadFailed'))`，文案随 i18n 切换
+- 生命周期：`onMounted` 初始化图表并加载数据，`onBeforeUnmount` 销毁实例并解绑 resize 监听
+
+```mermaid
+sequenceDiagram
+participant View as "FlightMap.vue"
+participant API as "flight.ts"
+participant Gateway as "后端网关"
+View->>API : getFlightFrequency()
+API->>Gateway : GET /api/product/flights/frequency
+Gateway-->>API : Result{flights, cityFrequency}
+API-->>View : FrequencyData
+View->>View : 提取城市/坐标 + 归一化频率
+View->>View : echarts.setOption(飞线图)
+View->>View : 筛选出发/落地城市重绘
+```
+
+图表来源
+- [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
+- [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
+
+章节来源
+- [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
+- [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
+- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
 
 ### 国际化配置与语言切换
 

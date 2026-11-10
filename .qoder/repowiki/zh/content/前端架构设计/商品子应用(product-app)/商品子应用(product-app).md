@@ -8,6 +8,9 @@
 - [package.json](file://frontend/product-app/package.json)
 - [ProductList.tsx](file://frontend/product-app/src/pages/ProductList.tsx)
 - [ProductDetail.tsx](file://frontend/product-app/src/pages/ProductDetail.tsx)
+- [FlightDetail.tsx](file://frontend/product-app/src/pages/FlightDetail.tsx)
+- [FlightMap2D.tsx](file://frontend/product-app/src/components/FlightMap2D.tsx)
+- [FlightMap3D.tsx](file://frontend/product-app/src/components/FlightMap3D.tsx)
 - [tracker.ts](file://frontend/product-app/src/utils/tracker.ts)
 - [tracker.spec.ts](file://frontend/product-app/src/__tests__/unit/utils/tracker.spec.ts)
 - [i18n/index.ts](file://frontend/product-app/src/i18n/index.ts)
@@ -23,6 +26,7 @@
 - 实现了 Ant Design 组件库的语言包动态切换支持
 - 添加了完整的中英文翻译资源文件
 - 完善了微前端环境下的语言状态同步机制
+- **新增** 机票商品详情页 FlightDetail，支持 2D（ECharts）/3D（Cesium）地图切换、飞机视角飞行动画与实时飞行信息面板（含 FlightMap2D/3D、FlightInfoPanel、FlightAnimationController 组件）
 - 更新了所有页面组件以使用新的国际化系统
 
 ## 目录
@@ -384,6 +388,25 @@ end
 
 **章节来源**
 - [ProductDetail.tsx:1-213](file://frontend/product-app/src/pages/ProductDetail.tsx#L1-L213)
+
+### 机票详情页(FlightDetail)
+机票商品（category='flight'）不再进入普通 ProductDetail，而是路由 `/flight/:id` 进入 FlightDetail。
+
+- 数据获取
+  - 根据路由参数 id 调用 GET /api/product/flights/:id 获取航班详情（含关联商品信息）
+  - 解析 routeCoordinates JSON 得到途经城市列表（JSON.parse 失败时安全回退为空数组）
+- 2D/3D 地图切换
+  - Segmented 控件在 2D（FlightMap2D，ECharts 单航线飞线）与 3D（FlightMap3D，Cesium 地球 + 弧线航线 + GLB 飞机模型）间切换
+  - 3D 模式下额外提供“全局俯瞰 / 飞机视角”切换，并展示 FlightAnimationController（播放/暂停 + 进度拖动）与 FlightInfoPanel（已飞时间/剩余/高度/接近城市）
+- 入口联动
+  - ProductList 中机票商品卡片使用 RocketOutlined 图标，点击“查看详情”时根据 category 判断跳转 `/flight/:id`
+- 依赖
+  - echarts（2D 飞线）、cesium + vite-plugin-cesium（3D 地球与模型）
+
+**章节来源**
+- [FlightDetail.tsx](file://frontend/product-app/src/pages/FlightDetail.tsx)
+- [App.tsx:70-79](file://frontend/product-app/src/App.tsx#L70-L79)
+- [ProductList.tsx:117-188](file://frontend/product-app/src/pages/ProductList.tsx#L117-L188)
 
 ## 依赖关系分析
 - 运行时依赖

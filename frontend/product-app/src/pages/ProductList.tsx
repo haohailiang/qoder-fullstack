@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Card, Input, Select, Button, List, Tag, Space, message } from 'antd'
-import { SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons'
+import { SearchOutlined, ShoppingCartOutlined, RocketOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -114,13 +114,17 @@ function ProductList() {
     fetchProducts()
   }
 
-  const handleDetail = (id: number) => {
+  const handleDetail = (id: number, category?: string) => {
     try {
       trackClick(id, 'viewDetail')
     } catch {
       // 埋点异常不影响业务
     }
-    navigate(`/detail/${id}`)
+    if (category === 'flight') {
+      navigate(`/flight/${id}`)
+    } else {
+      navigate(`/detail/${id}`)
+    }
   }
 
   return (
@@ -147,6 +151,7 @@ function ProductList() {
               { label: t('product.categoryClothing'), value: 'clothing' },
               { label: t('product.categoryFood'), value: 'food' },
               { label: t('product.categoryBooks'), value: 'books' },
+              { label: t('product.categoryFlight'), value: 'flight' },
             ]}
           />
           <Button type="primary" onClick={handleSearch}>
@@ -176,11 +181,14 @@ function ProductList() {
                     justifyContent: 'center',
                   }}
                 >
-                  <ShoppingCartOutlined style={{ fontSize: 48, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
+                  {item.category === 'flight'
+                    ? <RocketOutlined style={{ fontSize: 48, color: 'var(--ant-color-primary, #1677ff)' }} />
+                    : <ShoppingCartOutlined style={{ fontSize: 48, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
+                  }
                 </div>
               }
               actions={[
-                <Button type="link" onClick={() => handleDetail(item.id)}>
+                <Button type="link" onClick={() => handleDetail(item.id, item.category)}>
                   {t('product.viewDetail')}
                 </Button>,
               ]}

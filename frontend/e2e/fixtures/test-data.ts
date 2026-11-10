@@ -172,6 +172,99 @@ export function mockOrderList(count = 3): MockOrder[] {
   )
 }
 
+// ---------- 航班数据（机票详情） ----------
+export interface MockFlightDetail {
+  id: number
+  productId: number
+  departureCity: string
+  arrivalCity: string
+  departureLng: number
+  departureLat: number
+  arrivalLng: number
+  arrivalLat: number
+  flightNumber: string
+  duration: number
+  frequency: number
+  routeCoordinates: string
+  productName: string
+  productDescription: string
+  productPrice: number
+  productStock: number
+  productStatus: number
+}
+
+export function mockFlightDetail(overrides: Partial<MockFlightDetail> = {}): MockFlightDetail {
+  return {
+    id: 1,
+    productId: 7,
+    departureCity: '北京',
+    arrivalCity: '上海',
+    departureLng: 116.4074,
+    departureLat: 39.9042,
+    arrivalLng: 121.4737,
+    arrivalLat: 31.2304,
+    flightNumber: 'CA1234',
+    duration: 135,
+    frequency: 28,
+    routeCoordinates: JSON.stringify([{ name: '济南', lng: 117.0009, lat: 36.6758 }]),
+    productName: '北京→上海 机票',
+    productDescription: '首都机场至虹桥机场 CA1234',
+    productPrice: 1280,
+    productStock: 100,
+    productStatus: 1,
+    ...overrides,
+  }
+}
+
+export interface MockCityFrequency {
+  id: number
+  from: string
+  to: string
+  fromLng: number
+  fromLat: number
+  toLng: number
+  toLat: number
+  frequency: number
+  flightNumber: string
+  duration: number
+  routeCoordinates: string
+  productId: number
+  productName: string
+  productPrice: number
+}
+
+export function mockCityFrequency(
+  overrides: Partial<MockCityFrequency> = {},
+): MockCityFrequency {
+  return {
+    id: 1,
+    from: '北京',
+    to: '上海',
+    fromLng: 116.4074,
+    fromLat: 39.9042,
+    toLng: 121.4737,
+    toLat: 31.2304,
+    frequency: 28,
+    flightNumber: 'CA1234',
+    duration: 135,
+    routeCoordinates: JSON.stringify([{ name: '济南', lng: 117.0009, lat: 36.6758 }]),
+    productId: 7,
+    productName: '北京→上海 机票',
+    productPrice: 1280,
+    ...overrides,
+  }
+}
+
+export function mockFrequencyData(count = 3) {
+  return Array.from({ length: count }, (_, i) =>
+    mockCityFrequency({
+      id: i + 1,
+      flightNumber: `CA${1000 + i}`,
+      frequency: 28 - i,
+    }),
+  )
+}
+
 // ---------- 统一 API 响应包装 ----------
 export function apiSuccess<T>(data: T): ApiResponse<T> {
   return { code: 200, message: 'ok', data }

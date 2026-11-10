@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, MemoryRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper'
 import { ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import enUS from 'antd/locale/en_US'
@@ -7,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import './i18n'
 import ProductList from './pages/ProductList'
 import ProductDetail from './pages/ProductDetail'
+import FlightDetail from './pages/FlightDetail'
 
 type ThemeMode = 'dark' | 'light'
 
@@ -59,13 +61,25 @@ function App() {
         algorithm: themeMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
       }}
     >
-      <BrowserRouter basename="/product">
-        <Routes>
-          <Route path="/" element={<Navigate to="/list" replace />} />
-          <Route path="/list" element={<ProductList />} />
-          <Route path="/detail/:id" element={<ProductDetail />} />
-        </Routes>
-      </BrowserRouter>
+      {qiankunWindow.__POWERED_BY_QIANKUN__ ? (
+        <MemoryRouter initialEntries={['/list']}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/list" replace />} />
+            <Route path="/list" element={<ProductList />} />
+            <Route path="/detail/:id" element={<ProductDetail />} />
+            <Route path="/flight/:id" element={<FlightDetail />} />
+          </Routes>
+        </MemoryRouter>
+      ) : (
+        <BrowserRouter basename="/product">
+          <Routes>
+            <Route path="/" element={<Navigate to="/list" replace />} />
+            <Route path="/list" element={<ProductList />} />
+            <Route path="/detail/:id" element={<ProductDetail />} />
+            <Route path="/flight/:id" element={<FlightDetail />} />
+          </Routes>
+        </BrowserRouter>
+      )}
     </ConfigProvider>
   )
 }

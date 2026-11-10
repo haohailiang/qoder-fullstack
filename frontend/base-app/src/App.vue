@@ -27,6 +27,9 @@ const isInSubApp = computed(() => {
   return route.path.startsWith('/product') || route.path.startsWith('/order')
 })
 
+// 当前是否为管理员
+const isAdmin = computed(() => currentUserRef.value?.username === 'admin')
+
 // 当前是否为暗黑模式
 const isDark = computed(() => themeRef.value === 'dark')
 
@@ -48,8 +51,21 @@ async function handleLogout() {
   router.push('/login')
 }
 
-function navigateTo(path: string) {
-  router.push(path)
+// 菜单活跃索引（双向绑定 el-menu，保持与路由同步）
+const activeMenu = computed(() => {
+  const p = route.path
+  // 子应用内部路由（如 /product/list）映射到顶级菜单索引 /product
+  if (p.startsWith('/product')) return '/product'
+  if (p.startsWith('/order')) return '/order'
+  return p
+})
+
+function navigateTo(index: unknown) {
+  // el-menu 的 @select 在 active-index 属性变化时可能内部触发，传入非字符串值
+  // 仅处理用户主动点击产生的合法字符串路径
+  if (typeof index !== 'string' || !index.startsWith('/')) return
+  if (index === route.path) return
+  router.push(index)
 }
 </script>
 
@@ -61,13 +77,14 @@ function navigateTo(path: string) {
           <span class="app-title">{{ t('app.title') }}</span>
           <el-menu
             mode="horizontal"
-            :default-active="route.path"
+            :active-index="activeMenu"
             class="nav-menu"
             @select="navigateTo"
           >
             <el-menu-item index="/users">{{ t('app.menuUsers') }}</el-menu-item>
             <el-menu-item index="/product">{{ t('app.menuProducts') }}</el-menu-item>
             <el-menu-item index="/order">{{ t('app.menuOrders') }}</el-menu-item>
+            <el-menu-item v-if="isAdmin" index="/admin/flights">{{ t('app.menuFlightMap') }}</el-menu-item>
           </el-menu>
         </div>
         <div class="user-area">

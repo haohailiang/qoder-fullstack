@@ -4,6 +4,10 @@ import App from './App'
 import { renderWithQiankun, qiankunWindow } from 'vite-plugin-qiankun/dist/helper'
 import i18n from './i18n'
 
+// 保存 React root 引用，确保 qiankun unmount 时能正确卸载 React 树
+// 避免 "removeChild: The node to be removed is not a child of this node" 错误
+let reactRoot: ReactDOM.Root | null = null
+
 // 判断是否在 qiankun 环境中运行
 function render(props: any = {}) {
   const { container } = props
@@ -11,7 +15,8 @@ function render(props: any = {}) {
     ? container.querySelector('#root')
     : document.getElementById('root')
   
-  ReactDOM.createRoot(rootElement!).render(
+  reactRoot = ReactDOM.createRoot(rootElement!)
+  reactRoot.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
@@ -28,12 +33,10 @@ renderWithQiankun({
   },
   unmount(props) {
     console.log('[product-app] unmount')
-    const { container } = props
-    const rootElement = container
-      ? container.querySelector('#root')
-      : document.getElementById('root')
-    if (rootElement) {
-      ReactDOM.createRoot(rootElement).unmount()
+    // 使用保存的 root 引用正确卸载 React 树
+    if (reactRoot) {
+      reactRoot.unmount()
+      reactRoot = null
     }
   },
   update(props) {
