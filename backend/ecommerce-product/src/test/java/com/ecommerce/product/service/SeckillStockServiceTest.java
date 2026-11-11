@@ -190,14 +190,26 @@ class SeckillStockServiceTest {
         }
 
         @Test
-        @DisplayName("库存不足：Lua 脚本返回 0")
-        void shouldReturnZeroWhenStockInsufficient() {
+        @DisplayName("库存不足：Lua 脚本返回 -2")
+        void shouldReturnMinusTwoWhenStockInsufficient() {
             when(redisTemplate.execute(any(DefaultRedisScript.class), any(), any()))
-                    .thenReturn(0L);
+                    .thenReturn(SeckillStockService.RESULT_INSUFFICIENT);
 
             Long remaining = seckillStockService.tryDecrStock(10L, 100);
 
-            assertThat(remaining).isEqualTo(0L);
+            assertThat(remaining).isEqualTo(-2L);
+        }
+
+        @Test
+        @DisplayName("刚好售罄：Lua 脚本返回 0，属于扣减成功而非库存不足")
+        void shouldReturnZeroWhenSoldOutExactly() {
+            when(redisTemplate.execute(any(DefaultRedisScript.class), any(), any()))
+                    .thenReturn(0L);
+
+            Long remaining = seckillStockService.tryDecrStock(10L, 1);
+
+            assertThat(remaining).isZero();
+            assertThat(remaining).isNotEqualTo(SeckillStockService.RESULT_INSUFFICIENT);
         }
 
         @Test

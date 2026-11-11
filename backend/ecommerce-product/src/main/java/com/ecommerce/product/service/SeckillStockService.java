@@ -18,6 +18,11 @@ public class SeckillStockService {
     private static final String STOCK_KEY_PREFIX = "seckill:stock:";
     private static final String BOUGHT_KEY_PREFIX = "seckill:bought:";
 
+    /** Lua 返回值：库存未初始化 */
+    public static final long RESULT_NOT_INITIALIZED = -1L;
+    /** Lua 返回值：库存不足 */
+    public static final long RESULT_INSUFFICIENT = -2L;
+
     private final StringRedisTemplate redisTemplate;
     private final DefaultRedisScript<Long> seckillScript;
 
@@ -39,7 +44,10 @@ public class SeckillStockService {
 
     /**
      * 尝试预扣减库存（Lua 脚本保证原子性）
-     * @return 剩余库存量，-1=库存未初始化，0=库存不足
+     *
+     * @return 大于等于 0 时为扣减成功后的剩余库存（0 表示刚好售罄，仍属于成功）；
+     *         {@link #RESULT_NOT_INITIALIZED} 表示库存未初始化；
+     *         {@link #RESULT_INSUFFICIENT} 表示库存不足
      */
     public Long tryDecrStock(Long productId, Integer quantity) {
         String key = STOCK_KEY_PREFIX + productId;
@@ -49,7 +57,7 @@ public class SeckillStockService {
     }
 
     /**
-     * 回滚库存（消费失败时恢复）
+     * 回滚库存（下单消息投递失败或订单消费失败时恢复 Redis 预扣的数量）
      */
     public void rollbackStock(Long productId, Integer quantity) {
         String key = STOCK_KEY_PREFIX + productId;

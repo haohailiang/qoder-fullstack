@@ -7,7 +7,7 @@ spring:
   application:
     name: ecommerce-order
   datasource:
-    url: jdbc:mysql://192.168.178.100:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://192.168.178.100:3306/qoder_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -31,7 +31,9 @@ spring:
     virtual-host: /
     listener:
       simple:
-        acknowledge-mode: manual
+        # AUTO：监听方法正常返回后由容器 ack，抛异常则重试 max-attempts 次后进死信队列
+        # （此前为 manual，但消费者未持有 Channel/deliveryTag 也就从未 ack，导致消息常驻 unacked）
+        acknowledge-mode: auto
         prefetch: 1
         retry:
           enabled: true
@@ -50,9 +52,17 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
-# JWT 配置
+# JWT 配置（网关与用户服务共用同一签名密钥）
 jwt:
-  secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
+  secret: ${JWT_SECRET:qoder-fullstack-jwt-secret-key-change-me-in-production-2026}
+
+# 身份头信任边界：网关已向下游注入 X-User-Id / X-User-Name / X-User-Role 及 HMAC 签名头
+security:
+  trusted-header:
+    # false：保留本地直连 8083 调试能力（开发环境已知取舍）
+    # true：只接受带合法网关签名的请求，容器化/对外部署必须开启，并配合网络隔离
+    verify-signature: ${TRUSTED_HEADER_VERIFY_SIGNATURE:false}
+    max-age-seconds: 300
 
 # OpenFeign 配置
 spring.cloud.openfeign:
@@ -64,7 +74,8 @@ spring.cloud.openfeign:
 
 logging:
   level:
-    com.ecommerce.order: DEBUG
+    # 默认 INFO，本地需要详细日志时用 APP_LOG_LEVEL=DEBUG 覆盖
+    com.ecommerce.order: ${APP_LOG_LEVEL:INFO}
 
 # Springdoc OpenAPI 配置
 springdoc:

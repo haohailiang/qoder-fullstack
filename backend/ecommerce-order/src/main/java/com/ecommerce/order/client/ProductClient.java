@@ -17,4 +17,12 @@ public interface ProductClient {
     @PostMapping("/deduct-stock")
     Result<Boolean> deductStock(@RequestParam("productId") Long productId,
                                 @RequestParam("quantity") Integer quantity);
+
+    /**
+     * 秒杀库存回滚（订单落库失败进入死信后回调，恢复 Redis 预扣库存与购买标记）
+     */
+    @PostMapping("/seckill/rollback")
+    Result<Void> rollbackSeckillStock(@RequestParam("productId") Long productId,
+                                      @RequestParam("quantity") Integer quantity,
+                                      @RequestParam("userId") Long userId);
 }
