@@ -38,7 +38,7 @@ test.describe('用户登录', () => {
   test('登录成功后应将 token 写入 localStorage', async ({ page }) => {
     await adminLogin(page)
 
-    const token = await getLocalStorage(page, 'demo_token')
+    const token = await getLocalStorage(page, 'qoder_token')
     expect(token).toBeTruthy()
     expect(token).toBe('mock-jwt-token-e2e-test')
   })
@@ -46,7 +46,7 @@ test.describe('用户登录', () => {
   test('登录成功后应将用户信息写入 localStorage', async ({ page }) => {
     await adminLogin(page)
 
-    const userRaw = await getLocalStorage(page, 'demo_user')
+    const userRaw = await getLocalStorage(page, 'qoder_user')
     expect(userRaw).toBeTruthy()
 
     const user = JSON.parse(userRaw!)
@@ -58,8 +58,8 @@ test.describe('用户登录', () => {
     // 确保无 token
     await page.goto('/login')
     await page.evaluate(() => {
-      localStorage.removeItem('demo_token')
-      localStorage.removeItem('demo_user')
+      localStorage.removeItem('qoder_token')
+      localStorage.removeItem('qoder_user')
     })
 
     await page.goto('/users')
@@ -89,7 +89,7 @@ test.describe('用户登录', () => {
     await page.waitForURL('**/login', { timeout: 10_000 })
 
     // 验证 localStorage 已清除
-    const token = await getLocalStorage(page, 'demo_token')
+    const token = await getLocalStorage(page, 'qoder_token')
     expect(token).toBeNull()
   })
 })

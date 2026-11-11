@@ -78,20 +78,20 @@ test.describe('微前端架构适配', () => {
 
   // ---------- 全局状态共享 ----------
   test('登录后 token 应存在于 localStorage 中', async ({ page }) => {
-    const token = await getLocalStorage(page, 'demo_token')
+    const token = await getLocalStorage(page, 'qoder_token')
     expect(token).toBeTruthy()
   })
 
   test('主题偏好应存储在 localStorage 中', async ({ page }) => {
     // 登录后主题偏好应被设置
-    const theme = await getLocalStorage(page, 'demo_theme')
+    const theme = await getLocalStorage(page, 'qoder_theme')
     // 可能是 dark 或 light，但应该有值
     // 如果没有设置，默认是 dark
     expect(theme === null || theme === 'dark' || theme === 'light').toBe(true)
   })
 
   test('语言偏好应存储在 localStorage 中', async ({ page }) => {
-    const lang = await getLocalStorage(page, 'demo_lang')
+    const lang = await getLocalStorage(page, 'qoder_lang')
     expect(lang === null || lang === 'zh' || lang === 'en').toBe(true)
   })
 

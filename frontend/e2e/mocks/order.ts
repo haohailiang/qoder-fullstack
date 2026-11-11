@@ -23,18 +23,8 @@ export async function setupOrderMocks(page: Page): Promise<void> {
     })
   })
 
-  // 获取全部订单
-  await page.route('**/api/order/orders', (route) => {
-    if (route.request().method() === 'GET') {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(apiSuccess(orders)),
-      })
-    }
-  })
-
-  // 创建订单
+  // 订单集合接口：同一 URL 上 GET（全部订单，管理接口）与 POST（创建订单）合并注册，
+  // 分两次注册会让后注册的 handler 遮蔽前一个路由，导致未命中方法的请求挂起
   await page.route('**/api/order/orders', (route) => {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON()
@@ -52,7 +42,14 @@ export async function setupOrderMocks(page: Page): Promise<void> {
         contentType: 'application/json',
         body: JSON.stringify(apiSuccess(newOrder)),
       })
+      return
     }
+
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(apiSuccess(orders)),
+    })
   })
 
   // 取消订单

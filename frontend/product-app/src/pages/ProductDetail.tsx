@@ -28,7 +28,7 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1)
   const [loading, setLoading] = useState(false)
 
-  const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
+  const isDark = (localStorage.getItem('qoder_theme') || 'dark') === 'dark'
   const pageBg = isDark ? '#141414' : '#f5f5f5'
 
   useEffect(() => {
@@ -37,7 +37,7 @@ function ProductDetail() {
 
   const fetchProduct = async () => {
     try {
-      const token = localStorage.getItem('demo_token')
+      const token = localStorage.getItem('qoder_token')
       const response = await axios.get(`/api/product/products/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
@@ -53,7 +53,7 @@ function ProductDetail() {
     if (!product) return
     setLoading(true)
     try {
-      const token = localStorage.getItem('demo_token')
+      const token = localStorage.getItem('qoder_token')
       const response = await axios.post(
         '/api/order/orders',
         {
@@ -81,7 +81,7 @@ function ProductDetail() {
     if (!product) return
     setLoading(true)
     try {
-      const token = localStorage.getItem('demo_token')
+      const token = localStorage.getItem('qoder_token')
       const response = await axios.post(
         `/api/product/products/seckill/${product.id}?quantity=${quantity}`,
         {},

@@ -4,7 +4,7 @@ import request from '@/api/request'
 /** 主题类型：dark（暗黑模式）或 light（亮色模式） */
 export type ThemeMode = 'dark' | 'light'
 
-const THEME_KEY = 'demo_theme'
+const THEME_KEY = 'qoder_theme'
 
 /** 响应式主题状态，供全局组件实时读取 */
 export const themeRef = ref<ThemeMode>(readTheme())
@@ -71,7 +71,7 @@ export async function initTheme() {
   applyTheme(themeRef.value)
 
   // 如果已登录，尝试从后端加载最新偏好
-  const token = localStorage.getItem('demo_token')
+  const token = localStorage.getItem('qoder_token')
   if (token) {
     try {
       const result = await request.get<{ theme: ThemeMode }>('/user/users/theme')

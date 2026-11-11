@@ -27,7 +27,7 @@ export class OrderApp {
   constructor(container: HTMLElement, props: any = {}) {
     this.container = container
     this.props = props
-    this.theme = (localStorage.getItem('demo_theme') as 'dark' | 'light') || 'dark'
+    this.theme = (localStorage.getItem('qoder_theme') as 'dark' | 'light') || 'dark'
   }
 
   async render() {
@@ -116,6 +116,7 @@ export class OrderApp {
     }
   }
 
+  /** 全部订单为后端管理接口（仅 ADMIN），普通用户会得到 403，需把后端提示展示出来 */
   private async loadAllOrders() {
     this.loading = true
     try {
@@ -126,6 +127,8 @@ export class OrderApp {
       if (response.data.code === 200) {
         this.orders = response.data.data || []
         this.renderOrderList()
+      } else {
+        this.renderError(response.data.message || t('order.fetchFailed'))
       }
     } catch (error) {
       this.renderError(t('order.fetchFailed'))
@@ -300,7 +303,7 @@ export class OrderApp {
       return this.props.getToken()
     }
     // 否则从 localStorage 获取
-    return localStorage.getItem('demo_token')
+    return localStorage.getItem('qoder_token')
   }
 
   destroy() {

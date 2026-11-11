@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next'
 import zh from './zh'
 import en from './en'
 
-const LANG_KEY = 'demo_lang'
+const LANG_KEY = 'qoder_lang'
 
 function readLang(): string {
   const stored = localStorage.getItem(LANG_KEY)

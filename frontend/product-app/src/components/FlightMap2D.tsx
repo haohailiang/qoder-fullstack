@@ -110,7 +110,7 @@ function FlightMap2D({ flight, routeCities }: Props) {
       }
     }
 
-    const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
+    const isDark = (localStorage.getItem('qoder_theme') || 'dark') === 'dark'
 
     const option: echarts.EChartsOption = {
       backgroundColor: 'transparent',

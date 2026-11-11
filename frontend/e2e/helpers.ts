@@ -93,14 +93,14 @@ export function setLocalStorage(page: Page, key: string, value: string): Promise
 }
 
 /**
- * 清除所有 demo_ 前缀的 localStorage 项。
+ * 清除所有 qoder_ 前缀的 localStorage 项。
  */
-export function clearDemoStorage(page: Page): Promise<void> {
+export function clearQoderStorage(page: Page): Promise<void> {
   return page.evaluate(() => {
     const keys: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
-      if (key?.startsWith('demo_')) keys.push(key)
+      if (key?.startsWith('qoder_')) keys.push(key)
     }
     keys.forEach((k) => localStorage.removeItem(k))
   })

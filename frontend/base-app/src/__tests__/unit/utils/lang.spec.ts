@@ -24,7 +24,7 @@ vi.mock('@/i18n', () => {
         locale: localeRef,
       },
     },
-    LANG_KEY: 'demo_lang',
+    LANG_KEY: 'qoder_lang',
   }
 })
 
@@ -55,7 +55,7 @@ describe('utils/lang', () => {
 
     it('应写入 localStorage', async () => {
       await setLang('en')
-      expect(localStorage.getItem('demo_lang')).toBe('en')
+      expect(localStorage.getItem('qoder_lang')).toBe('en')
     })
 
     it('应同步更新 vue-i18n 的 locale', async () => {
@@ -80,7 +80,7 @@ describe('utils/lang', () => {
   // ---------- initLang ----------
   describe('initLang', () => {
     it('无 token 时应使用本地缓存的语言', async () => {
-      localStorage.setItem('demo_lang', 'en')
+      localStorage.setItem('qoder_lang', 'en')
       langRef.value = 'en'
       const i18n = (await import('@/i18n')).default
       // initLang 会设置 locale
@@ -89,7 +89,7 @@ describe('utils/lang', () => {
     })
 
     it('有 token 且后端返回语言时应更新', async () => {
-      localStorage.setItem('demo_token', 'test-token')
+      localStorage.setItem('qoder_token', 'test-token')
       const request = (await import('@/api/request')).default
       vi.mocked(request.get).mockResolvedValueOnce({ language: 'en' })
 
@@ -97,12 +97,12 @@ describe('utils/lang', () => {
       await initLang()
 
       expect(langRef.value).toBe('en')
-      expect(localStorage.getItem('demo_lang')).toBe('en')
+      expect(localStorage.getItem('qoder_lang')).toBe('en')
     })
 
     it('后端请求失败时应静默使用本地缓存', async () => {
-      localStorage.setItem('demo_token', 'test-token')
-      localStorage.setItem('demo_lang', 'zh')
+      localStorage.setItem('qoder_token', 'test-token')
+      localStorage.setItem('qoder_lang', 'zh')
       langRef.value = 'zh'
 
       const request = (await import('@/api/request')).default

@@ -32,7 +32,7 @@ renderWithQiankun({
     console.log('[order-app] update', props)
     // 接收基座应用的主题状态
     if (props?.theme) {
-      localStorage.setItem('demo_theme', props.theme)
+      localStorage.setItem('qoder_theme', props.theme)
       // 重新渲染以应用新主题
       if (appInstance) {
         appInstance.render()
@@ -40,7 +40,7 @@ renderWithQiankun({
     }
     // 接收基座应用的语言状态
     if (props?.lang) {
-      localStorage.setItem('demo_lang', props.lang)
+      localStorage.setItem('qoder_lang', props.lang)
       // 重新渲染以应用新语言
       if (appInstance) {
         appInstance.render()

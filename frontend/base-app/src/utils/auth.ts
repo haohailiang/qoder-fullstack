@@ -7,8 +7,8 @@ import { ref } from 'vue'
  * - sessionStorage 每个标签页独立，新开标签页会要求重新登录
  * 代价是 Token 长期驻留，因此仅用于开发演示，生产环境可结合后端 Token 有效期控制。
  */
-const TOKEN_KEY = 'demo_token'
-const USER_KEY = 'demo_user'
+const TOKEN_KEY = 'qoder_token'
+const USER_KEY = 'qoder_user'
 
 /** 响应式 Token，供路由守卫与 App 头部实时读取 */
 export const tokenRef = ref<string | null>(localStorage.getItem(TOKEN_KEY))

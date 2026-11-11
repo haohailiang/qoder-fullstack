@@ -29,12 +29,12 @@ describe('utils/auth', () => {
     it('应将 token 写入 localStorage 并可通过 getToken 读取', () => {
       setAuth('jwt-token-123', mockUser)
       expect(getToken()).toBe('jwt-token-123')
-      expect(localStorage.getItem('demo_token')).toBe('jwt-token-123')
+      expect(localStorage.getItem('qoder_token')).toBe('jwt-token-123')
     })
 
     it('应将用户信息序列化后写入 localStorage', () => {
       setAuth('jwt-token-123', mockUser)
-      const stored = JSON.parse(localStorage.getItem('demo_user')!)
+      const stored = JSON.parse(localStorage.getItem('qoder_user')!)
       expect(stored).toEqual(mockUser)
     })
 
@@ -56,8 +56,8 @@ describe('utils/auth', () => {
     it('应清除 localStorage 中的 token 和 user', () => {
       setAuth('token', mockUser)
       clearAuth()
-      expect(localStorage.getItem('demo_token')).toBeNull()
-      expect(localStorage.getItem('demo_user')).toBeNull()
+      expect(localStorage.getItem('qoder_token')).toBeNull()
+      expect(localStorage.getItem('qoder_user')).toBeNull()
     })
 
     it('应将 tokenRef 和 currentUserRef 重置为 null', () => {
@@ -75,7 +75,7 @@ describe('utils/auth', () => {
     })
 
     it('tokenRef 应在 setAuth 后正确反映 localStorage 的值', () => {
-      localStorage.setItem('demo_token', 'pre-existing')
+      localStorage.setItem('qoder_token', 'pre-existing')
       // tokenRef 在模块加载时初始化，由于模块缓存无法重新触发
       // 这里验证 setAuth 能正确更新 tokenRef
       setAuth('pre-existing', mockUser)
@@ -86,7 +86,7 @@ describe('utils/auth', () => {
   // ---------- currentUserRef 初始化 ----------
   describe('currentUserRef 初始化', () => {
     it('localStorage 中有合法用户 JSON 时应正确解析', () => {
-      localStorage.setItem('demo_user', JSON.stringify(mockUser))
+      localStorage.setItem('qoder_user', JSON.stringify(mockUser))
       // 注意：模块已加载，currentUserRef 在模块初始化时读取
       // 这里验证 setAuth 后重新读取的场景
       setAuth('t', mockUser)
@@ -94,7 +94,7 @@ describe('utils/auth', () => {
     })
 
     it('localStorage 中有非法 JSON 时应为 null', () => {
-      localStorage.setItem('demo_user', 'not-json')
+      localStorage.setItem('qoder_user', 'not-json')
       clearAuth()
       expect(currentUserRef.value).toBeNull()
     })

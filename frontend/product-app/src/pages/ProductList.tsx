@@ -29,7 +29,7 @@ function ProductList() {
   const listRef = useRef<HTMLDivElement>(null)
   const exposedSet = useRef<Set<number>>(new Set())
 
-  const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
+  const isDark = (localStorage.getItem('qoder_theme') || 'dark') === 'dark'
   const pageBg = isDark ? '#141414' : '#f5f5f5'
 
   const fetchProducts = async () => {
@@ -39,7 +39,7 @@ function ProductList() {
       if (keyword) params.keyword = keyword
       if (category) params.category = category
       
-      const token = localStorage.getItem('demo_token')
+      const token = localStorage.getItem('qoder_token')
       const response = await axios.get('/api/product/products/search', {
         params,
         headers: token ? { Authorization: `Bearer ${token}` } : {},

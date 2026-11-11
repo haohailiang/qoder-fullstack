@@ -52,7 +52,7 @@ function FlightDetail() {
   const [animProgress, setAnimProgress] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
 
-  const isDark = (localStorage.getItem('demo_theme') || 'dark') === 'dark'
+  const isDark = (localStorage.getItem('qoder_theme') || 'dark') === 'dark'
   const pageBg = isDark ? '#141414' : '#f5f5f5'
 
   useEffect(() => {
@@ -61,7 +61,7 @@ function FlightDetail() {
 
   const fetchFlight = async () => {
     try {
-      const token = localStorage.getItem('demo_token')
+      const token = localStorage.getItem('qoder_token')
       const response = await axios.get(`/api/product/flights/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })

@@ -27,7 +27,7 @@ function buildContext(pageName: string): TrackContext {
   let userId: string | null = null
   try {
     // 优先从 localStorage 获取（base-app 登录后写入）
-    userId = localStorage.getItem('demo_token')
+    userId = localStorage.getItem('qoder_token')
     // 若只需纯 ID 可在此处解码 JWT，当前仅做透传标识
   } catch {
     // 跨域 / 隐私模式下 localStorage 可能不可用，静默忽略

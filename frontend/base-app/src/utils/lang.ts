@@ -51,7 +51,7 @@ export async function initLang() {
   i18n.global.locale.value = langRef.value
 
   // 如果已登录，尝试从后端加载最新偏好
-  const token = localStorage.getItem('demo_token')
+  const token = localStorage.getItem('qoder_token')
   if (token) {
     try {
       const result = await request.get<{ language: Lang }>('/user/users/language')

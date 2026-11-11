@@ -2,7 +2,7 @@
  * 轻量级国际化模块（order-app 使用原生 TS，无需完整 i18n 库）
  */
 
-const LANG_KEY = 'demo_lang'
+const LANG_KEY = 'qoder_lang'
 
 type Lang = 'zh' | 'en'
 

@@ -15,14 +15,14 @@ type ThemeMode = 'dark' | 'light'
 function App() {
   const { i18n } = useTranslation()
   const [themeMode, setThemeMode] = useState<ThemeMode>(
-    () => (localStorage.getItem('demo_theme') as ThemeMode) || 'dark'
+    () => (localStorage.getItem('qoder_theme') as ThemeMode) || 'dark'
   )
   const [currentLang, setCurrentLang] = useState<string>(i18n.language || 'zh')
 
   useEffect(() => {
     // 监听 qiankun 全局状态变化（主题 + 语言）
     const handleStorage = () => {
-      const stored = (localStorage.getItem('demo_theme') as ThemeMode) || 'dark'
+      const stored = (localStorage.getItem('qoder_theme') as ThemeMode) || 'dark'
       setThemeMode(stored)
       setCurrentLang(i18n.language || 'zh')
     }
@@ -33,7 +33,7 @@ function App() {
   // 监听来自 qiankun 的主题变化
   useEffect(() => {
     const observer = new MutationObserver(() => {
-      const stored = (localStorage.getItem('demo_theme') as ThemeMode) || 'dark'
+      const stored = (localStorage.getItem('qoder_theme') as ThemeMode) || 'dark'
       if (stored !== themeMode) {
         setThemeMode(stored)
       }

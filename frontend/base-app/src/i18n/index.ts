@@ -2,7 +2,7 @@ import { createI18n } from 'vue-i18n'
 import zh from './zh'
 import en from './en'
 
-const LANG_KEY = 'demo_lang'
+const LANG_KEY = 'qoder_lang'
 
 /** 读取本地缓存的语言，默认 zh */
 function readLang(): 'zh' | 'en' {

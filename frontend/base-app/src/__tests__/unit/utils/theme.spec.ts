@@ -30,7 +30,7 @@ describe('utils/theme', () => {
     })
 
     it('localStorage 有值时应返回对应主题', () => {
-      localStorage.setItem('demo_theme', 'light')
+      localStorage.setItem('qoder_theme', 'light')
       themeRef.value = 'light'
       expect(getTheme()).toBe('light')
     })
@@ -59,7 +59,7 @@ describe('utils/theme', () => {
 
     it('应写入 localStorage', async () => {
       await setTheme('light')
-      expect(localStorage.getItem('demo_theme')).toBe('light')
+      expect(localStorage.getItem('qoder_theme')).toBe('light')
     })
 
     it('应将 dark 类应用到 html 元素', async () => {

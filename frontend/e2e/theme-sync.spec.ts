@@ -49,25 +49,25 @@ test.describe('主题跨应用同步', () => {
     const themeBtn = page.locator('.theme-toggle-btn')
 
     // 切换到 light
-    await page.evaluate(() => localStorage.setItem('demo_theme', 'dark'))
+    await page.evaluate(() => localStorage.setItem('qoder_theme', 'dark'))
     await themeBtn.click()
     await page.waitForTimeout(500)
 
-    const theme = await getLocalStorage(page, 'demo_theme')
+    const theme = await getLocalStorage(page, 'qoder_theme')
     expect(theme).toBe('light')
 
     // 切换回 dark
     await themeBtn.click()
     await page.waitForTimeout(500)
 
-    const theme2 = await getLocalStorage(page, 'demo_theme')
+    const theme2 = await getLocalStorage(page, 'qoder_theme')
     expect(theme2).toBe('dark')
   })
 
   // ---------- product-app 主题适配 ----------
   test('product-app 应读取 localStorage 中的主题并应用', async ({ page }) => {
     // 先设置为 light 主题
-    await page.evaluate(() => localStorage.setItem('demo_theme', 'light'))
+    await page.evaluate(() => localStorage.setItem('qoder_theme', 'light'))
 
     // 导航到商品页
     await page.goto('/product/list')
@@ -87,7 +87,7 @@ test.describe('主题跨应用同步', () => {
 
   test('product-app 在 dark 主题下应使用深色背景', async ({ page }) => {
     // 确保 dark 主题
-    await page.evaluate(() => localStorage.setItem('demo_theme', 'dark'))
+    await page.evaluate(() => localStorage.setItem('qoder_theme', 'dark'))
 
     await page.goto('/product/list')
     await waitForSubAppMount(page)
@@ -106,7 +106,7 @@ test.describe('主题跨应用同步', () => {
   // ---------- order-app 主题适配 ----------
   test('order-app 应读取 localStorage 中的主题并应用', async ({ page }) => {
     // 设置为 light 主题
-    await page.evaluate(() => localStorage.setItem('demo_theme', 'light'))
+    await page.evaluate(() => localStorage.setItem('qoder_theme', 'light'))
 
     await page.goto('/order')
     await waitForSubAppMount(page)
@@ -123,7 +123,7 @@ test.describe('主题跨应用同步', () => {
   })
 
   test('order-app 在 dark 主题下应使用深色背景', async ({ page }) => {
-    await page.evaluate(() => localStorage.setItem('demo_theme', 'dark'))
+    await page.evaluate(() => localStorage.setItem('qoder_theme', 'dark'))
 
     await page.goto('/order')
     await waitForSubAppMount(page)
@@ -143,7 +143,7 @@ test.describe('主题跨应用同步', () => {
   test('刷新页面后主题应保持', async ({ page }) => {
     // 切换到 light
     const themeBtn = page.locator('.theme-toggle-btn')
-    await page.evaluate(() => localStorage.setItem('demo_theme', 'dark'))
+    await page.evaluate(() => localStorage.setItem('qoder_theme', 'dark'))
     await themeBtn.click()
     await page.waitForTimeout(500)
 
@@ -152,7 +152,7 @@ test.describe('主题跨应用同步', () => {
     await page.waitForTimeout(1000)
 
     // 验证主题仍然是 light
-    const theme = await getLocalStorage(page, 'demo_theme')
+    const theme = await getLocalStorage(page, 'qoder_theme')
     expect(theme).toBe('light')
 
     // 验证 html 元素没有 dark 类

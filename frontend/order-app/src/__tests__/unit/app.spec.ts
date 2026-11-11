@@ -126,7 +126,7 @@ describe('OrderApp', () => {
       const propsApp = new OrderApp(container, {
         getToken: () => 'from-props',
       })
-      localStorage.setItem('demo_token', 'from-storage')
+      localStorage.setItem('qoder_token', 'from-storage')
 
       // 通过 render 间接验证
       // props 中的 getToken 应被调用
@@ -134,7 +134,7 @@ describe('OrderApp', () => {
     })
 
     it('props 无 getToken 时应从 localStorage 获取', () => {
-      localStorage.setItem('demo_token', 'from-storage')
+      localStorage.setItem('qoder_token', 'from-storage')
       expect(app['getToken']()).toBe('from-storage')
     })
 
@@ -159,7 +159,7 @@ describe('OrderApp', () => {
     })
 
     it('应从 localStorage 读取主题', () => {
-      localStorage.setItem('demo_theme', 'light')
+      localStorage.setItem('qoder_theme', 'light')
       const lightApp = new OrderApp(container, {})
       expect(lightApp['theme']).toBe('light')
     })

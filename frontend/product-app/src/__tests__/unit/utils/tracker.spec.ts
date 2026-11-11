@@ -69,8 +69,8 @@ describe('utils/tracker', () => {
       consoleSpy.mockRestore()
     })
 
-    it('应从 localStorage 读取 demo_token 作为 userId', () => {
-      localStorage.setItem('demo_token', 'jwt-abc-123')
+    it('应从 localStorage 读取 qoder_token 作为 userId', () => {
+      localStorage.setItem('qoder_token', 'jwt-abc-123')
       const consoleSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
 
       trackEvent('UserId', {}, 'Page')
