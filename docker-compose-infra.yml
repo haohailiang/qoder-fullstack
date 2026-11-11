@@ -9,7 +9,7 @@ services:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: demo_fullstack
+      MYSQL_DATABASE: qoder_fullstack
       TZ: Asia/Shanghai
       # 官方 mysql:8.0 镜像默认 locale 为 POSIX，容器内 mysql 客户端（含
       # /docker-entrypoint-initdb.d 的初始化客户端）此时 character_set_client
