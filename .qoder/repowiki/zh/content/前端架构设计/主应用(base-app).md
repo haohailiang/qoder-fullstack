@@ -10,10 +10,10 @@
 - [user.ts（用户接口）](file://frontend/base-app/src/api/user.ts)
 - [sms.ts（短信记录接口）](file://frontend/base-app/src/api/sms.ts)
 - [flight.ts（航班接口）](file://frontend/base-app/src/api/flight.ts)
-- [FlightMap.vue](file://frontend/base-app/src/views/FlightMap.vue)
 - [Login.vue](file://frontend/base-app/src/views/Login.vue)
 - [Register.vue](file://frontend/base-app/src/views/Register.vue)
 - [UserManage.vue](file://frontend/base-app/src/views/UserManage.vue)
+- [FlightMap.vue](file://frontend/base-app/src/views/FlightMap.vue)
 - [i18n/index.ts](file://frontend/base-app/src/i18n/index.ts)
 - [i18n/zh.ts](file://frontend/base-app/src/i18n/zh.ts)
 - [i18n/en.ts](file://frontend/base-app/src/i18n/en.ts)
@@ -28,12 +28,12 @@
 
 ## 更新摘要
 **变更内容**   
-- 增强了前端国际化系统，实现了跨所有微应用的完整 i18n 支持
-- 在 base-app 中添加了语言切换下拉菜单组件
-- 实现了 Element Plus 动态语言切换功能
-- 完善了子应用（product-app、order-app）的国际化配置
-- 优化了语言状态管理和同步机制
-- **新增** Admin 航线频率飞线图页面 FlightMap.vue（基于 ECharts 飞线图 + 中国地图），配套航班 API `api/flight.ts` 与受保护路由 `/admin/flights`（requiresAuth + adminOnly），支持按出发/落地城市筛选
+- 新增 FlightMap.vue 组件，提供交互式航班路线可视化功能
+- 集成 ECharts 地图可视化，支持航线动画和频率显示
+- 添加双下拉筛选器，支持出发城市和落地城市实时过滤
+- 扩展国际化配置，包含航线地图相关翻译文本
+- 在管理员菜单中添加航线地图导航入口
+- 新增航班数据 API 接口定义
 
 ## 目录
 1. [简介](#简介)
@@ -47,16 +47,16 @@
 9. [结论](#结论)
 
 ## 简介
-本文件面向基于 Vue 3 + Element Plus 的主应用 base-app，系统性说明其架构设计、路由与布局、页面与组件组织、用户认证流程、权限控制、用户管理界面与交互、国际化与主题切换、响应式适配，以及构建配置、部署策略和性能优化方案。该主应用作为微前端基座，通过 qiankun 加载 React 商品子应用与 Angular 订单子应用，统一提供导航、鉴权、语言与主题能力。
+本文件面向基于 Vue 3 + Element Plus 的主应用 base-app，系统性说明其架构设计、路由与布局、页面与组件组织、用户认证流程、权限控制、用户管理界面与交互、**航线地图可视化功能**、国际化与主题切换、响应式适配，以及构建配置、部署策略和性能优化方案。该主应用作为微前端基座，通过 qiankun 加载 React 商品子应用与 Angular 订单子应用，统一提供导航、鉴权、语言与主题能力。
 
-**更新** 本次更新重点增强了国际化系统，实现了跨所有微应用的完整 i18n 支持，包括 base-app 的语言切换下拉菜单和 Element Plus 动态语言切换功能。
+**更新** 本次更新重点新增了 FlightMap.vue 组件，实现了基于 ECharts 的交互式航班路线可视化系统，支持双下拉筛选器和实时数据过滤功能。
 
 ## 项目结构
 base-app 采用按功能域组织的目录结构：
-- src/api：后端接口定义与请求封装
-- src/views：页面级视图组件
-- src/router：路由与守卫
-- src/i18n：多语言资源与初始化（包含 zh.ts 和 en.ts）
+- src/api：后端接口定义与请求封装（新增 flight.ts）
+- src/views：页面级视图组件（新增 FlightMap.vue）
+- src/router：路由与守卫（新增 /admin/flights 路由）
+- src/i18n：多语言资源与初始化（新增 flightMap 翻译键）
 - src/utils：认证状态、主题、语言等工具模块
 - src/micro：qiankun 微前端集成
 - src/styles：全局样式
@@ -69,11 +69,11 @@ A["main.ts<br/>应用入口"] --> B["App.vue<br/>根布局/导航/国际化/主�
 A --> C["router/index.ts<br/>路由与守卫"]
 A --> D["i18n/index.ts<br/>多语言初始化"]
 A --> E["micro/index.ts<br/>qiankun 微前端"]
-B --> F["views/*<br/>登录/注册/用户管理/子应用占位"]
+B --> F["views/*<br/>登录/注册/用户管理/航线地图/子应用占位"]
 B --> G["utils/*<br/>auth/theme/lang"]
-F --> H["api/*<br/>auth/user/sms/request"]
-D --> I["i18n/zh.ts<br/>中文语言包"]
-D --> J["i18n/en.ts<br/>英文语言包"]
+F --> H["api/*<br/>auth/user/sms/flight/request"]
+D --> I["i18n/zh.ts<br/>中文语言包(含flightMap)"]
+D --> J["i18n/en.ts<br/>英文语言包(含flightMap)"]
 end
 subgraph "子应用"
 K["product-app<br/>React 商品应用"] --> L["i18n/index.ts<br/>react-i18next"]
@@ -87,8 +87,8 @@ O --> |"HTTP"| 网关["后端网关(8080)"]
 
 图表来源
 - [main.ts:1-48](file://frontend/base-app/src/main.ts#L1-L48)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 - [product-app i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
@@ -101,39 +101,38 @@ O --> |"HTTP"| 网关["后端网关(8080)"]
 
 ## 核心组件
 - 应用入口 main.ts：创建 Vue 应用，挂载 Element Plus、图标库、路由、国际化；启动主题与语言初始化；启动 qiankun。
-- 根组件 App.vue：使用 el-config-provider 包裹，提供顶部导航、**语言切换下拉菜单**、主题切换、用户信息展示与退出；根据路由判断渲染基座视图或子应用容器。**新增 Element Plus 动态语言切换功能**。
-- 路由 index.ts：定义公开与受保护路由，包含登录、注册、用户管理、商品与订单子应用路由；beforeEach 实现基于 token 的访问控制。
+- 根组件 App.vue：使用 el-config-provider 包裹，提供顶部导航、**语言切换下拉菜单**、主题切换、用户信息展示与退出；根据路由判断渲染基座视图或子应用容器。**新增管理员航线地图菜单项**。
+- 路由 index.ts：定义公开与受保护路由，包含登录、注册、用户管理、**航线地图(/admin/flights)**、商品与订单子应用路由；beforeEach 实现基于 token 的访问控制。
 - 请求封装 request.ts：Axios 实例，统一拦截器处理 Authorization、业务码校验、401/403 与"被挤下线"逻辑、错误提示。
 - 认证接口 auth.ts：登录、注册、验证码、短信验证码、当前用户、登出等 API 类型与调用。
 - 用户接口 user.ts：用户 CRUD 接口类型与调用。
 - 短信记录接口 sms.ts：查询短信发送记录。
-- 航班接口 flight.ts：封装 `/product/flights/frequency`、`/product/flights/search`、`/product/flights` 三个只读接口及 `CityFrequency`/`FrequencyData` 类型，供 Admin 飞线图使用。
+- **航班接口 flight.ts：航班频率统计、搜索、列表等 API 类型与调用**。
 - 工具模块：
   - utils/auth.ts：token 与用户信息的响应式状态与持久化。
   - utils/theme.ts：主题模式 dark/light 的读取、切换、应用到 <html>、与后端同步。
   - **utils/lang.ts：语言 zh/en 的读取、切换、与 vue-i18n 同步、与后端同步，包含完整的语言状态管理**。
 - **i18n 系统**：
   - **i18n/index.ts：vue-i18n 初始化配置**
-  - **i18n/zh.ts：中文语言包，包含 app、login、register、users、lang、common 等模块**
+  - **i18n/zh.ts：中文语言包，包含 app、login、register、users、flightMap、lang、common 等模块**
   - **i18n/en.ts：英文语言包，结构与中文包对应**
 - 微前端 micro/index.ts：qiankun 注册 product-app 与 order-app，透传 getToken/getTheme/getLang/globalActions，并监听主题/语言变化同步到子应用。
 
 章节来源
 - [main.ts:1-48](file://frontend/base-app/src/main.ts#L1-L48)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 - [request.ts:1-110](file://frontend/base-app/src/api/request.ts#L1-L110)
 - [auth.ts:1-87](file://frontend/base-app/src/api/auth.ts#L1-L87)
 - [user.ts:1-43](file://frontend/base-app/src/api/user.ts#L1-L43)
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
 - [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
-- [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
 - [utils/auth.ts:1-60](file://frontend/base-app/src/utils/auth.ts#L1-L60)
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
-- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
-- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
+- [i18n/zh.ts:1-165](file://frontend/base-app/src/i18n/zh.ts#L1-L165)
+- [i18n/en.ts:1-165](file://frontend/base-app/src/i18n/en.ts#L1-L165)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 
 ## 架构总览
@@ -141,7 +140,7 @@ O --> |"HTTP"| 网关["后端网关(8080)"]
 - 统一 UI 框架与基础组件（Element Plus）
 - 统一鉴权与路由守卫
 - **统一的国际化与主题管理**
-- 承载自有页面（登录、注册、用户管理）
+- 承载自有页面（登录、注册、用户管理、**航线地图**）
 - 通过 qiankun 动态加载子应用（商品、订单）
 
 ```mermaid
@@ -157,12 +156,13 @@ Micro --> SubOrder["子应用: 订单(order-app)<br/>轻量级 i18n"]
 Base --> API["API 层(request.ts)"]
 API --> Gateway["后端网关(8080)"]
 I18N --> EP["Element Plus<br/>动态语言切换"]
+Base --> FlightMap["航线地图(FlightMap.vue)<br/>ECharts 可视化"]
 ```
 
 图表来源
 - [main.ts:1-48](file://frontend/base-app/src/main.ts#L1-L48)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 - [request.ts:1-110](file://frontend/base-app/src/api/request.ts#L1-L110)
 
@@ -171,7 +171,7 @@ I18N --> EP["Element Plus<br/>动态语言切换"]
 ### 路由与权限控制
 - 路由定义：
   - 公开路由：/login、/register（meta.public=true）
-  - 受保护路由：/users（requiresAuth=true）、/product/*、/order/*（isSubApp=true）
+  - 受保护路由：/users（requiresAuth=true）、**/admin/flights（requiresAuth=true, adminOnly=true）**、/product/*、/order/*（isSubApp=true）
   - 默认重定向至 /users
 - 路由守卫 beforeEach：
   - 若目标为公开路由且已登录，则重定向到 /users
@@ -189,14 +189,16 @@ CheckPublic --> |否| NeedAuth{"是否需要认证?"}
 NeedAuth --> |否| AllowRoute["放行"]
 NeedAuth --> |是| HasToken2{"是否有 token?"}
 HasToken2 --> |否| ToLogin["跳转到 /login?redirect=..."]
-HasToken2 --> |是| AllowRoute
+HasToken2 --> |是| AdminCheck{"是否管理员?"}
+AdminCheck --> |否| AllowRoute
+AdminCheck --> |是| AllowRoute
 ```
 
 图表来源
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 
 章节来源
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 
 ### 用户认证流程（登录/注册/权限）
 - 登录流程：
@@ -279,45 +281,55 @@ Records["加载短信记录"] --> RecordTable["渲染记录表格"]
 - [user.ts:1-43](file://frontend/base-app/src/api/user.ts#L1-L43)
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
 
-### 航线频率飞线图（FlightMap）
-面向管理员的数据可视化页面，路由 `/admin/flights`（`requiresAuth` + `adminOnly`），用于展示各城市间航线的航班频率。
-- 数据获取
-  - 通过 `flight.ts` 的 `getFlightFrequency()` 调用 GET /api/product/flights/frequency，取响应体 `cityFrequency` 列表
-  - 每条 `CityFrequency` 含出发/落地城市、经纬度、frequency、flightNumber、duration 及关联商品信息
-- 可视化
-  - 基于 ECharts 飞线图（lines + effect）叠加中国地图，按频率最大值归一化飞线粗细与颜色
-  - 内置中国主要城市坐标表（cityCoords），避免额外地理编码请求
-- 交互筛选
-  - 从数据中提取出发/落地城市下拉选项，`departureCity`/`arrivalCity` 变更时通过 computed `filteredData` 实时重绘
-  - 加载失败统一 `ElMessage.error(t('flightMap.loadFailed'))`，文案随 i18n 切换
-- 生命周期：`onMounted` 初始化图表并加载数据，`onBeforeUnmount` 销毁实例并解绑 resize 监听
+### 航线地图可视化组件（FlightMap.vue）
+
+**新增** 本次更新新增了 FlightMap.vue 组件，提供了基于 ECharts 的交互式航班路线可视化功能。
+
+#### 核心功能特性
+- **ECharts 地图可视化**：集成中国地图 GeoJSON，展示全国主要城市的航班路线
+- **双下拉筛选器**：支持按出发城市和落地城市进行实时数据过滤
+- **动态飞线效果**：使用粒子动画展示航线流向，线条粗细反映航班频率
+- **交互式图表**：支持缩放、平移、悬停提示等交互操作
+- **数据表格联动**：下方表格展示筛选后的航班详细信息
+
+#### 技术实现细节
+- **数据获取**：通过 getFlightFrequency() API 获取航班频率统计数据
+- **坐标映射**：内置 35 个中国主要城市的经纬度坐标
+- **频率可视化**：根据航班频率动态调整线条粗细和颜色渐变
+- **途经城市支持**：解析 JSON 格式的途经城市坐标，以不同样式显示
+- **响应式设计**：自动适应窗口大小变化，支持移动端浏览
 
 ```mermaid
-sequenceDiagram
-participant View as "FlightMap.vue"
-participant API as "flight.ts"
-participant Gateway as "后端网关"
-View->>API : getFlightFrequency()
-API->>Gateway : GET /api/product/flights/frequency
-Gateway-->>API : Result{flights, cityFrequency}
-API-->>View : FrequencyData
-View->>View : 提取城市/坐标 + 归一化频率
-View->>View : echarts.setOption(飞线图)
-View->>View : 筛选出发/落地城市重绘
+flowchart TD
+Init["组件初始化"] --> LoadData["加载航班数据"]
+LoadData --> ParseCoords["解析城市坐标"]
+ParseCoords --> BuildChart["构建 ECharts 配置"]
+BuildChart --> Render["渲染地图可视化"]
+Render --> Filter["双下拉筛选器"]
+Filter --> UpdateChart["实时更新图表"]
+UpdateChart --> Table["更新数据表格"]
 ```
 
 图表来源
 - [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
 - [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
 
+#### 视觉设计特点
+- **多层视觉效果**：
+  - 涟漪效果的城市节点（蓝色）
+  - 途经城市散点（橙色）
+  - 粒子动画飞线（橙色箭头）
+  - 静态频率飞线（渐变色）
+- **智能配色方案**：根据航班频率动态计算线条颜色和透明度
+- **用户体验优化**：加载状态指示、错误提示、重置按钮
+
 章节来源
 - [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
 - [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
 
 ### 国际化配置与语言切换
 
-**更新** 本次更新重点增强了国际化系统，实现了跨所有微应用的完整 i18n 支持。
+**更新** 本次更新增强了国际化系统，新增了航线地图相关的翻译文本。
 
 #### 主应用国际化架构
 - **i18n 初始化**：
@@ -340,7 +352,7 @@ View->>View : 筛选出发/落地城市重绘
 - **应用内联动**：
   - App.vue 中根据语言设置页面标题与 Element Plus 组件语言
   - Login/Register 表单提示与按钮文案均通过 t() 获取
-  - 所有界面文本完全国际化
+  - **FlightMap 组件的所有界面文本完全国际化**
 
 ```mermaid
 flowchart TD
@@ -357,7 +369,7 @@ EP --> Apply
 图表来源
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
 
 #### 子应用国际化支持
 - **product-app（React）**：
@@ -371,10 +383,10 @@ EP --> Apply
 
 章节来源
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
-- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
-- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
+- [i18n/zh.ts:1-165](file://frontend/base-app/src/i18n/zh.ts#L1-L165)
+- [i18n/en.ts:1-165](file://frontend/base-app/src/i18n/en.ts#L1-L165)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
 - [product-app i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
 - [order-app i18n.ts:1-129](file://frontend/order-app/src/i18n.ts#L1-L129)
 
@@ -400,11 +412,11 @@ Apply --> Backend["异步保存到后端(不阻塞UI)"]
 
 图表来源
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
 
 章节来源
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
 
 ### 微前端集成（qiankun）
 - 子应用注册：
@@ -451,6 +463,7 @@ Base->>Q : start({sandbox})
   - vue-router：路由与守卫
   - vue-i18n：国际化
   - qiankun：微前端运行时
+  - **echarts：地图可视化库**
 
 ```mermaid
 graph LR
@@ -468,9 +481,11 @@ views_login["views/Login.vue"] --> api_auth["api/auth.ts"]
 views_register["views/Register.vue"] --> api_auth
 views_usermanage["views/UserManage.vue"] --> api_user["api/user.ts"]
 views_usermanage --> api_sms["api/sms.ts"]
+views_flightmap["views/FlightMap.vue"] --> api_flight["api/flight.ts"]
 api_auth --> api_request["api/request.ts"]
 api_user --> api_request
 api_sms --> api_request
+api_flight --> api_request
 micro_idx --> utils_auth
 micro_idx --> utils_theme
 micro_idx --> utils_lang
@@ -480,18 +495,20 @@ micro_idx --> sub_order["order-app i18n"]
 
 图表来源
 - [main.ts:1-48](file://frontend/base-app/src/main.ts#L1-L48)
-- [App.vue:1-215](file://frontend/base-app/src/App.vue#L1-L215)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [App.vue:1-232](file://frontend/base-app/src/App.vue#L1-L232)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 - [Login.vue:1-320](file://frontend/base-app/src/views/Login.vue#L1-L320)
 - [Register.vue:1-305](file://frontend/base-app/src/views/Register.vue#L1-L305)
 - [UserManage.vue:1-255](file://frontend/base-app/src/views/UserManage.vue#L1-L255)
+- [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
 - [auth.ts:1-87](file://frontend/base-app/src/api/auth.ts#L1-L87)
 - [user.ts:1-43](file://frontend/base-app/src/api/user.ts#L1-L43)
 - [sms.ts:1-25](file://frontend/base-app/src/api/sms.ts#L1-L25)
+- [flight.ts:1-41](file://frontend/base-app/src/api/flight.ts#L1-L41)
 - [request.ts:1-110](file://frontend/base-app/src/api/request.ts#L1-L110)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
-- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
-- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
+- [i18n/zh.ts:1-165](file://frontend/base-app/src/i18n/zh.ts#L1-L165)
+- [i18n/en.ts:1-165](file://frontend/base-app/src/i18n/en.ts#L1-L165)
 - [product-app i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
 - [order-app i18n.ts:1-129](file://frontend/order-app/src/i18n.ts#L1-L129)
 
@@ -512,6 +529,7 @@ micro_idx --> sub_order["order-app i18n"]
   - 图片与静态资源优化：使用现代图片格式与懒加载
   - 首屏优化：关键 CSS 内联、预加载关键字体与资源
   - **国际化资源优化：按需加载语言包，减少首屏体积**
+  - **ECharts 按需引入：仅加载必要的地图数据和组件**
 - 安全与健壮性
   - Token 存储于 localStorage，适合演示；生产建议结合短期 Token + 刷新机制
   - 统一错误处理与用户提示，避免白屏
@@ -519,16 +537,21 @@ micro_idx --> sub_order["order-app i18n"]
 
 章节来源
 - [vite.config.ts:1-26](file://frontend/base-app/vite.config.ts#L1-L26)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 
 ## 故障排查指南
 - 无法访问受保护路由
   - 检查路由守卫是否正确判断 requiresAuth 与 token
-  - 确认 localStorage 中存在 demo_token
+  - 确认 localStorage 中存在 qoder_token
 - 登录后仍被跳转回登录页
   - 检查 Axios 响应拦截器对 401/403 的处理逻辑
   - 确认后端返回的业务码是否为 40101（被挤下线）
+- **航线地图相关问题**：
+  - **检查 ECharts 是否正确初始化，地图 GeoJSON 是否成功加载**
+  - **确认航班数据 API (/product/flights/frequency) 是否正常返回**
+  - **检查双下拉筛选器的数据绑定和过滤逻辑**
+  - **验证城市坐标映射是否正确，特别是途经城市坐标解析**
 - **语言切换相关问题**：
   - **检查 utils/lang.ts 是否正确写入 localStorage 与响应式状态**
   - **确认 App.vue 中 Element Plus 动态语言切换逻辑是否正常**
@@ -536,7 +559,7 @@ micro_idx --> sub_order["order-app i18n"]
   - **验证 i18n.global.locale 是否正确更新**
 - **国际化相关错误**：
   - **检查语言包文件（zh.ts、en.ts）语法是否正确**
-  - **确认所有需要的翻译键都已定义**
+  - **确认所有需要的翻译键都已定义，包括 flightMap 相关键**
   - **检查子应用的 i18n 配置是否与主应用同步**
 - 主题/语言切换无效
   - 检查 utils/theme.ts 与 utils/lang.ts 是否正确写入 localStorage 与响应式状态
@@ -550,20 +573,25 @@ micro_idx --> sub_order["order-app i18n"]
 
 章节来源
 - [request.ts:1-110](file://frontend/base-app/src/api/request.ts#L1-L110)
-- [index.ts（路由）:1-61](file://frontend/base-app/src/router/index.ts#L1-L61)
+- [index.ts（路由）:1-67](file://frontend/base-app/src/router/index.ts#L1-L67)
 - [utils/theme.ts:1-88](file://frontend/base-app/src/utils/theme.ts#L1-L88)
 - [utils/lang.ts:1-68](file://frontend/base-app/src/utils/lang.ts#L1-L68)
 - [i18n/index.ts:1-25](file://frontend/base-app/src/i18n/index.ts#L1-L25)
-- [i18n/zh.ts:1-144](file://frontend/base-app/src/i18n/zh.ts#L1-L144)
-- [i18n/en.ts:1-144](file://frontend/base-app/src/i18n/en.ts#L1-L144)
+- [i18n/zh.ts:1-165](file://frontend/base-app/src/i18n/zh.ts#L1-L165)
+- [i18n/en.ts:1-165](file://frontend/base-app/src/i18n/en.ts#L1-L165)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
+- [FlightMap.vue:1-430](file://frontend/base-app/src/views/FlightMap.vue#L1-L430)
 
 ## 结论
-base-app 作为微前端基座，围绕 Vue 3 + Element Plus 构建了清晰的路由与权限体系、统一的认证与状态管理、**完善的国际化与主题能力**，并通过 qiankun 实现了多技术栈子应用的无缝集成。**本次更新重点增强了国际化系统，实现了跨所有微应用的完整 i18n 支持，包括 base-app 的语言切换下拉菜单和 Element Plus 动态语言切换功能**。配合 Vite 的开发体验与可扩展的构建配置，既满足演示场景的快速迭代，也具备向生产环境演进的基础能力。建议在后续版本中逐步推进 Element Plus 按需引入、Token 刷新机制与更细粒度的权限控制，进一步提升性能与安全。
+base-app 作为微前端基座，围绕 Vue 3 + Element Plus 构建了清晰的路由与权限体系、统一的认证与状态管理、**完善的国际化与主题能力**，并通过 qiankun 实现了多技术栈子应用的无缝集成。**本次更新重点新增了 FlightMap.vue 组件，实现了基于 ECharts 的交互式航班路线可视化系统，支持双下拉筛选器和实时数据过滤功能**。配合 Vite 的开发体验与可扩展的构建配置，既满足演示场景的快速迭代，也具备向生产环境演进的基础能力。建议在后续版本中逐步推进 Element Plus 按需引入、Token 刷新机制与更细粒度的权限控制，进一步提升性能与安全。
 
-**更新总结** 本次更新成功实现了全面的国际化系统，包括：
+**更新总结** 本次更新成功实现了全面的国际化系统和航线地图可视化功能，包括：
 - 主应用中完整的 vue-i18n 配置和多语言包
 - 语言切换下拉菜单组件
 - Element Plus 动态语言切换
 - 子应用的国际化支持
 - 语言状态的全局管理和同步机制
+- **FlightMap.vue 交互式航班路线可视化组件**
+- **ECharts 地图集成与动画效果**
+- **双下拉筛选器和实时数据过滤**
+- **管理员专属的航线地图导航入口**

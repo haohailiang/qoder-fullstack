@@ -65,7 +65,7 @@ source_files:
 - 前端三个子应用分别暴露端口 `80`（base）、`7100`（product）、`7200`（order）。
 
 ### 3.4 VM 部署辅助
-- `vm-ssh.js` 硬编码了 VM 地址 `192.168.178.100`、用户名 `root`、密码 `root123456`。
+- `vm-ssh.js` 曾硬编码 VM 地址 `192.168.178.100`、用户名 `root` 与 root 口令；现已改为从 `VM_HOST` / `VM_USER` / `VM_PASS` 环境变量读取，缺失 `VM_PASS` 时直接报错退出（原明文口令仍需在主机的层面完成轮换）。
 - 支持两种模式：`node vm-ssh.js <command>` 远程执行命令，`node vm-ssh.js upload <local> <remote>` 通过 SFTP 上传文件。
 - 该脚本是仓库内唯一的“部署到远端主机”的能力，未集成到 docker-compose 流程中。
 

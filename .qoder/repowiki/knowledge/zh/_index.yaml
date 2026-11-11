@@ -3,11 +3,11 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-11-09T08:01:32Z"
+exported_at: "2026-11-10T00:31:33Z"
 modules:
     "":
-        dir_name: 电商微服务一体化编排根工程
-        title: 电商微服务一体化编排根工程
+        dir_name: 电商前后端一体化编排根工程
+        title: 电商前后端一体化编排根工程
         scope:
             - README.md
             - .gitignore
@@ -24,8 +24,8 @@ modules:
         depends_on: []
         related_to: []
     backend:
-        dir_name: 电商后端微服务聚合工程
-        title: 电商后端微服务聚合工程
+        dir_name: 电商后端多模块微服务工程
+        title: 电商后端多模块微服务工程
         scope:
             - backend/
         source_files: []
@@ -34,8 +34,8 @@ modules:
         related_to:
             - path: frontend
     frontend:
-        dir_name: 微前端前端工程（Vue3 主应用 + React_原生 JS 子应用）
-        title: 微前端前端工程（Vue3 主应用 + React/原生 JS 子应用）
+        dir_name: 微前端前端工程（base-app + product-app + order-app）
+        title: 微前端前端工程（base-app + product-app + order-app）
         scope:
             - frontend/
         source_files: []

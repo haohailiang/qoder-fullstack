@@ -13,10 +13,23 @@
 - [CaptchaResponse.java](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/dto/CaptchaResponse.java)
 - [ProductController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java)
 - [SeckillController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java)
-- [Product.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Product.java)
+- [FlightController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FlightController.java)
+- [Flight.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Flight.java)
+- [FlightService.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/FlightService.java)
+- [FlightServiceImpl.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/FlightServiceImpl.java)
+- [FlightRepository.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/repository/FlightRepository.java)
+- [FlightMapper.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/repository/mapper/FlightMapper.java)
+- [FlightMapper.xml](file://backend/ecommerce-product/src/main/resources/mapper/FlightMapper.xml)
 - [OrderController.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java)
 - [Order.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/Order.java)
 </cite>
+
+## 更新摘要
+**变更内容**   
+- 新增航班管理API接口章节，包含完整的CRUD操作、搜索筛选和频率统计功能
+- 添加航班实体模型定义和相关数据映射说明
+- 更新商品服务架构，增加航班管理模块
+- 补充航班相关的数据流程图和依赖关系图
 
 ## 目录
 1. [引言](#引言)
@@ -31,7 +44,7 @@
 10. [附录：数据模型定义](#附录数据模型定义)
 
 ## 引言
-本文件为后端微服务电商系统的完整API参考，覆盖用户服务认证、用户管理、验证码；商品服务CRUD、搜索、秒杀；订单服务管理与秒杀消费。文档包含HTTP方法、URL路径、请求参数、响应格式、错误码说明、调用流程图、数据模型定义、版本兼容性说明等。所有外部请求统一经API网关（端口8080）路由到下游微服务，网关负责JWT鉴权并将用户信息透传给下游服务。
+本文件为后端微服务电商系统的完整API参考，覆盖用户服务认证、用户管理、验证码；商品服务CRUD、搜索、秒杀；航班管理服务；订单服务管理与秒杀消费。文档包含HTTP方法、URL路径、请求参数、响应格式、错误码说明、调用流程图、数据模型定义、版本兼容性说明等。所有外部请求统一经API网关（端口8080）路由到下游微服务，网关负责JWT鉴权并将用户信息透传给下游服务。
 
 ## 项目结构
 后端采用Spring Cloud微服务架构，拆分为公共模块、网关、用户服务、商品服务、订单服务；前端基于qiankun微前端。各微服务通过Nacos注册发现，网关按路径前缀分发请求。Swagger文档在各服务内集成，并通过网关聚合展示。
@@ -68,7 +81,7 @@ OrderSvc --> RabbitMQ
 - 统一响应体 Result：所有接口返回统一结构，code=200表示成功，message为提示信息，data为业务数据。
 - 业务异常 BusinessException：业务校验失败抛出，由全局异常处理器转换为Result。
 - 网关鉴权 AuthGlobalFilter：白名单放行、JWT校验、用户头透传。
-- 各微服务控制器：AuthController、CaptchaController、UserController、ProductController、SeckillController、OrderController。
+- 各微服务控制器：AuthController、CaptchaController、UserController、ProductController、SeckillController、FlightController、OrderController。
 
 章节来源
 - [Result.java:1-64](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java#L1-L64)
@@ -78,7 +91,7 @@ OrderSvc --> RabbitMQ
 ## 架构总览
 系统对外暴露统一入口为网关，内部微服务职责清晰：
 - 用户服务：认证、用户管理、短信与图片验证码、主题偏好。
-- 商品服务：商品CRUD、ES搜索、秒杀库存预扣与抢购、库存同步。
+- 商品服务：商品CRUD、ES搜索、秒杀库存预扣与抢购、库存同步、航班管理。
 - 订单服务：订单CRUD、秒杀订单异步消费、Feign调用商品服务扣减库存。
 
 ```mermaid
@@ -310,6 +323,52 @@ SendMQ --> ReturnQueuing["返回排队中(orderNo,status=QUEUING)"]
 章节来源
 - [SeckillController.java:45-149](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L45-L149)
 
+### 航班管理接口（/api/product/flights/**）
+**新增** 航班管理接口提供完整的航班CRUD操作、搜索筛选和频率统计功能。
+
+- GET /api/product/flights
+  - 说明：查询所有航班（含关联商品信息）。
+  - 鉴权：JWT。
+  - 响应：Result<List<Flight>>。
+- GET /api/product/flights/{id}
+  - 说明：根据ID查询航班详情。
+  - 鉴权：JWT。
+  - 响应：Result<Flight>。
+- GET /api/product/flights/search
+  - 说明：按出发城市和/或落地城市筛选航班。
+  - 鉴权：JWT。
+  - 查询参数：departureCity?、arrivalCity?
+  - 响应：Result<List<Flight>>。
+- GET /api/product/flights/frequency
+  - 说明：获取城市间航班频率统计数据（供飞线图使用）。
+  - 鉴权：JWT。
+  - 响应：Result<Map<String, Object>>（包含flights和cityFrequency）。
+- POST /api/product/flights
+  - 说明：创建新航班，需关联已有商品ID。
+  - 鉴权：JWT。
+  - 请求体：Flight实体。
+  - 响应：Result<Flight>。
+- PUT /api/product/flights/{id}
+  - 说明：根据航班ID更新航班信息。
+  - 鉴权：JWT。
+  - 请求体：Flight实体。
+  - 响应：Result<Flight>。
+- DELETE /api/product/flights/{id}
+  - 说明：根据航班ID删除指定航班。
+  - 鉴权：JWT。
+  - 响应：Result<Void>。
+
+示例
+- 请求（筛选航班）：
+  - 方法：GET
+  - 路径：/api/product/flights/search?departureCity=北京&arrivalCity=上海
+  - 头部：Authorization: Bearer <token>
+- 响应：
+  - { code: 200, message: "success", data: [Flight, ...] }
+
+章节来源
+- [FlightController.java:26-77](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FlightController.java#L26-L77)
+
 ### 订单服务管理接口（/api/order/orders/**）
 - POST /api/order/orders
   - 说明：创建订单。
@@ -358,18 +417,20 @@ SendMQ --> ReturnQueuing["返回排队中(orderNo,status=QUEUING)"]
 ## 依赖关系分析
 - 网关依赖JWT工具与白名单配置，对下游服务透传用户头。
 - 用户服务依赖AuthService、RedisSessionService、UserService、CaptchaService。
-- 商品服务依赖ProductService、SeckillStockService、RabbitTemplate、ElasticsearchRepository。
+- 商品服务依赖ProductService、SeckillStockService、FlightService、RabbitTemplate、ElasticsearchRepository。
 - 订单服务依赖OrderService、ProductClient（OpenFeign）、RabbitMQ消费者。
 
 ```mermaid
 graph LR
 Gateway["网关"] --> UserCtrl["用户控制器"]
 Gateway --> ProductCtrl["商品控制器"]
+Gateway --> FlightCtrl["航班控制器"]
 Gateway --> OrderCtrl["订单控制器"]
 UserCtrl --> AuthService["认证服务"]
 UserCtrl --> UserService["用户服务"]
 ProductCtrl --> ProductService["商品服务"]
 ProductCtrl --> SeckillStockService["秒杀库存服务"]
+FlightCtrl --> FlightService["航班服务"]
 ProductCtrl --> RabbitTemplate["RabbitMQ模板"]
 OrderCtrl --> OrderService["订单服务"]
 OrderService --> ProductClient["商品Feign客户端"]
@@ -379,6 +440,7 @@ OrderService --> ProductClient["商品Feign客户端"]
 - [AuthController.java:38-45](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/controller/AuthController.java#L38-L45)
 - [ProductController.java:20-24](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L20-L24)
 - [SeckillController.java:33-43](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L33-L43)
+- [FlightController.java:20-24](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FlightController.java#L20-L24)
 - [OrderController.java:21-25](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L21-L25)
 
 章节来源
@@ -388,6 +450,7 @@ OrderService --> ProductClient["商品Feign客户端"]
 - 图片验证码与短信验证码：进程内存实现，重启后失效；短信发送同一手机号60秒频控，超频返回code=429。
 - 秒杀库存：Redis Lua脚本原子扣减，防止超卖；用户购买标识去重。
 - 搜索引擎：Elasticsearch提供关键词、分类、价格区间等多条件搜索。
+- 航班查询：MyBatis动态SQL支持多条件筛选，JOIN查询优化关联商品信息。
 - 限流策略：
   - 验证码频控：图片验证码一次性使用；短信验证码60秒限制。
   - 秒杀防刷：用户维度购买标识；库存预扣与时间窗口校验。
@@ -417,7 +480,7 @@ OrderService --> ProductClient["商品Feign客户端"]
 - [BusinessException.java:1-23](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L1-L23)
 
 ## 结论
-本API文档覆盖了用户、商品、订单三大核心域的全部REST接口，明确了认证方式、权限控制、限流策略与错误处理机制。通过网关统一鉴权与路由，结合Redis、RabbitMQ、Elasticsearch等中间件，实现了高并发场景下的安全与性能保障。建议在生产环境完善分布式缓存与会话持久化，优化限流策略与监控告警。
+本API文档覆盖了用户、商品、航班、订单四大核心域的全部REST接口，明确了认证方式、权限控制、限流策略与错误处理机制。通过网关统一鉴权与路由，结合Redis、RabbitMQ、Elasticsearch等中间件，实现了高并发场景下的安全与性能保障。新增的航班管理功能提供了完整的机票业务支撑，建议在生产环境完善分布式缓存与会话持久化，优化限流策略与监控告警。
 
 ## 附录：数据模型定义
 
@@ -440,6 +503,14 @@ OrderService --> ProductClient["商品Feign客户端"]
 
 章节来源
 - [Product.java:1-32](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Product.java#L1-L32)
+
+### 航班模型
+- Flight
+  - 字段：id、productId、departureCity、arrivalCity、departureLng、departureLat、arrivalLng、arrivalLat、flightNumber、duration、frequency、routeCoordinates、createdDate、lastModifiedDate
+  - 关联字段：productName、productDescription、productPrice、productStock、productImageUrl、productStatus
+
+章节来源
+- [Flight.java:11-38](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Flight.java#L11-L38)
 
 ### 订单模型
 - Order

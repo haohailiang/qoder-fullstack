@@ -1,4 +1,4 @@
-# demo-fullstack
+# qoder-fullstack
 
 前后端分离的微服务电商示例项目，基于 Spring Cloud 微服务架构 + qiankun 微前端架构：
 
@@ -49,7 +49,7 @@
 ## 目录结构
 
 ```
-demo-fullstack/
+qoder-fullstack/
 ├── backend/                                  # Spring Cloud 微服务后端
 │   ├── pom.xml                               # Maven 父 POM（Spring Boot 3.3.x, Java 17, Spring Cloud 2023.0.x, springdoc 2.6.0）
 │   ├── ecommerce-common/                     # 公共模块
@@ -195,7 +195,7 @@ demo-fullstack/
 
 后端启动前，需要先创建数据库和表。推荐使用项目根目录的初始化脚本 [`init-sql/01-init-database.sql`](init-sql/01-init-database.sql)，包含：
 
-- 创建数据库 `demo_fullstack`（utf8mb4）
+- 创建数据库 `qoder_fullstack`（utf8mb4）
 - `users` 表 — 用户数据（含审计字段 `created_by / created_date / last_modified_by / last_modified_date`，主题偏好 `theme_preference`）
 - `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`；机票类商品 `category = 'flight'`）
 - `flights` 表 — 航班数据（机票商品特有字段：`product_id`、`departure_city / arrival_city`、经纬度、`flight_number`、`duration`、`frequency`、`route_coordinates` JSON，通过 `product_id` 关联 `products`）
@@ -496,7 +496,7 @@ cd backend
 - **默认主题**：暗黑模式（dark）
 - **切换入口**：主应用导航栏右侧主题切换按钮（始终可见）
 - **持久化策略**：
-  - 客户端缓存：`localStorage` 存储 `demo_theme` 键值，保证页面刷新即时恢复
+  - 客户端缓存：`localStorage` 存储 `qoder_theme` 键值，保证页面刷新即时恢复
   - 数据库持久化：`users.theme_preference` 字段存储用户偏好，登录时自动同步
 - **跨应用同步**：通过 qiankun 全局状态 + `MutationObserver` + `storage` 事件实现主应用与子应用实时同步
 
@@ -600,7 +600,7 @@ docker compose up -d
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://<Docker服务器IP>:3306/demo_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://<Docker服务器IP>:3306/qoder_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
   data:
     redis:
       host: <Docker服务器IP>

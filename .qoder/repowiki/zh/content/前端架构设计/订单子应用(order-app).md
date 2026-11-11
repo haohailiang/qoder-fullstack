@@ -218,7 +218,7 @@ G --> M["返回列表"]
   - 同时包含 "sms.*" 键，便于扩展短信记录相关文案
   - 所有键值都经过精心设计，具有良好的语义性和可维护性
 - 语言切换
-  - 通过 localStorage 的 demo_lang 键保存当前语言
+  - 通过 localStorage 的 qoder_lang 键保存当前语言
   - 基座应用可通过 props.lang 下发语言，子应用监听 update 后写入本地存储并重渲染
   - 支持 'zh' 和 'en' 两种语言，默认为中文
 - 翻译函数
@@ -346,7 +346,7 @@ participant Base as "基座应用"
 participant Order as "order-app"
 participant I18n as "i18n.ts"
 Base->>Order : update({ lang : 'en' })
-Order->>Order : localStorage.setItem('demo_lang', 'en')
+Order->>Order : localStorage.setItem('qoder_lang', 'en')
 Order->>Order : re-render()
 Order->>I18n : t('order.title')
 I18n-->>Order : "Orders"

@@ -11,6 +11,8 @@
 - [FlightDetail.tsx](file://frontend/product-app/src/pages/FlightDetail.tsx)
 - [FlightMap2D.tsx](file://frontend/product-app/src/components/FlightMap2D.tsx)
 - [FlightMap3D.tsx](file://frontend/product-app/src/components/FlightMap3D.tsx)
+- [FlightInfoPanel.tsx](file://frontend/product-app/src/components/FlightInfoPanel.tsx)
+- [FlightAnimationController.tsx](file://frontend/product-app/src/components/FlightAnimationController.tsx)
 - [tracker.ts](file://frontend/product-app/src/utils/tracker.ts)
 - [tracker.spec.ts](file://frontend/product-app/src/__tests__/unit/utils/tracker.spec.ts)
 - [i18n/index.ts](file://frontend/product-app/src/i18n/index.ts)
@@ -21,12 +23,15 @@
 
 ## 更新摘要
 **变更内容**   
-- 增强了商品子应用的国际化功能，集成了完整的 react-i18next 解决方案
-- **新增** 实现了 sophisticated 用户行为追踪系统，包含页面访问、商品曝光和用户点击埋点
+- **新增** FlightDetail.tsx 航班详情页面，支持 2D ECharts 和 3D Cesium 双模式可视化
+- **新增** 专门的地图组件：FlightMap2D（基于 ECharts 的 2D 中国地图）和 FlightMap3D（基于 Cesium 的 3D 地球）
+- **新增** 动画控制组件 FlightAnimationController，提供播放控制和进度条
+- **新增** 飞行信息面板 FlightInfoPanel，显示实时飞行状态数据
+- 增强了国际化功能，集成了完整的 react-i18next 解决方案
+- 实现了 sophisticated 用户行为追踪系统，包含页面访问、商品曝光和用户点击埋点
 - 实现了 Ant Design 组件库的语言包动态切换支持
 - 添加了完整的中英文翻译资源文件
 - 完善了微前端环境下的语言状态同步机制
-- **新增** 机票商品详情页 FlightDetail，支持 2D（ECharts）/3D（Cesium）地图切换、飞机视角飞行动画与实时飞行信息面板（含 FlightMap2D/3D、FlightInfoPanel、FlightAnimationController 组件）
 - 更新了所有页面组件以使用新的国际化系统
 
 ## 目录
@@ -45,24 +50,30 @@
 - 应用初始化、路由配置、国际化与主题适配
 - 商品列表页的数据获取、筛选展示逻辑
 - 商品详情页的信息展示、图片占位、购买与秒杀流程
+- **新增** 航班详情页面的 2D/3D 可视化展示，支持 ECharts 和 Cesium 双引擎
 - **新增** 用户行为追踪系统，包括页面访问、商品曝光和用户点击埋点
 - 与主应用的通信机制、状态同步（主题/语言）
 - 在微前端环境下的特殊配置与优化策略
 
-**更新** 本次更新重点增强了国际化功能，实现了完整的 react-i18next 集成和 Ant Design 语言包动态切换，同时新增了 sophisticated 的用户行为追踪系统。
+**更新** 本次更新重点新增了航班详情可视化功能，提供了丰富的 2D 和 3D 地图展示体验，同时增强了国际化功能和用户行为追踪能力。
 
 ## 项目结构
 product-app 是一个独立的 Vite + React 工程，作为 qiankun 子应用运行。关键目录与职责如下：
 - src/main.tsx：qiankun 生命周期入口，负责渲染 App 与处理 update 时的主题/语言同步
-- src/App.tsx：React 根组件，提供 Ant Design 主题与语言上下文，定义 /list 与 /detail/:id 路由
+- src/App.tsx：React 根组件，提供 Ant Design 主题与语言上下文，定义 /list、/detail/:id 与 /flight/:id 路由
 - src/pages/ProductList.tsx：商品列表页，支持关键词与分类筛选，调用后端搜索接口，集成用户行为追踪
 - src/pages/ProductDetail.tsx：商品详情页，展示详情、价格、库存，支持普通购买与秒杀下单
-- **src/utils/tracker.ts：用户行为追踪工具，提供页面访问、商品曝光、用户点击埋点功能**
+- **src/pages/FlightDetail.tsx：航班详情页面，支持 2D/3D 地图切换、动画控制和飞行信息展示**
+- **src/components/FlightMap2D.tsx：基于 ECharts 的 2D 中国地图可视化组件**
+- **src/components/FlightMap3D.tsx：基于 Cesium 的 3D 地球可视化组件**
+- **src/components/FlightInfoPanel.tsx：飞行信息面板，显示实时飞行状态**
+- **src/components/FlightAnimationController.tsx：动画控制器，提供播放控制和进度调节**
+- src/utils/tracker.ts：用户行为追踪工具，提供页面访问、商品曝光、用户点击埋点功能
 - src/i18n/index.ts：i18next 初始化与语言持久化
-- src/i18n/zh.ts：中文翻译资源文件
-- src/i18n/en.ts：英文翻译资源文件
-- vite.config.ts：qiankun 插件、开发代理、别名等构建配置
-- package.json：依赖声明，包含 react、antd、axios、react-router-dom、i18next 等
+- src/i18n/zh.ts：中文翻译资源文件（包含产品与航班相关翻译）
+- src/i18n/en.ts：英文翻译资源文件（包含产品与航班相关翻译）
+- vite.config.ts：qiankun 插件、Cesium 配置、开发代理、别名等构建配置
+- package.json：依赖声明，包含 react、antd、axios、react-router-dom、i18next、echarts、cesium 等
 
 ```mermaid
 graph TB
@@ -70,6 +81,11 @@ subgraph "product-app"
 M["main.tsx<br/>qiankun 生命周期"] --> A["App.tsx<br/>路由/主题/语言"]
 A --> L["pages/ProductList.tsx<br/>商品列表 + 行为追踪"]
 A --> D["pages/ProductDetail.tsx<br/>商品详情"]
+A --> F["pages/FlightDetail.tsx<br/>航班详情可视化"]
+F --> M2D["components/FlightMap2D.tsx<br/>ECharts 2D地图"]
+F --> M3D["components/FlightMap3D.tsx<br/>Cesium 3D地球"]
+F --> IP["components/FlightInfoPanel.tsx<br/>飞行信息面板"]
+F --> AC["components/FlightAnimationController.tsx<br/>动画控制"]
 L --> T["utils/tracker.ts<br/>用户行为追踪"]
 A --> I18N["i18n/index.ts<br/>国际化配置"]
 I18N --> ZH["i18n/zh.ts<br/>中文翻译"]
@@ -83,38 +99,52 @@ B --> M
 
 **图表来源**
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
-- [App.tsx:55-69](file://frontend/product-app/src/App.tsx#L55-L69)
+- [App.tsx:55-80](file://frontend/product-app/src/App.tsx#L55-L80)
+- [FlightDetail.tsx:45-237](file://frontend/product-app/src/pages/FlightDetail.tsx#L45-L237)
+- [FlightMap2D.tsx:44-246](file://frontend/product-app/src/components/FlightMap2D.tsx#L44-L246)
+- [FlightMap3D.tsx:93-463](file://frontend/product-app/src/components/FlightMap3D.tsx#L93-L463)
 - [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
 - [micro/index.ts:32-45](file://frontend/base-app/src/micro/index.ts#L32-L45)
 
 **章节来源**
 - [main.tsx:1-61](file://frontend/product-app/src/main.tsx#L1-L61)
-- [App.tsx:1-74](file://frontend/product-app/src/App.tsx#L1-L74)
-- [vite.config.ts:1-49](file://frontend/product-app/vite.config.ts#L1-L49)
-- [package.json:1-29](file://frontend/product-app/package.json#L1-L29)
+- [App.tsx:1-88](file://frontend/product-app/src/App.tsx#L1-L88)
+- [vite.config.ts:1-107](file://frontend/product-app/vite.config.ts#L1-L107)
+- [package.json:1-41](file://frontend/product-app/package.json#L1-L41)
 
 ## 核心组件
 - 应用初始化与微前端生命周期
   - main.tsx 使用 renderWithQiankun 暴露 bootstrap/mount/unmount/update 钩子；独立运行时直接渲染 App
   - update 钩子接收基座传来的 theme/lang，写入 localStorage 并触发 i18n 切换
 - 路由与布局
-  - App.tsx 使用 BrowserRouter basename="/product"，定义默认跳转至 /list，以及 /list 与 /detail/:id 两个页面路由
+  - App.tsx 使用 BrowserRouter basename="/product"，定义默认跳转至 /list，以及 /list、/detail/:id 与 /flight/:id 三个页面路由
   - 通过 ConfigProvider 注入 antd 的 locale 与主题算法（亮/暗）
 - 国际化
   - i18n/index.ts 初始化 i18next，从 localStorage 读取语言，fallback 为中文
   - App.tsx 监听 i18n 语言变化，动态设置 antd 的 locale（zh_CN/en_US）
   - 所有页面组件使用 useTranslation hook 访问翻译文本
+- **航班详情可视化**
+  - FlightDetail.tsx 提供航班信息的 2D/3D 双模式展示，支持地图类型切换和视角切换
+  - FlightMap2D.tsx 基于 ECharts 实现中国地图上的航线可视化，支持飞线动画和城市节点
+  - FlightMap3D.tsx 基于 Cesium 实现 3D 地球上的航线可视化，支持飞机模型和动画控制
+  - FlightInfoPanel.tsx 显示实时飞行状态，包括已飞行时间、剩余时间、高度和进度
+  - FlightAnimationController.tsx 提供播放/暂停控制和进度条调节
 - **用户行为追踪**
   - tracker.ts 提供统一的埋点接口，支持页面访问、商品曝光、用户点击等事件
   - 使用 IntersectionObserver 实现商品曝光检测
   - 支持 navigator.sendBeacon 进行异步非阻塞上报
   - 内置批量发送机制，100ms 内的事件合并上报
 
-**更新** 新增了完整的国际化支持和 sophisticated 的用户行为追踪系统，包括中英文翻译资源和 Ant Design 语言包动态切换。
+**更新** 新增了完整的航班详情可视化功能，包括 2D ECharts 和 3D Cesium 双引擎支持，同时保持了原有的国际化支持和用户行为追踪系统。
 
 **章节来源**
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
-- [App.tsx:13-70](file://frontend/product-app/src/App.tsx#L13-L70)
+- [App.tsx:13-80](file://frontend/product-app/src/App.tsx#L13-L80)
+- [FlightDetail.tsx:45-237](file://frontend/product-app/src/pages/FlightDetail.tsx#L45-L237)
+- [FlightMap2D.tsx:44-246](file://frontend/product-app/src/components/FlightMap2D.tsx#L44-L246)
+- [FlightMap3D.tsx:93-463](file://frontend/product-app/src/components/FlightMap3D.tsx#L93-L463)
+- [FlightInfoPanel.tsx:27-108](file://frontend/product-app/src/components/FlightInfoPanel.tsx#L27-L108)
+- [FlightAnimationController.tsx:13-59](file://frontend/product-app/src/components/FlightAnimationController.tsx#L13-L59)
 - [tracker.ts:1-135](file://frontend/product-app/src/utils/tracker.ts#L1-L135)
 - [i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
 
@@ -127,6 +157,9 @@ participant Base as "基座(base-app)"
 participant QK as "qiankun"
 participant Prod as "product-app(main.tsx)"
 participant App as "App.tsx"
+participant Flight as "FlightDetail.tsx"
+participant Map2D as "FlightMap2D.tsx"
+participant Map3D as "FlightMap3D.tsx"
 participant Tracker as "tracker.ts"
 participant API as "后端API"
 Base->>QK : registerMicroApps({ name : 'product-app', entry, activeRule : '/product' })
@@ -138,6 +171,11 @@ Base->>QK : setGlobalState({theme, lang})
 QK->>Prod : update(props={theme, lang})
 Prod->>Prod : 写入localStorage并触发storage事件
 Prod->>App : i18n.changeLanguage(props.lang)
+App->>Flight : 导航到 /flight/ : id
+Flight->>API : GET /api/product/flights/ : id
+API-->>Flight : 返回航班数据
+Flight->>Map2D : 渲染 2D ECharts 地图
+Flight->>Map3D : 渲染 3D Cesium 地球
 App->>Tracker : trackPageView('ProductList')
 Tracker->>Tracker : IntersectionObserver 监听商品曝光
 Tracker->>Tracker : navigator.sendBeacon 异步上报
@@ -149,7 +187,10 @@ API-->>App : 返回商品列表
 - [micro/index.ts:32-45](file://frontend/base-app/src/micro/index.ts#L32-L45)
 - [micro/index.ts:22-30](file://frontend/base-app/src/micro/index.ts#L22-L30)
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
-- [App.tsx:55-69](file://frontend/product-app/src/App.tsx#L55-L69)
+- [App.tsx:64-80](file://frontend/product-app/src/App.tsx#L64-L80)
+- [FlightDetail.tsx:62-74](file://frontend/product-app/src/pages/FlightDetail.tsx#L62-L74)
+- [FlightMap2D.tsx:49-77](file://frontend/product-app/src/components/FlightMap2D.tsx#L49-L77)
+- [FlightMap3D.tsx:109-159](file://frontend/product-app/src/components/FlightMap3D.tsx#L109-L159)
 - [tracker.ts:55-74](file://frontend/product-app/src/utils/tracker.ts#L55-L74)
 
 ## 详细组件分析
@@ -159,7 +200,7 @@ API-->>App : 返回商品列表
   - main.tsx 定义 render(props)，根据是否在 qiankun 环境中选择容器节点，并使用 ReactDOM.createRoot 渲染 <App />
   - 通过 renderWithQiankun 注册生命周期：bootstrap、mount、unmount、update
 - 主题与语言同步
-  - update 钩子中，若 props.theme 存在，则写入 localStorage('demo_theme') 并 dispatch storage 事件，使 App 组件重新读取主题
+  - update 钩子中，若 props.theme 存在，则写入 localStorage('qoder_theme') 并 dispatch storage 事件，使 App 组件重新读取主题
   - 若 props.lang 存在且与当前 i18n.language 不同，则调用 i18n.changeLanguage 切换语言
 - 独立运行模式
   - 当不在 qiankun 环境时，直接执行 render() 以支持独立预览
@@ -170,8 +211,8 @@ Start(["启动"]) --> CheckQK{"是否由qiankun加载?"}
 CheckQK --> |是| Mount["mount(props)"]
 CheckQK --> |否| RenderDirect["直接render()"]
 Mount --> Update["update(props)"]
-Update --> SyncTheme["写入localStorage('demo_theme')并触发storage事件"]
-Update --> SyncLang["写入localStorage('demo_lang')并调用i18n.changeLanguage"]
+Update --> SyncTheme["写入localStorage('qoder_theme')并触发storage事件"]
+Update --> SyncLang["写入localStorage('qoder_lang')并调用i18n.changeLanguage"]
 SyncTheme --> End(["就绪"])
 SyncLang --> End
 RenderDirect --> End
@@ -187,16 +228,16 @@ RenderDirect --> End
 ### 路由与主题/语言配置
 - 路由
   - App.tsx 使用 BrowserRouter basename="/product"，将子应用路由限定在 /product 前缀下
-  - 默认重定向到 /list，同时提供 /detail/:id 路由
+  - 默认重定向到 /list，同时提供 /detail/:id 与 /flight/:id 两个额外路由
 - 主题
   - 通过 ConfigProvider 的 theme.algorithm 切换 darkAlgorithm/defaultAlgorithm
-  - 初始主题来自 localStorage('demo_theme')，默认 dark
+  - 初始主题来自 localStorage('qoder_theme')，默认 dark
   - 监听 window.storage 事件与 document.documentElement class 变更，实现跨组件的主题同步
 - 语言
   - 通过 i18n.on('languageChanged') 监听语言变化，动态设置 antd 的 locale（zh_CN/en_US）
   - 使用 currentLang 状态管理当前语言，根据语言选择对应的 Ant Design 语言包
 
-**更新** 新增了完整的语言切换机制，支持 Ant Design 组件库的动态语言切换。
+**更新** 新增了航班详情路由 /flight/:id，支持航班数据的可视化展示。
 
 ```mermaid
 classDiagram
@@ -208,15 +249,15 @@ class App {
 +useEffect 监听i18n.languageChanged
 +ConfigProvider(locale, theme)
 +BrowserRouter(basename="/product")
-+Routes(/ -> /list, /list, /detail/ : id)
++Routes(/ -> /list, /list, /detail/ : id, /flight/ : id)
 }
 ```
 
 **图表来源**
-- [App.tsx:13-70](file://frontend/product-app/src/App.tsx#L13-L70)
+- [App.tsx:13-80](file://frontend/product-app/src/App.tsx#L13-L80)
 
 **章节来源**
-- [App.tsx:1-74](file://frontend/product-app/src/App.tsx#L1-L74)
+- [App.tsx:1-88](file://frontend/product-app/src/App.tsx#L1-L88)
 
 ### 国际化(i18n)系统
 - 初始化配置
@@ -224,15 +265,15 @@ class App {
   - 定义了 LANG_KEY 常量用于 localStorage 键名管理
   - 配置了 interpolation 选项以禁用 HTML 转义
 - 翻译资源管理
-  - zh.ts 包含完整的中文翻译键值对，涵盖商品中心的所有界面文本
+  - zh.ts 包含完整的中文翻译键值对，涵盖商品中心和航班相关的所有界面文本
   - en.ts 包含对应的英文翻译，保持键名一致性
-  - 所有翻译键都遵循 product.xxx 命名空间规范
+  - 所有翻译键都遵循 product.xxx 和 flight.xxx 命名空间规范
 - 组件集成
   - 所有页面组件通过 useTranslation hook 访问翻译函数 t
   - 支持动态语言切换，无需刷新页面
   - 错误消息和成功提示也使用国际化
 
-**新增** 完整的国际化系统，包括翻译资源管理和组件集成。
+**更新** 新增了航班相关的翻译键值，包括出发城市、到达城市、飞行时长、频率、余票等信息的国际化支持。
 
 ```mermaid
 flowchart TD
@@ -245,16 +286,78 @@ DynamicSwitch --> AntDLocale["Ant Design语言包切换"]
 
 **图表来源**
 - [i18n/index.ts:16-26](file://frontend/product-app/src/i18n/index.ts#L16-L26)
-- [i18n/zh.ts:2-30](file://frontend/product-app/src/i18n/zh.ts#L2-L30)
-- [i18n/en.ts:2-30](file://frontend/product-app/src/i18n/en.ts#L2-L30)
-- [App.tsx:43-53](file://frontend/product-app/src/App.tsx#L43-L53)
+- [i18n/zh.ts:2-56](file://frontend/product-app/src/i18n/zh.ts#L2-L56)
+- [i18n/en.ts:2-56](file://frontend/product-app/src/i18n/en.ts#L2-L56)
+- [App.tsx:43-55](file://frontend/product-app/src/App.tsx#L43-L55)
 
 **章节来源**
 - [i18n/index.ts:1-30](file://frontend/product-app/src/i18n/index.ts#L1-L30)
-- [i18n/zh.ts:1-33](file://frontend/product-app/src/i18n/zh.ts#L1-L33)
-- [i18n/en.ts:1-33](file://frontend/product-app/src/i18n/en.ts#L1-L33)
+- [i18n/zh.ts:1-56](file://frontend/product-app/src/i18n/zh.ts#L1-L56)
+- [i18n/en.ts:1-56](file://frontend/product-app/src/i18n/en.ts#L1-L56)
 - [main.tsx:47-53](file://frontend/product-app/src/main.tsx#L47-L53)
-- [App.tsx:43-53](file://frontend/product-app/src/App.tsx#L43-L53)
+- [App.tsx:43-55](file://frontend/product-app/src/App.tsx#L43-L55)
+
+### 航班详情可视化系统
+- 航班详情页面 (FlightDetail.tsx)
+  - 支持 2D 和 3D 两种地图模式的切换
+  - 在 3D 模式下支持全局视角和飞机视角的切换
+  - 集成动画控制器，支持播放/暂停和进度调节
+  - 显示航班基本信息：航班号、出发/到达城市、飞行时长、频率、余票等
+  - 调用后端接口获取航班数据和产品信息
+- 2D 地图组件 (FlightMap2D.tsx)
+  - 基于 ECharts 实现中国地图可视化
+  - 支持动态加载中国地图 GeoJSON 数据
+  - 显示出发城市和到达城市的涟漪效果节点
+  - 绘制带粒子动画的飞线效果
+  - 支持途经城市的分段航线展示
+  - 自适应深色/浅色主题
+- 3D 地图组件 (FlightMap3D.tsx)
+  - 基于 Cesium 实现 3D 地球可视化
+  - 使用高德地图卫星瓦片作为底图
+  - 生成弧形航线轨迹，模拟真实飞行路径
+  - 支持飞机模型的旋转和位置更新
+  - 实现相机跟随飞机的视角模式
+  - 途经城市标签的智能显隐控制
+- 飞行信息面板 (FlightInfoPanel.tsx)
+  - 显示实时飞行状态：已飞行时间、剩余时间、当前高度、飞行进度
+  - 智能显示接近的途经城市信息
+  - 半透明背景设计，不影响地图查看
+- 动画控制器 (FlightAnimationController.tsx)
+  - 提供播放/暂停按钮控制
+  - 支持进度条拖拽调节
+  - 显示当前时间和总时间的格式化显示
+
+**新增** 完整的航班详情可视化系统，提供了丰富的 2D 和 3D 地图展示体验。
+
+```mermaid
+flowchart TD
+FlightDetail["FlightDetail.tsx<br/>航班详情页面"] --> FetchData["获取航班数据"]
+FetchData --> ParseRoute["解析航线坐标"]
+ParseRoute --> ModeSelect{"选择地图模式"}
+ModeSelect --> |2D| Map2D["FlightMap2D.tsx<br/>ECharts 2D地图"]
+ModeSelect --> |3D| Map3D["FlightMap3D.tsx<br/>Cesium 3D地球"]
+Map2D --> RouteDisplay["显示航线和城市节点"]
+Map3D --> PlaneModel["显示飞机模型和弧线轨迹"]
+PlaneModel --> CameraControl["相机视角控制"]
+FlightDetail --> InfoPanel["FlightInfoPanel.tsx<br/>飞行信息面板"]
+FlightDetail --> AnimController["FlightAnimationController.tsx<br/>动画控制"]
+AnimController --> PlayControl["播放/暂停控制"]
+AnimController --> ProgressSlider["进度条调节"]
+```
+
+**图表来源**
+- [FlightDetail.tsx:45-237](file://frontend/product-app/src/pages/FlightDetail.tsx#L45-L237)
+- [FlightMap2D.tsx:44-246](file://frontend/product-app/src/components/FlightMap2D.tsx#L44-L246)
+- [FlightMap3D.tsx:93-463](file://frontend/product-app/src/components/FlightMap3D.tsx#L93-L463)
+- [FlightInfoPanel.tsx:27-108](file://frontend/product-app/src/components/FlightInfoPanel.tsx#L27-L108)
+- [FlightAnimationController.tsx:13-59](file://frontend/product-app/src/components/FlightAnimationController.tsx#L13-L59)
+
+**章节来源**
+- [FlightDetail.tsx:1-237](file://frontend/product-app/src/pages/FlightDetail.tsx#L1-L237)
+- [FlightMap2D.tsx:1-246](file://frontend/product-app/src/components/FlightMap2D.tsx#L1-L246)
+- [FlightMap3D.tsx:1-463](file://frontend/product-app/src/components/FlightMap3D.tsx#L1-L463)
+- [FlightInfoPanel.tsx:1-108](file://frontend/product-app/src/components/FlightInfoPanel.tsx#L1-L108)
+- [FlightAnimationController.tsx:1-59](file://frontend/product-app/src/components/FlightAnimationController.tsx#L1-L59)
 
 ### 用户行为追踪系统(tracker)
 - 核心功能
@@ -272,7 +375,7 @@ DynamicSwitch --> AntDLocale["Ant Design语言包切换"]
   - 使用 data-* 属性标记商品元素，便于 IntersectionObserver 检测
   - 支持扩展更多埋点场景和业务属性
 
-**新增** sophisticated 的用户行为追踪系统，提供完整的埋点解决方案。
+**更新** 保持了原有的用户行为追踪系统，同时为新的航班详情页面预留了扩展接口。
 
 ```mermaid
 flowchart TD
@@ -299,7 +402,7 @@ UserClick["用户点击"] --> TrackClick["trackClick"]
 ### 商品列表页(ProductList)
 - 数据获取
   - 组件挂载后调用 fetchProducts，请求 /api/product/products/search，携带 keyword/category 参数
-  - 从 localStorage 读取 demo_token 并附加 Authorization 头
+  - 从 localStorage 读取 qoder_token 并附加 Authorization 头
   - 成功时设置 products 列表，失败时使用国际化错误消息提示
 - 筛选与展示
   - 提供关键词输入框与分类下拉框，点击搜索按钮或回车触发查询
@@ -389,25 +492,6 @@ end
 **章节来源**
 - [ProductDetail.tsx:1-213](file://frontend/product-app/src/pages/ProductDetail.tsx#L1-L213)
 
-### 机票详情页(FlightDetail)
-机票商品（category='flight'）不再进入普通 ProductDetail，而是路由 `/flight/:id` 进入 FlightDetail。
-
-- 数据获取
-  - 根据路由参数 id 调用 GET /api/product/flights/:id 获取航班详情（含关联商品信息）
-  - 解析 routeCoordinates JSON 得到途经城市列表（JSON.parse 失败时安全回退为空数组）
-- 2D/3D 地图切换
-  - Segmented 控件在 2D（FlightMap2D，ECharts 单航线飞线）与 3D（FlightMap3D，Cesium 地球 + 弧线航线 + GLB 飞机模型）间切换
-  - 3D 模式下额外提供“全局俯瞰 / 飞机视角”切换，并展示 FlightAnimationController（播放/暂停 + 进度拖动）与 FlightInfoPanel（已飞时间/剩余/高度/接近城市）
-- 入口联动
-  - ProductList 中机票商品卡片使用 RocketOutlined 图标，点击“查看详情”时根据 category 判断跳转 `/flight/:id`
-- 依赖
-  - echarts（2D 飞线）、cesium + vite-plugin-cesium（3D 地球与模型）
-
-**章节来源**
-- [FlightDetail.tsx](file://frontend/product-app/src/pages/FlightDetail.tsx)
-- [App.tsx:70-79](file://frontend/product-app/src/App.tsx#L70-L79)
-- [ProductList.tsx:117-188](file://frontend/product-app/src/pages/ProductList.tsx#L117-L188)
-
 ## 依赖关系分析
 - 运行时依赖
   - react/react-dom：React 18 渲染
@@ -415,14 +499,17 @@ end
   - axios：HTTP 客户端
   - react-router-dom：前端路由
   - i18next/react-i18next：国际化
+  - **echarts：2D 地图可视化引擎**
+  - **cesium：3D 地球可视化引擎**
 - 构建与微前端
   - vite：构建工具
   - @vitejs/plugin-react：React 支持
   - vite-plugin-qiankun：qiankun 子应用适配
+  - **vite-plugin-cesium：Cesium 构建支持**
 - 基座侧
   - qiankun：微前端框架，负责子应用注册、生命周期管理、全局状态分发
 
-**更新** 新增了 i18next 和 react-i18next 作为核心依赖。
+**更新** 新增了 echarts 和 cesium 作为核心可视化依赖，以及 vite-plugin-cesium 构建支持。
 
 ```mermaid
 graph LR
@@ -431,27 +518,34 @@ Pkg --> A["antd"]
 Pkg --> X["axios"]
 Pkg --> RR["react-router-dom"]
 Pkg --> I["i18next/react-i18next"]
+Pkg --> E["echarts"]
+Pkg --> C["cesium"]
 V["vite.config.ts"] --> VP["@vitejs/plugin-react"]
 V --> QP["vite-plugin-qiankun"]
+V --> CP["vite-plugin-cesium"]
 BA["base-app micro/index.ts"] --> Q["qiankun"]
 Q --> PA["product-app(main.tsx)"]
 PA --> TR["product-app tracker.ts"]
+PA --> FD["product-app FlightDetail.tsx"]
+FD --> FM2D["product-app FlightMap2D.tsx"]
+FD --> FM3D["product-app FlightMap3D.tsx"]
 ```
 
 **图表来源**
-- [package.json:11-27](file://frontend/product-app/package.json#L11-L27)
-- [vite.config.ts:1-31](file://frontend/product-app/vite.config.ts#L1-L31)
+- [package.json:14-24](file://frontend/product-app/package.json#L14-L24)
+- [vite.config.ts:64-69](file://frontend/product-app/vite.config.ts#L64-L69)
 - [micro/index.ts:1-5](file://frontend/base-app/src/micro/index.ts#L1-L5)
 
 **章节来源**
-- [package.json:1-29](file://frontend/product-app/package.json#L1-L29)
-- [vite.config.ts:1-49](file://frontend/product-app/vite.config.ts#L1-L49)
+- [package.json:1-41](file://frontend/product-app/package.json#L1-L41)
+- [vite.config.ts:1-107](file://frontend/product-app/vite.config.ts#L1-L107)
 - [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
 
 ## 性能与优化
 - 构建与热更新
   - vite.config.ts 移除了 React Refresh preamble，以避免 qiankun 的 eval 执行 ES module import 的问题；代价是在 qiankun 模式下 HMR 不可用
   - 建议在基座 beforeLoad 钩子中设置 React Refresh 兼容标志与桩函数，已在 base-app 中实现
+  - **新增了 Cesium 专用插件，解决 qiankun 模式下 Cesium Workers 的跨域问题**
 - 网络请求
   - 列表页一次性拉取全部数据，适合小规模数据；数据量大时应改为服务端分页（page/size）
   - 建议封装 axios 实例，统一拦截器处理 token、错误码与消息提示
@@ -467,8 +561,13 @@ PA --> TR["product-app tracker.ts"]
   - 异步非阻塞：使用 setTimeout 和 navigator.sendBeacon 确保不影响业务逻辑
   - IntersectionObserver 高效监听：只监听可见的商品元素，避免全量监听的性能开销
   - 异常静默捕获：所有埋点操作都有try-catch保护，确保不影响用户体验
+- **可视化性能优化**
+  - ECharts 地图懒加载：仅在需要时加载中国地图 GeoJSON 数据
+  - Cesium 资源优化：禁用不需要的 UI 组件和功能，减少内存占用
+  - 动画帧率控制：使用 requestAnimationFrame 实现平滑动画，避免过度渲染
+  - 相机移动优化：平滑过渡动画，避免突兀的视角切换
 
-**更新** 新增了国际化相关的性能优化建议和用户行为追踪的性能优化策略。
+**更新** 新增了 Cesium 构建配置和可视化性能优化策略，包括地图懒加载、动画帧率控制和相机移动优化。
 
 [本节为通用指导，不直接分析具体文件]
 
@@ -494,8 +593,15 @@ PA --> TR["product-app tracker.ts"]
   - 验证 data-product-id、data-product-name 等属性是否正确设置
   - 检查浏览器控制台是否有 [tracker] 开头的调试日志
   - 确认 navigator.sendBeacon 是否被浏览器支持
+- **航班详情可视化问题**
+  - 检查 ECharts 是否正确初始化，确认地图 GeoJSON 数据加载成功
+  - 检查 Cesium 是否正确初始化，确认 WebGL 支持和 CORS 配置
+  - 验证航班数据格式是否符合预期，特别是经纬度坐标和航线坐标
+  - 检查 models/plane.glb 模型文件是否正确部署
+  - 确认 Cesium Ion token 配置（已清空以避免 401 错误）
+  - 检查高德地图瓦片服务是否可访问
 
-**更新** 新增了国际化相关的故障排查指南和用户行为追踪问题的排查方法。
+**更新** 新增了航班详情可视化的故障排查指南，包括 ECharts 和 Cesium 的常见问题解决方法。
 
 **章节来源**
 - [micro/index.ts:62-71](file://frontend/base-app/src/micro/index.ts#L62-L71)
@@ -503,17 +609,21 @@ PA --> TR["product-app tracker.ts"]
 - [App.tsx:20-50](file://frontend/product-app/src/App.tsx#L20-L50)
 - [vite.config.ts:6-24](file://frontend/product-app/vite.config.ts#L6-L24)
 - [tracker.ts:65-71](file://frontend/product-app/src/utils/tracker.ts#L65-L71)
+- [FlightMap2D.tsx:54-64](file://frontend/product-app/src/components/FlightMap2D.tsx#L54-L64)
+- [FlightMap3D.tsx:109-159](file://frontend/product-app/src/components/FlightMap3D.tsx#L109-L159)
 
 ## 结论
-product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与基座 base-app 协作，实现了微前端环境下的商品列表与详情功能。其特点包括：
+product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与基座 base-app 协作，实现了微前端环境下的商品列表、详情与航班可视化功能。其特点包括：
 - 清晰的初始化与生命周期管理
 - 基于 basename 的路由隔离
 - 通过 localStorage 与 i18n 事件实现主题/语言的跨应用同步
 - 简洁的商品数据获取与展示逻辑
 - **新增** 完整的国际化支持，包括中英文翻译资源和 Ant Design 语言包动态切换
 - **新增** sophisticated 的用户行为追踪系统，支持页面访问、商品曝光和用户点击埋点
+- **新增** 丰富的航班详情可视化功能，支持 2D ECharts 和 3D Cesium 双引擎
+- **新增** 专业的地图组件，提供航线可视化、飞机模型和动画控制
 
-**更新** 本次更新显著增强了应用的国际化能力和用户行为追踪能力，提供了更好的多语言用户体验和数据收集能力。
+**更新** 本次更新显著增强了应用的功能丰富性，新增了完整的航班详情可视化系统，提供了更好的多语言用户体验和数据收集能力，同时保持了原有的商品管理功能。
 
 后续可扩展点：
 - 列表页引入服务端分页与缓存
@@ -525,3 +635,6 @@ product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与
 - **为 ProductDetail.tsx 添加用户行为追踪功能**
 - **扩展更多埋点场景和业务属性**
 - **实现埋点数据的可视化分析和报表展示**
+- **增强航班详情页面的交互功能，如航线编辑、多航班对比等**
+- **优化 Cesium 性能，支持更多航线和更复杂的动画效果**
+- **实现航班数据的实时更新和WebSocket推送**

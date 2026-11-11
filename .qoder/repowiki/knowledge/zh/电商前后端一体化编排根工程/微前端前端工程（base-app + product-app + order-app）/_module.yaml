@@ -1,6 +1,6 @@
 schema_version: 1
 module_path: frontend
-title: 微前端前端工程（Vue3 主应用 + React/原生 JS 子应用）
+title: 微前端前端工程（base-app + product-app + order-app）
 scope:
     - frontend/
 source_files: []
