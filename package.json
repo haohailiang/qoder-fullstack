@@ -1,4 +1,6 @@
 {
+  "name": "qoder-fullstack",
+  "private": true,
   "scripts": {
     "test:unit": "npm run test --workspace=frontend/base-app --workspace=frontend/product-app --workspace=frontend/order-app",
     "test:unit:base": "npm run test --workspace=frontend/base-app",
