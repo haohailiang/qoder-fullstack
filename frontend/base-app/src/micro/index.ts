@@ -44,7 +44,7 @@ const apps = [
     },
   },
   {
-    name: 'order-app', // Angular 订单子应用
+    name: 'order-app', // 原生 TypeScript 订单子应用
     entry: '//localhost:7200',
     container: '#subapp-container',
     activeRule: '/order',

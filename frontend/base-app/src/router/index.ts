@@ -39,7 +39,7 @@ const router = createRouter({
       component: () => import('@/views/SubAppPlaceholder.vue'),
       meta: { requiresAuth: true, isSubApp: true },
     },
-    // 订单子应用路由（由 qiankun 加载 Angular 子应用处理）
+    // 订单子应用路由（由 qiankun 加载原生 TypeScript 子应用处理）
     {
       path: '/order/:pathMatch(.*)*',
       name: 'order-app',
