@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -20,11 +21,13 @@ import java.io.IOException;
 /**
  * 业务服务统一安全配置。
  *
- * <p>网关已完成 JWT 校验，各业务服务信任网关请求头，因此放行所有请求，
- * 仅通过 {@link TrustedAuthenticationFilter} 从请求头提取用户身份写入 SecurityContext。
+ * <p>网关已完成 JWT 校验与 Redis 会话校验，各业务服务信任网关请求头，因此 URL 层面放行所有请求，
+ * 由 {@link TrustedAuthenticationFilter} 从请求头提取用户身份与角色写入 SecurityContext，
+ * 方法级权限再由 {@code @EnableMethodSecurity} 驱动的 {@code @PreAuthorize} 在管理接口上生效。
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final TrustedAuthenticationFilter trustedAuthenticationFilter;

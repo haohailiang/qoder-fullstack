@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: ecommerce-gateway
+  # Redis 会话：鉴权时比对 login:token:{uid}，使登出与单设备互踢生效（与用户服务同一实例）
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:192.168.178.100}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      timeout: 3000ms
   cloud:
     nacos:
       discovery:
@@ -11,10 +17,15 @@ spring:
         server-addr: 192.168.178.100:8848
     gateway:
       # 全局默认过滤器：开启跨域感知
+      # 仅允许本地开发源，避免 * + allowCredentials 组合允许任意站点携带凭据跨域调用
       globalcors:
         cors-configurations:
           '[/**]':
-            allowedOriginPatterns: "*"
+            allowedOriginPatterns:
+              - http://localhost:5173
+              - http://127.0.0.1:5173
+              - http://localhost:7100
+              - http://localhost:7200
             allowedMethods: "*"
             allowedHeaders: "*"
             allowCredentials: true
@@ -111,7 +122,14 @@ spring:
 
 # JWT 配置（与用户服务保持一致，用于网关解析和校验 Token）
 jwt:
-  secret: demo-fullstack-jwt-secret-key-change-me-in-production-2026
+  secret: ${JWT_SECRET:qoder-fullstack-jwt-secret-key-change-me-in-production-2026}
+
+# 网关自身行为开关
+gateway:
+  session-check:
+    # true：除 JWT 签名外再比对 Redis 会话（登出/挤下线立即生效）
+    # false：仅校验 JWT（Redis 不可用时的临时降级开关）
+    enabled: ${GATEWAY_SESSION_CHECK:true}
 
 # Springdoc OpenAPI 配置（网关自身）
 springdoc:
