@@ -2,9 +2,16 @@ const { Client } = require('ssh2');
 const fs = require('fs');
 const path = require('path');
 
-const VM_HOST = '192.168.178.100';
-const VM_USER = 'root';
-const VM_PASS = 'root123456';
+// SSH 凭据一律从环境变量读取，禁止明文入库。
+// PowerShell: $env:VM_PASS="..."   Linux/macOS: export VM_PASS="..."
+const VM_HOST = process.env.VM_HOST || '192.168.178.100';
+const VM_USER = process.env.VM_USER || 'root';
+const VM_PASS = process.env.VM_PASS;
+
+if (!VM_PASS) {
+  console.error('缺少环境变量 VM_PASS，请先设置目标主机的 SSH 口令后再执行（例：$env:VM_PASS="..."）');
+  process.exit(1);
+}
 
 function sshExec(command) {
   return new Promise((resolve, reject) => {

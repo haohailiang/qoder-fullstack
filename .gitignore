@@ -8,12 +8,22 @@
 **/dist/
 
 # Redis dump
-dump.rdb
+*.rdb
+
+# 根目录调试截图
+/page_initial.png
+/tracker_console_output.png
+/tracker_final_verification.png
+
+# 本地凭据（VM_PASS 等环境变量文件不得入库）
+.env
+.env.*
 
 # IDE
 .idea/
 *.iml
 .vscode/
+.workbuddy
 
 # OS
 .DS_Store
