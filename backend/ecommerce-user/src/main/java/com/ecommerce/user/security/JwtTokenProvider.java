@@ -21,6 +21,12 @@ public class JwtTokenProvider {
     /** Token 载荷中存放用户 id 的 claim 名 */
     public static final String CLAIM_USER_ID = "uid";
 
+    /** Token 载荷中存放角色的 claim 名（网关读取后注入 X-User-Role） */
+    public static final String CLAIM_ROLE = "role";
+
+    /** 无角色信息时的兜底角色 */
+    private static final String DEFAULT_ROLE = "USER";
+
     private final SecretKey secretKey;
     private final long expirationMillis;
 
@@ -32,13 +38,22 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 生成 Token：subject 存 username，附加 uid claim 与过期时间
+     * 生成 Token（无角色信息，默认 USER）
      */
     public String generateToken(String username, Long userId) {
+        return generateToken(username, userId, DEFAULT_ROLE);
+    }
+
+    /**
+     * 生成 Token：subject 存 username，附加 uid / role claim 与过期时间。
+     * role 使网关无需回查用户表就能得到角色，并向下游注入 X-User-Role。
+     */
+    public String generateToken(String username, Long userId, String role) {
         Date now = new Date();
         return Jwts.builder()
                 .setSubject(username)
                 .claim(CLAIM_USER_ID, userId)
+                .claim(CLAIM_ROLE, (role == null || role.isBlank()) ? DEFAULT_ROLE : role)
                 .setIssuedAt(now)
                 .setExpiration(new Date(now.getTime() + expirationMillis))
                 .signWith(secretKey, SignatureAlgorithm.HS256)

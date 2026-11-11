@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -51,6 +52,29 @@ class ProductControllerTest {
 
     @MockBean
     private RabbitTemplate rabbitTemplate;
+
+    /**
+     * 商品写接口已标注 @PreAuthorize("hasRole('ADMIN')")，
+     * 角色由 TrustedAuthenticationFilter 从网关注入的 X-User-Role 转为 ROLE_ADMIN。
+     */
+    private static RequestPostProcessor asAdmin() {
+        return request -> {
+            request.addHeader("X-User-Id", "1");
+            request.addHeader("X-User-Name", "admin");
+            request.addHeader("X-User-Role", "ADMIN");
+            return request;
+        };
+    }
+
+    /** 普通登录用户，用于验证管理接口对非 ADMIN 直接拒绝 */
+    private static RequestPostProcessor asPlainUser() {
+        return request -> {
+            request.addHeader("X-User-Id", "100");
+            request.addHeader("X-User-Name", "zhangsan");
+            request.addHeader("X-User-Role", "USER");
+            return request;
+        };
+    }
 
     // ──────────────────── GET /products ────────────────────
 
@@ -191,12 +215,26 @@ class ProductControllerTest {
                     """;
 
             mockMvc.perform(post("/products")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.id").value(10))
                     .andExpect(jsonPath("$.data.name").value("新商品"));
+        }
+
+        @Test
+        @DisplayName("权限场景：非 ADMIN 创建商品返回 403")
+        void shouldReturn403WhenNotAdmin() throws Exception {
+            mockMvc.perform(post("/products")
+                            .with(asPlainUser())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"越权商品","price":1.00,"stock":1}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
         }
     }
 
@@ -217,6 +255,7 @@ class ProductControllerTest {
                     """;
 
             mockMvc.perform(put("/products/1")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -235,6 +274,7 @@ class ProductControllerTest {
                     """;
 
             mockMvc.perform(put("/products/999")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -254,9 +294,19 @@ class ProductControllerTest {
         void shouldDeleteProduct() throws Exception {
             doNothing().when(productService).deleteProduct(1L);
 
-            mockMvc.perform(delete("/products/1"))
+            mockMvc.perform(delete("/products/1")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
+        }
+
+        @Test
+        @DisplayName("权限场景：非 ADMIN 删除商品返回 403")
+        void shouldReturn403WhenNotAdmin() throws Exception {
+            mockMvc.perform(delete("/products/1")
+                            .with(asPlainUser()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
         }
 
         @Test
@@ -265,7 +315,8 @@ class ProductControllerTest {
             doThrow(new BusinessException(404, "商品不存在: 999"))
                     .when(productService).deleteProduct(999L);
 
-            mockMvc.perform(delete("/products/999"))
+            mockMvc.perform(delete("/products/999")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(404))
                     .andExpect(jsonPath("$.message").value("商品不存在: 999"));
@@ -303,6 +354,20 @@ class ProductControllerTest {
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").value(false));
         }
+
+        @Test
+        @DisplayName("内部接口：普通用户身份调用也不受管理接口权限限制")
+        void shouldAllowCallWithoutAdminRole() throws Exception {
+            when(productService.deductStock(1L, 1)).thenReturn(true);
+
+            mockMvc.perform(post("/products/deduct-stock")
+                            .with(asPlainUser())
+                            .param("productId", "1")
+                            .param("quantity", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data").value(true));
+        }
     }
 
     // ──────────────────── POST /products/sync-es ────────────────────
@@ -316,7 +381,8 @@ class ProductControllerTest {
         void shouldSyncAllToEs() throws Exception {
             doNothing().when(productService).syncAllToElasticsearch();
 
-            mockMvc.perform(post("/products/sync-es"))
+            mockMvc.perform(post("/products/sync-es")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }

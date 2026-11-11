@@ -44,6 +44,13 @@ public class User {
     @Min(value = 0, message = "年龄不能小于 0")
     private Integer age;
 
+    /**
+     * 角色：USER（普通用户）/ ADMIN（管理员），未设置时由持久层默认为 USER。
+     * 登录时写入 JWT 的 role claim，网关据此注入 X-User-Role，
+     * 业务服务用 @PreAuthorize("hasRole('ADMIN')") 保护管理接口。
+     */
+    private String role;
+
     /** 创建人：当前登录用户标识，未登录或系统操作时为 "system"（新增时写入，之后不再变化） */
     private String createdBy;
 

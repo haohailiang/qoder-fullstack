@@ -1,5 +1,6 @@
 package com.ecommerce.user.controller;
 
+import com.ecommerce.common.BusinessException;
 import com.ecommerce.common.Result;
 import com.ecommerce.user.dto.LoginRequest;
 import com.ecommerce.user.dto.LoginResponse;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 认证接口。
  * 实际访问路径为 /api/auth/**（/api 来自 server.servlet.context-path 配置）。
  * 其中 /auth/register、/auth/login、/auth/captcha 与 /auth/send-sms-code 匿名可访问，
- * /auth/me 与 /auth/logout 需要携带有效 JWT。
+ * /auth/me 与 /auth/logout 需要携带有效 JWT（无身份时返回 401，不再 NPE 500）。
  * 
  * <p>登出时会清除 Redis 中存储的会话 Token，确保该设备立即失效。
  */
@@ -74,22 +75,34 @@ public class AuthController {
     @GetMapping("/me")
     @Operation(summary = "获取当前用户", description = "获取当前登录用户的详细信息")
     public Result<User> me(Authentication authentication) {
-        return Result.success(authService.getCurrentUser(authentication.getName()));
+        return Result.success(authService.getCurrentUser(requireUsername(authentication)));
     }
 
     /**
      * 退出登录。
-     * 清除 Redis 中存储的会话 Token，使当前设备立即失效。
+     * 清除 Redis 中存储的会话 Token，使当前设备立即失效（网关会话校验会同步拒绝旧 Token）。
      * 前端也应同步清除本地 localStorage 中的 Token 和用户信息。
      */
     @PostMapping("/logout")
     @Operation(summary = "退出登录", description = "清除 Redis 中的会话 Token，使当前设备立即失效")
     public Result<Void> logout(Authentication authentication) {
         // 获取当前登录用户信息
-        User user = authService.getCurrentUser(authentication.getName());
+        User user = authService.getCurrentUser(requireUsername(authentication));
         // 清除 Redis 中的会话 Token
         redisSessionService.removeToken(user.getId());
         log.info("用户 {} 已退出登录，Redis 会话已清除", user.getUsername());
         return Result.success();
+    }
+
+    /**
+     * 从 SecurityContext 取当前认证主体。
+     * 直接访问 8081 且未携带身份头时 Authentication 为 null，这里显式返回 401，
+     * 避免此前因自动拆箱导致的 500 NPE。
+     */
+    private String requireUsername(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            throw new BusinessException(401, "未授权访问，请先登录");
+        }
+        return authentication.getName();
     }
 }

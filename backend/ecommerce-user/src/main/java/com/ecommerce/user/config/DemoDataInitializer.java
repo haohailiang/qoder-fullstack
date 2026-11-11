@@ -36,19 +36,19 @@ public class DemoDataInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         if (userRepository.findByUsername("admin").isEmpty()) {
-            userRepository.save(buildUser("admin", "系统管理员", "admin@ecommerce.com", "13800000000", 35));
-            log.info("已初始化管理员账号: admin");
+            userRepository.save(buildUser("admin", "系统管理员", "admin@ecommerce.com", "13800000000", 35, "ADMIN"));
+            log.info("已初始化管理员账号: admin（role=ADMIN）");
         }
         if (userRepository.findByUsername("zhangsan").isEmpty()) {
-            userRepository.save(buildUser("zhangsan", "张三", "zhangsan@example.com", "13800000001", 25));
+            userRepository.save(buildUser("zhangsan", "张三", "zhangsan@example.com", "13800000001", 25, "USER"));
         }
         if (userRepository.findByUsername("lisi").isEmpty()) {
-            userRepository.save(buildUser("lisi", "李四", "lisi@example.com", "13800000002", 30));
+            userRepository.save(buildUser("lisi", "李四", "lisi@example.com", "13800000002", 30, "USER"));
         }
         log.info("演示数据初始化检查完成（已存在则跳过插入）");
     }
 
-    private User buildUser(String username, String name, String email, String phone, int age) {
+    private User buildUser(String username, String name, String email, String phone, int age, String role) {
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
@@ -56,6 +56,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         user.setEmail(email);
         user.setPhone(phone);
         user.setAge(age);
+        user.setRole(role);
         return user;
     }
 }

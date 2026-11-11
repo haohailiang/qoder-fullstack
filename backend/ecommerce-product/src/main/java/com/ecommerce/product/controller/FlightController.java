@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -53,24 +54,27 @@ public class FlightController {
         return Result.success(flightService.getFrequencyData());
     }
 
-    /** 创建航班 */
+    /** 创建航班（管理接口，仅 ADMIN） */
     @PostMapping
-    @Operation(summary = "创建航班", description = "创建新航班，需关联已有商品 ID")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "创建航班", description = "管理接口，创建新航班，需关联已有商品 ID")
     public Result<Flight> createFlight(@Valid @RequestBody Flight flight) {
         return Result.success(flightService.createFlight(flight));
     }
 
-    /** 更新航班 */
+    /** 更新航班（管理接口，仅 ADMIN） */
     @PutMapping("/{id}")
-    @Operation(summary = "更新航班", description = "根据航班 ID 更新航班信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "更新航班", description = "管理接口，根据航班 ID 更新航班信息")
     public Result<Flight> updateFlight(@Parameter(description = "航班 ID") @PathVariable Long id,
                                         @Valid @RequestBody Flight flight) {
         return Result.success(flightService.updateFlight(id, flight));
     }
 
-    /** 删除航班 */
+    /** 删除航班（管理接口，仅 ADMIN） */
     @DeleteMapping("/{id}")
-    @Operation(summary = "删除航班", description = "根据航班 ID 删除指定航班")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "删除航班", description = "管理接口，根据航班 ID 删除指定航班")
     public Result<Void> deleteFlight(@Parameter(description = "航班 ID") @PathVariable Long id) {
         flightService.deleteFlight(id);
         return Result.success(null);

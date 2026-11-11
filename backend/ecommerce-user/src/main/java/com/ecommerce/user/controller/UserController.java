@@ -10,6 +10,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +34,8 @@ import java.util.Map;
 @Tag(name = "用户管理", description = "用户 CRUD 操作接口")
 public class UserController {
 
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
+
     private final UserService userService;
     private final UserRepository userRepository;
 
@@ -39,44 +44,43 @@ public class UserController {
         this.userRepository = userRepository;
     }
 
-    // 创建一个 /hello 的 GET 请求处理方法，返回 "Hello, World!"
-    @GetMapping("/hello1")
-    @Operation(summary = "测试接口", description = "返回 Hello World 字符串，用于测试服务是否正常")
-    public String hello() {
-        return "Hello, World!";
-    }
-
-    /** 查询用户列表 */
+    /** 查询用户列表（管理接口，仅 ADMIN） */
     @GetMapping
-    @Operation(summary = "查询用户列表", description = "查询所有用户信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "查询用户列表", description = "管理接口，查询所有用户信息")
     public Result<List<User>> list() {
         return Result.success(userService.listUsers());
     }
 
-    /** 根据 id 查询用户 */
+    /** 根据 id 查询用户（管理接口，仅 ADMIN） */
     @GetMapping("/{id}")
-    @Operation(summary = "查询用户详情", description = "根据用户 ID 查询单个用户信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "查询用户详情", description = "管理接口，根据用户 ID 查询单个用户信息")
     public Result<User> get(@Parameter(description = "用户 ID") @PathVariable Long id) {
         return Result.success(userService.getUser(id));
     }
 
-    /** 新增用户 */
+    /** 新增用户（管理接口，仅 ADMIN） */
     @PostMapping
-    @Operation(summary = "新增用户", description = "创建新用户，需要提供用户名、姓名、邮箱、手机号等信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "新增用户", description = "管理接口，创建新用户，需要提供用户名、姓名、邮箱、手机号等信息")
     public Result<User> create(@Valid @RequestBody User user) {
+        log.info("管理员创建用户: operator={}, username={}", currentUsername(), user.getUsername());
         return Result.success(userService.createUser(user));
     }
 
-    /** 更新用户 */
+    /** 更新用户（管理接口，仅 ADMIN） */
     @PutMapping("/{id}")
-    @Operation(summary = "更新用户", description = "根据用户 ID 更新用户信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "更新用户", description = "管理接口，根据用户 ID 更新用户信息")
     public Result<User> update(@Parameter(description = "用户 ID") @PathVariable Long id, @Valid @RequestBody User user) {
         return Result.success(userService.updateUser(id, user));
     }
 
-    /** 删除用户 */
+    /** 删除用户（管理接口，仅 ADMIN） */
     @DeleteMapping("/{id}")
-    @Operation(summary = "删除用户", description = "根据用户 ID 删除指定用户")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "删除用户", description = "管理接口，根据用户 ID 删除指定用户")
     public Result<Void> delete(@Parameter(description = "用户 ID") @PathVariable Long id) {
         userService.deleteUser(id);
         return Result.success();
@@ -136,5 +140,12 @@ public class UserController {
             throw new com.ecommerce.common.BusinessException(401, "未授权访问");
         }
         return Long.parseLong(userIdStr);
+    }
+
+    /** 审计日志用的当前操作人（网关未注入身份时记为 unknown） */
+    private String currentUsername() {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        return authentication == null ? "unknown" : authentication.getName();
     }
 }

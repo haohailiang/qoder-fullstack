@@ -14,8 +14,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -199,16 +202,33 @@ class AuthControllerExceptionTest {
     }
 
     @Test
-    @DisplayName("参数校验：登录缺失 smsCode 字段（@NotBlank 触发 400）")
+    @DisplayName("登录缺失 smsCode 字段：非 admin 仍必须交给短信服务校验，不得因字段缺省而跳过")
     void loginSmsCodeMissing() throws Exception {
         String body = "{\"username\":\"zhangsan\",\"password\":\"123456\","
                 + "\"captchaKey\":\"test-captcha-key\",\"captchaValue\":\"test-captcha-value\"}";
+        // 真实 SmsService.validateCode 对空白验证码报 400，这里恢复其行为（@BeforeEach 默认关掉了校验）
+        doThrow(new BusinessException(400, "请输入短信验证码"))
+                .when(smsService).validateCode(any(), isNull());
+
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400))
-                .andExpect(jsonPath("$.message").value("短信验证码不能为空"));
+                .andExpect(jsonPath("$.message").value("请输入短信验证码"));
+    }
+
+    @Test
+    @DisplayName("演示开关：admin 免验证码登录不触发图片/短信验证码校验")
+    void adminLoginSkipsCaptchaValidation() throws Exception {
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"123456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(captchaService, never()).validate(any(), any());
+        verify(smsService, never()).validateCode(any(), any());
     }
 
     @Test

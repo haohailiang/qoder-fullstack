@@ -14,6 +14,7 @@ import com.ecommerce.user.service.RedisSessionService;
 import com.ecommerce.user.service.SmsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -29,14 +30,23 @@ import org.springframework.stereotype.Service;
  * - 注册产生的用户，审计字段 createdBy / lastModifiedBy 由 UserRepository 自动记为 "system"
  *   （注册时尚无登录上下文，符合“未登录或系统操作默认记录 system”的约定）
  * - 登录成功后将 JWT Token 写入 Redis，实现单设备登录（互踢/挤下线）机制
+ * - admin 账号免验证码由 {@code auth.skip-captcha-for-admin} 控制，默认仅便于演示，真实部署应关闭
  */
 @Service
 public class AuthServiceImpl implements AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
-    /** 管理员用户名：admin 登录时跳过图片验证码和短信验证码校验，简化演示流程 */
+    /** 管理员用户名：admin 登录时可跳过图片验证码和短信验证码校验，简化演示流程 */
     private static final String ADMIN_USERNAME = "admin";
+
+    /**
+     * 是否允许管理员账号免验证码登录（仅供本地演示）。
+     * <p>真实部署必须设为 false（AUTH_SKIP_ADMIN_CAPTCHA=false），否则任何人知道 admin 密码
+     * 即可绕过验证码直接登录，验证码对管理员账号形同虚设。
+     */
+    @Value("${auth.skip-captcha-for-admin:true}")
+    private boolean skipCaptchaForAdmin;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -86,10 +96,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        boolean isAdmin = ADMIN_USERNAME.equalsIgnoreCase(request.getUsername());
+        boolean skipCaptcha = skipCaptchaForAdmin && ADMIN_USERNAME.equalsIgnoreCase(request.getUsername());
 
-        // 第一步：校验图片验证码（admin 用户跳过此步骤）
-        if (!isAdmin) {
+        // 第一步：校验图片验证码（仅在配置允许时，admin 演示账号可跳过）
+        if (!skipCaptcha) {
             captchaService.validate(request.getCaptchaKey(), request.getCaptchaValue());
         }
 
@@ -98,8 +108,8 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException(401, "用户名或密码错误：密码不正确");
         }
-        // 第二步：校验短信验证码（admin 用户跳过此步骤）
-        if (!isAdmin) {
+        // 第二步：校验短信验证码（同上，仅演示场景对 admin 豁免）
+        if (!skipCaptcha) {
             smsService.validateCode(user.getPhone(), request.getSmsCode());
         }
         
@@ -109,8 +119,8 @@ public class AuthServiceImpl implements AuthService {
         }
         
         try {
-            // 第四步：生成新 JWT Token
-            String token = tokenProvider.generateToken(user.getUsername(), user.getId());
+            // 第四步：生成新 JWT Token（携带 role claim，网关据此注入 X-User-Role）
+            String token = tokenProvider.generateToken(user.getUsername(), user.getId(), user.getRole());
             
             // 第五步：将新 Token 写入 Redis（覆盖旧 Token，使旧设备自动失效）
             redisSessionService.saveToken(user.getId(), token, tokenProvider.getExpiresInSeconds());

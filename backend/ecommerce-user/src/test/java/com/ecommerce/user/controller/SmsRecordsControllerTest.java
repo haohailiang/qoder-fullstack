@@ -21,11 +21,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 短信发送记录查询接口（GET /sms/records，需 JWT 认证）集成测试。
+ * 短信发送记录查询接口（GET /sms/records，需登录）集成测试。
  * <p>
  * @MockBean 关闭真实 SmsService，聚焦接口的认证与响应结构：
- * - 无 Token：命中安全过滤链返回 HTTP 401（统一 Result 结构）
- * - 有效 Token：返回内存记录列表（手机号 / 验证码 / 时间 / 状态），按时间倒序
+ * - 无任何身份头：方法级 @PreAuthorize 拒绝，按本项目的统一错误模型返回 code 403
+ *   （浏览器侧看到的 401 / 40101 由网关先行返回，服务层只保证「无身份即拒绝」）
+ * - 网关已注入身份：返回内存记录列表（手机号 / 验证码 / 时间 / 状态），按时间倒序
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -41,15 +42,15 @@ class SmsRecordsControllerTest {
     private SmsService smsService;
 
     @Test
-    @DisplayName("未认证：无 Token 访问 /sms/records 返回 HTTP 401")
+    @DisplayName("未认证：无身份头访问 /sms/records 被方法级权限拦截")
     void recordsRequireAuth() throws Exception {
         mockMvc.perform(get("/sms/records"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value(401));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(403));
     }
 
     @Test
-    @DisplayName("有效 Token：返回短信发送记录列表，字段与倒序一致")
+    @DisplayName("网关已注入身份：返回短信发送记录列表，字段与倒序一致")
     void recordsReturnListWithToken() throws Exception {
         LocalDateTime now = LocalDateTime.now();
         List<SmsRecord> mockRecords = List.of(
@@ -59,7 +60,12 @@ class SmsRecordsControllerTest {
 
         String token = tokenProvider.generateToken("zhangsan", 1L);
 
-        mockMvc.perform(get("/sms/records").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+        // 服务层不解析 JWT，登录态由网关校验后注入的 X-User-* 头体现（Bearer 头仅作请求上下文模拟）
+        mockMvc.perform(get("/sms/records")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .header("X-User-Id", "1")
+                        .header("X-User-Name", "zhangsan")
+                        .header("X-User-Role", "USER"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))

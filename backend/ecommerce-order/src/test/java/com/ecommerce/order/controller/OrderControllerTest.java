@@ -45,6 +45,8 @@ class OrderControllerTest {
     private OrderService orderService;
 
     private static final String HEADER_USER_ID = "X-User-Id";
+    private static final String HEADER_USER_NAME = "X-User-Name";
+    private static final String HEADER_USER_ROLE = "X-User-Role";
 
     // ──────────────────── POST /orders ────────────────────
 
@@ -163,11 +165,52 @@ class OrderControllerTest {
             Order order = buildOrder(1L, "ORD-1", 100L, 10L, OrderStatus.SHIPPED);
             when(orderService.getOrderByOrderNo("ORD-1")).thenReturn(order);
 
-            mockMvc.perform(get("/orders/ORD-1"))
+            mockMvc.perform(get("/orders/ORD-1")
+                            .header(HEADER_USER_ID, "100")
+                            .header(HEADER_USER_NAME, "zhangsan"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.orderNo").value("ORD-1"))
                     .andExpect(jsonPath("$.data.status").value("SHIPPED"));
+        }
+
+        @Test
+        @DisplayName("正常场景：ADMIN 可查看他人订单")
+        void shouldReturnOtherUsersOrderForAdmin() throws Exception {
+            Order order = buildOrder(1L, "ORD-1", 100L, 10L, OrderStatus.SHIPPED);
+            when(orderService.getOrderByOrderNo("ORD-1")).thenReturn(order);
+
+            mockMvc.perform(get("/orders/ORD-1")
+                            .header(HEADER_USER_ID, "1")
+                            .header(HEADER_USER_NAME, "admin")
+                            .header(HEADER_USER_ROLE, "ADMIN"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+
+        @Test
+        @DisplayName("归属校验：非归属人查看他人订单返回 403")
+        void shouldReturn403WhenNotOwner() throws Exception {
+            Order order = buildOrder(1L, "ORD-1", 100L, 10L, OrderStatus.SHIPPED);
+            when(orderService.getOrderByOrderNo("ORD-1")).thenReturn(order);
+
+            mockMvc.perform(get("/orders/ORD-1")
+                            .header(HEADER_USER_ID, "200")
+                            .header(HEADER_USER_NAME, "lisi"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403))
+                    .andExpect(jsonPath("$.message").value("无权查看此订单"));
+        }
+
+        @Test
+        @DisplayName("异常场景：未登录查询订单详情返回 401")
+        void shouldReturn401WhenAnonymous() throws Exception {
+            Order order = buildOrder(1L, "ORD-1", 100L, 10L, OrderStatus.SHIPPED);
+            when(orderService.getOrderByOrderNo("ORD-1")).thenReturn(order);
+
+            mockMvc.perform(get("/orders/ORD-1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(401));
         }
 
         @Test
@@ -176,7 +219,9 @@ class OrderControllerTest {
             when(orderService.getOrderByOrderNo("NONEXIST"))
                     .thenThrow(new BusinessException(404, "订单不存在: NONEXIST"));
 
-            mockMvc.perform(get("/orders/NONEXIST"))
+            mockMvc.perform(get("/orders/NONEXIST")
+                            .header(HEADER_USER_ID, "100")
+                            .header(HEADER_USER_NAME, "zhangsan"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(404))
                     .andExpect(jsonPath("$.message").value("订单不存在: NONEXIST"));
@@ -196,11 +241,25 @@ class OrderControllerTest {
             Order order2 = buildOrder(2L, "ORD-2", 200L, 20L, OrderStatus.COMPLETED);
             when(orderService.getAllOrders()).thenReturn(List.of(order1, order2));
 
-            mockMvc.perform(get("/orders"))
+            mockMvc.perform(get("/orders")
+                            .header(HEADER_USER_ID, "1")
+                            .header(HEADER_USER_NAME, "admin")
+                            .header(HEADER_USER_ROLE, "ADMIN"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
                     .andExpect(jsonPath("$.data").isNotEmpty());
+        }
+
+        @Test
+        @DisplayName("权限场景：非 ADMIN 查询全部订单返回 403")
+        void shouldReturn403WhenNotAdmin() throws Exception {
+            mockMvc.perform(get("/orders")
+                            .header(HEADER_USER_ID, "100")
+                            .header(HEADER_USER_NAME, "zhangsan")
+                            .header(HEADER_USER_ROLE, "USER"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
         }
     }
 
@@ -260,6 +319,9 @@ class OrderControllerTest {
             doNothing().when(orderService).updateOrderStatus(1L, OrderStatus.SHIPPED);
 
             mockMvc.perform(put("/orders/1/status")
+                            .header(HEADER_USER_ID, "1")
+                            .header(HEADER_USER_NAME, "admin")
+                            .header(HEADER_USER_ROLE, "ADMIN")
                             .param("status", "2"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
@@ -271,6 +333,9 @@ class OrderControllerTest {
             doNothing().when(orderService).updateOrderStatus(1L, OrderStatus.COMPLETED);
 
             mockMvc.perform(put("/orders/1/status")
+                            .header(HEADER_USER_ID, "1")
+                            .header(HEADER_USER_NAME, "admin")
+                            .header(HEADER_USER_ROLE, "ADMIN")
                             .param("status", "3"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
@@ -280,6 +345,9 @@ class OrderControllerTest {
         @DisplayName("异常场景：无效状态值返回 400")
         void shouldReturn400ForInvalidStatus() throws Exception {
             mockMvc.perform(put("/orders/1/status")
+                            .header(HEADER_USER_ID, "1")
+                            .header(HEADER_USER_NAME, "admin")
+                            .header(HEADER_USER_ROLE, "ADMIN")
                             .param("status", "99"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(400))

@@ -7,9 +7,9 @@
 SET NAMES utf8mb4;
 
 -- 创建数据库
-CREATE DATABASE IF NOT EXISTS demo_fullstack DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS qoder_fullstack DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE demo_fullstack;
+USE qoder_fullstack;
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     email           VARCHAR(200)    NOT NULL COMMENT '邮箱',
     phone           VARCHAR(20)     NOT NULL COMMENT '手机号',
     age             INT             COMMENT '年龄',
+    role            VARCHAR(20)     NOT NULL DEFAULT 'USER' COMMENT '角色：USER/ADMIN',
     status          TINYINT         NOT NULL DEFAULT 1 COMMENT '状态：0禁用 1启用',
     created_by      VARCHAR(100)    COMMENT '创建人',
     created_date    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -97,10 +98,10 @@ CREATE TABLE IF NOT EXISTS flights (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='航班表';
 
 -- 插入演示数据
-INSERT INTO users (username, password, name, email, phone, age) VALUES
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '管理员', 'admin@ecommerce.com', '13800000001', 30),
-('zhangsan', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '张三', 'zhangsan@ecommerce.com', '13800000002', 25),
-('lisi', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '李四', 'lisi@ecommerce.com', '13800000003', 28);
+INSERT INTO users (username, password, name, email, phone, age, role) VALUES
+('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '管理员', 'admin@ecommerce.com', '13800000001', 30, 'ADMIN'),
+('zhangsan', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '张三', 'zhangsan@ecommerce.com', '13800000002', 25, 'USER'),
+('lisi', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '李四', 'lisi@ecommerce.com', '13800000003', 28, 'USER');
 
 INSERT INTO products (name, description, price, stock, category, status, is_seckill, seckill_price, seckill_start_time, seckill_end_time) VALUES
 ('iPhone 15 Pro', '苹果最新旗舰手机，A17 Pro 芯片', 7999.00, 500, 'electronics', 1, 0, NULL, NULL, NULL),

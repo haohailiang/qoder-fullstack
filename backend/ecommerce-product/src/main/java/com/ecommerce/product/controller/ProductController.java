@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -55,37 +56,41 @@ public class ProductController {
         return Result.success(productService.searchProducts(keyword, category, priceMin, priceMax));
     }
 
-    /** 创建商品 */
+    /** 创建商品（管理接口，仅 ADMIN） */
     @PostMapping
-    @Operation(summary = "创建商品", description = "创建新商品，需要提供商品名称、价格、库存等信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "创建商品", description = "管理接口，创建新商品，需要提供商品名称、价格、库存等信息")
     public Result<Product> createProduct(@Valid @RequestBody Product product) {
         return Result.success(productService.createProduct(product));
     }
 
-    /** 更新商品 */
+    /** 更新商品（管理接口，仅 ADMIN） */
     @PutMapping("/{id}")
-    @Operation(summary = "更新商品", description = "根据商品 ID 更新商品信息")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "更新商品", description = "管理接口，根据商品 ID 更新商品信息")
     public Result<Product> updateProduct(@Parameter(description = "商品 ID") @PathVariable Long id, @Valid @RequestBody Product product) {
         return Result.success(productService.updateProduct(id, product));
     }
 
-    /** 删除商品 */
+    /** 删除商品（管理接口，仅 ADMIN） */
     @DeleteMapping("/{id}")
-    @Operation(summary = "删除商品", description = "根据商品 ID 删除指定商品")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "删除商品", description = "管理接口，根据商品 ID 删除指定商品")
     public Result<Void> deleteProduct(@Parameter(description = "商品 ID") @PathVariable Long id) {
         productService.deleteProduct(id);
         return Result.success(null);
     }
 
-    /** 全量同步商品到 ES */
+    /** 全量同步商品到 ES（管理接口，仅 ADMIN） */
     @PostMapping("/sync-es")
-    @Operation(summary = "同步商品到 ES", description = "全量同步所有商品数据到 Elasticsearch")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "同步商品到 ES", description = "管理接口，全量同步所有商品数据到 Elasticsearch")
     public Result<Void> syncAllToEs() {
         productService.syncAllToElasticsearch();
         return Result.success(null);
     }
 
-    /** 扣减库存（供订单服务 Feign 调用） */
+    /** 扣减库存（服务间内部接口，已由网关屏蔽外部访问，因此不加角色注解） */
     @PostMapping("/deduct-stock")
     @Operation(summary = "扣减库存", description = "扣减指定商品的库存数量，供订单服务 Feign 调用")
     public Result<Boolean> deductStock(@Parameter(description = "商品 ID") @RequestParam("productId") Long productId,

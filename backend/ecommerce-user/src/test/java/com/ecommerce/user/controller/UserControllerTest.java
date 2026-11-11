@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,29 @@ class UserControllerTest {
     private static final String HEADER_USER_ID = "X-User-Id";
     private static final String HEADER_USER_NAME = "X-User-Name";
 
+    /**
+     * 用户 CRUD 已标注 @PreAuthorize("hasRole('ADMIN')")：
+     * 测试通过网关同款身份头（X-User-Role）由 TrustedAuthenticationFilter 转为 ROLE_ADMIN。
+     */
+    private static RequestPostProcessor asAdmin() {
+        return request -> {
+            request.addHeader(HEADER_USER_ID, "1");
+            request.addHeader(HEADER_USER_NAME, "admin");
+            request.addHeader("X-User-Role", "ADMIN");
+            return request;
+        };
+    }
+
+    /** 普通登录用户：用于验证管理接口对非 ADMIN 返回 403 */
+    private static RequestPostProcessor asPlainUser() {
+        return request -> {
+            request.addHeader(HEADER_USER_ID, "100");
+            request.addHeader(HEADER_USER_NAME, "zhangsan");
+            request.addHeader("X-User-Role", "USER");
+            return request;
+        };
+    }
+
     // ──────────────────── GET /users ────────────────────
 
     @Nested
@@ -67,7 +91,8 @@ class UserControllerTest {
             when(userService.listUsers()).thenReturn(List.of(user));
 
             // When & Then
-            mockMvc.perform(get("/users"))
+            mockMvc.perform(get("/users")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.message").value("success"))
@@ -80,11 +105,21 @@ class UserControllerTest {
         void shouldReturnEmptyArray() throws Exception {
             when(userService.listUsers()).thenReturn(List.of());
 
-            mockMvc.perform(get("/users"))
+            mockMvc.perform(get("/users")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data").isArray())
                     .andExpect(jsonPath("$.data").isEmpty());
+        }
+
+        @Test
+        @DisplayName("权限场景：非 ADMIN 查询用户列表返回 403")
+        void shouldReturn403WhenNotAdmin() throws Exception {
+            mockMvc.perform(get("/users")
+                            .with(asPlainUser()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
         }
     }
 
@@ -100,7 +135,8 @@ class UserControllerTest {
             User user = buildUser(1L, "zhangsan", "张三");
             when(userService.getUser(1L)).thenReturn(user);
 
-            mockMvc.perform(get("/users/1"))
+            mockMvc.perform(get("/users/1")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.username").value("zhangsan"))
@@ -113,7 +149,8 @@ class UserControllerTest {
             when(userService.getUser(999L))
                     .thenThrow(new BusinessException(404, "用户不存在: id=999"));
 
-            mockMvc.perform(get("/users/999"))
+            mockMvc.perform(get("/users/999")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(404))
                     .andExpect(jsonPath("$.message").value("用户不存在: id=999"));
@@ -137,6 +174,7 @@ class UserControllerTest {
                     """;
 
             mockMvc.perform(post("/users")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -153,6 +191,7 @@ class UserControllerTest {
                     """;
 
             mockMvc.perform(post("/users")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -168,6 +207,7 @@ class UserControllerTest {
                     """;
 
             mockMvc.perform(post("/users")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -183,6 +223,7 @@ class UserControllerTest {
                     """;
 
             mockMvc.perform(post("/users")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -198,6 +239,7 @@ class UserControllerTest {
                     """;
 
             mockMvc.perform(post("/users")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -223,6 +265,7 @@ class UserControllerTest {
                     """;
 
             mockMvc.perform(put("/users/1")
+                            .with(asAdmin())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isOk())
@@ -242,9 +285,19 @@ class UserControllerTest {
         void shouldDeleteUser() throws Exception {
             doNothing().when(userService).deleteUser(1L);
 
-            mockMvc.perform(delete("/users/1"))
+            mockMvc.perform(delete("/users/1")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
+        }
+
+        @Test
+        @DisplayName("权限场景：非 ADMIN 删除用户返回 403")
+        void shouldReturn403WhenNotAdmin() throws Exception {
+            mockMvc.perform(delete("/users/1")
+                            .with(asPlainUser()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
         }
 
         @Test
@@ -253,7 +306,8 @@ class UserControllerTest {
             doThrow(new BusinessException(404, "用户不存在: id=999"))
                     .when(userService).deleteUser(999L);
 
-            mockMvc.perform(delete("/users/999"))
+            mockMvc.perform(delete("/users/999")
+                            .with(asAdmin()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(404))
                     .andExpect(jsonPath("$.message").value("用户不存在: id=999"));
@@ -299,7 +353,7 @@ class UserControllerTest {
             mockMvc.perform(get("/users/theme"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(401))
-                    .andExpect(jsonPath("$.message").value("("));
+                    .andExpect(jsonPath("$.message").value("未授权访问"));
         }
     }
 

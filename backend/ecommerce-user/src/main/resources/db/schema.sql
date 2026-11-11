@@ -7,8 +7,8 @@ SET NAMES utf8mb4;
 -- MyBatis UserMapper.xml 的 resultMap 映射为驼峰命名的实体字段）。
 --
 -- 本地开发首次使用前，请先创建数据库再执行本脚本：
---   CREATE DATABASE IF NOT EXISTS demo_fullstack DEFAULT CHARSET utf8mb4;
---   USE demo_fullstack;
+--   CREATE DATABASE IF NOT EXISTS qoder_fullstack DEFAULT CHARSET utf8mb4;
+--   USE qoder_fullstack;
 --   source backend/src/main/resources/db/schema.sql
 -- 或在 Navicat / DBeaver 等客户端中直接执行本文件内容。
 
@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     email         VARCHAR(128) NOT NULL COMMENT '邮箱',
     phone         VARCHAR(20)  NOT NULL COMMENT '手机号，用于接收短信验证码',
     age           INT          DEFAULT NULL COMMENT '年龄',
+    role          VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '角色：USER/ADMIN，网关注入 JWT role claim 后由 @PreAuthorize 校验',
     created_by         VARCHAR(64) DEFAULT NULL COMMENT '创建人（当前登录用户标识，未登录/系统操作记为 system）',
     created_date       DATETIME    DEFAULT NULL COMMENT '创建时间（服务端时间）',
     last_modified_by   VARCHAR(64) DEFAULT NULL COMMENT '最后修改人',
