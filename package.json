@@ -2,12 +2,12 @@
   "name": "qoder-fullstack",
   "private": true,
   "scripts": {
-    "test:unit": "npm run test --workspace=frontend/base-app --workspace=frontend/product-app --workspace=frontend/order-app",
-    "test:unit:base": "npm run test --workspace=frontend/base-app",
-    "test:unit:product": "npm run test --workspace=frontend/product-app",
-    "test:unit:order": "npm run test --workspace=frontend/order-app",
-    "test:e2e": "npx playwright test --config=frontend/e2e/playwright.config.ts",
-    "test:e2e:ui": "npx playwright test --config=frontend/e2e/playwright.config.ts --ui",
+    "test:unit": "npm --prefix frontend/base-app run test && npm --prefix frontend/product-app run test && npm --prefix frontend/order-app run test",
+    "test:unit:base": "npm --prefix frontend/base-app run test",
+    "test:unit:product": "npm --prefix frontend/product-app run test",
+    "test:unit:order": "npm --prefix frontend/order-app run test",
+    "test:e2e": "npm --prefix frontend/e2e run test:e2e -- --config=playwright.config.ts",
+    "test:e2e:ui": "npm --prefix frontend/e2e run test:e2e:ui -- --config=playwright.config.ts",
     "test:all": "npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
