@@ -132,6 +132,12 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      # 阿里云 OSS：AK/SK 通过 .env 或 shell 环境变量注入，禁止写入仓库
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-oss-cn-hangzhou.aliyuncs.com}
+      OSS_BUCKET: ${OSS_BUCKET:-}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_DIR: ${OSS_DIR:-product}
 
   ecommerce-order:
     build:

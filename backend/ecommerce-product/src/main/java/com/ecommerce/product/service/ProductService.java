@@ -19,6 +19,11 @@ public interface ProductService {
 
     Product updateProduct(Long id, Product product);
 
+    /**
+     * 仅更新商品图片 URL（空字符串表示清除图片）
+     */
+    Product updateProductImage(Long id, String imageUrl);
+
     void deleteProduct(Long id);
 
     /**

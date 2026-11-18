@@ -144,6 +144,7 @@ function ProductDetail() {
         <div style={{ display: 'flex', gap: 24 }}>
           <div
             style={{
+              position: 'relative',
               width: 400,
               height: 400,
               background: 'var(--ant-color-fill-tertiary, #f0f2f5)',
@@ -152,9 +153,27 @@ function ProductDetail() {
               justifyContent: 'center',
               borderRadius: 8,
               flexShrink: 0,
+              overflow: 'hidden',
             }}
           >
             <ShoppingCartOutlined style={{ fontSize: 80, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
+            {/* 有图片时覆盖图标；加载失败自动隐藏，回退到图标兜底 */}
+            {product.imageUrl && (
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            )}
           </div>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 24, marginBottom: 12 }}>

@@ -84,4 +84,10 @@
     <update id="updateStock">
         UPDATE products SET stock = stock - #{quantity} WHERE id = #{id} AND stock &gt;= #{quantity}
     </update>
+
+    <update id="updateImageUrl">
+        UPDATE products
+        SET image_url = #{imageUrl}, last_modified_date = NOW()
+        WHERE id = #{id}
+    </update>
 </mapper>

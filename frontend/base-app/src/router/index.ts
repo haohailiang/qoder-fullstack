@@ -28,6 +28,12 @@ const router = createRouter({
       meta: { requiresAuth: true, adminOnly: true },
     },
     {
+      path: '/admin/product-images',
+      name: 'productImages',
+      component: () => import('@/views/ProductImageManage.vue'),
+      meta: { requiresAuth: true, adminOnly: true },
+    },
+    {
       path: '/admin/flights',
       name: 'flightMap',
       component: () => import('@/views/FlightMap.vue'),

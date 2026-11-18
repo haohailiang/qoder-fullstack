@@ -48,4 +48,8 @@ public class ProductRepository {
     public int updateStock(Long id, Integer quantity) {
         return productMapper.updateStock(id, quantity);
     }
+
+    public int updateImageUrl(Long id, String imageUrl) {
+        return productMapper.updateImageUrl(id, imageUrl);
+    }
 }

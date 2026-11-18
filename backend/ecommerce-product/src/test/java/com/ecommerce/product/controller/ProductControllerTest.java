@@ -283,6 +283,105 @@ class ProductControllerTest {
         }
     }
 
+    // ──────────────────── PUT /products/{id}/image ────────────────────
+
+    @Nested
+    @DisplayName("PUT /products/{id}/image - 更新商品图片")
+    class UpdateProductImage {
+
+        @Test
+        @DisplayName("正常场景：更新图片成功")
+        void shouldUpdateProductImage() throws Exception {
+            Product updated = buildProduct(1L, "测试商品", new BigDecimal("99.99"));
+            updated.setImageUrl("https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/product/a.png");
+            when(productService.updateProductImage(eq(1L), eq(updated.getImageUrl()))).thenReturn(updated);
+
+            mockMvc.perform(put("/products/1/image")
+                            .with(asAdmin())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"imageUrl":"https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/product/a.png"}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.imageUrl").value(updated.getImageUrl()));
+        }
+
+        @Test
+        @DisplayName("权限场景：非 ADMIN 更新图片返回 403")
+        void shouldReturn403WhenNotAdmin() throws Exception {
+            mockMvc.perform(put("/products/1/image")
+                            .with(asPlainUser())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"imageUrl":"https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/product/a.png"}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
+        }
+
+        @Test
+        @DisplayName("异常场景：商品不存在返回 404")
+        void shouldReturn404WhenNotFound() throws Exception {
+            when(productService.updateProductImage(eq(999L), any()))
+                    .thenThrow(new BusinessException(404, "商品不存在: 999"));
+
+            mockMvc.perform(put("/products/999/image")
+                            .with(asAdmin())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"imageUrl":"https://demo-bucket.oss-cn-hangzhou.aliyuncs.com/product/a.png"}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(404));
+        }
+
+        @Test
+        @DisplayName("校验场景：非 http(s) URL 返回 400")
+        void shouldReturn400WhenUrlInvalid() throws Exception {
+            mockMvc.perform(put("/products/1/image")
+                            .with(asAdmin())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"imageUrl":"javascript:alert(1)"}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400));
+        }
+
+        @Test
+        @DisplayName("校验场景：协议相对地址 //evil.com 返回 400")
+        void shouldReturn400WhenProtocolRelativeUrl() throws Exception {
+            mockMvc.perform(put("/products/1/image")
+                            .with(asAdmin())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"imageUrl":"//evil.com/a.png"}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(400));
+        }
+
+        @Test
+        @DisplayName("正常场景：本地存储返回的站内相对路径可回写")
+        void shouldAcceptLocalRelativeUrl() throws Exception {
+            String localUrl = "/api/product/files/local/product/2026/11/18/a.png";
+            Product updated = buildProduct(1L, "测试商品", new BigDecimal("99.99"));
+            updated.setImageUrl(localUrl);
+            when(productService.updateProductImage(eq(1L), eq(localUrl))).thenReturn(updated);
+
+            mockMvc.perform(put("/products/1/image")
+                            .with(asAdmin())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"imageUrl":"/api/product/files/local/product/2026/11/18/a.png"}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.imageUrl").value(localUrl));
+        }
+    }
+
     // ──────────────────── DELETE /products/{id} ────────────────────
 
     @Nested

@@ -84,6 +84,18 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
+    public Product updateProductImage(Long id, String imageUrl) {
+        Product existing = getProductById(id);
+        String normalized = imageUrl == null ? "" : imageUrl.trim();
+        productRepository.updateImageUrl(id, normalized);
+        existing.setImageUrl(normalized);
+        // 图片变更后同步到 ES，保证搜索结果中的图片即时生效
+        syncToElasticsearch(id);
+        return existing;
+    }
+
+    @Override
+    @Transactional
     public void deleteProduct(Long id) {
         getProductById(id); // 确认存在
         productRepository.deleteById(id);

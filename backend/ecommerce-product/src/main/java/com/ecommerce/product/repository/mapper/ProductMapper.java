@@ -27,4 +27,6 @@ public interface ProductMapper {
     int deleteById(@Param("id") Long id);
 
     int updateStock(@Param("id") Long id, @Param("quantity") Integer quantity);
+
+    int updateImageUrl(@Param("id") Long id, @Param("imageUrl") String imageUrl);
 }

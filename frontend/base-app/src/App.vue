@@ -160,6 +160,7 @@ function navigateTo(index: unknown) {
             @select="navigateTo"
           >
             <el-menu-item v-if="isAdmin" index="/users">{{ t('app.menuUsers') }}</el-menu-item>
+            <el-menu-item v-if="isAdmin" index="/admin/product-images">{{ t('app.menuProductImages') }}</el-menu-item>
             <el-menu-item index="/product">{{ t('app.menuProducts') }}</el-menu-item>
             <el-menu-item index="/order">{{ t('app.menuOrders') }}</el-menu-item>
             <el-menu-item v-if="isAdmin" index="/admin/flights">{{ t('app.menuFlightMap') }}</el-menu-item>

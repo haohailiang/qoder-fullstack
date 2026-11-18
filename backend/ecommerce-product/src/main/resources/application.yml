@@ -6,6 +6,11 @@ server:
 spring:
   application:
     name: ecommerce-product
+  servlet:
+    multipart:
+      # 与 oss.max-size-mb 保持一致，避免大文件在进入业务层前被容器拒绝
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     url: jdbc:mysql://192.168.178.100:3306/qoder_fullstack?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
@@ -64,6 +69,24 @@ security:
     # true：只接受带合法网关签名的请求，容器化/对外部署必须开启，并配合网络隔离
     verify-signature: ${TRUSTED_HEADER_VERIFY_SIGNATURE:false}
     max-age-seconds: 300
+
+# 阿里云 OSS 配置：AK/SK 仅通过环境变量注入，未配置时应用仍可启动（上传接口返回 503）
+oss:
+  enabled: ${OSS_ENABLED:true}
+  endpoint: ${OSS_ENDPOINT:oss-cn-hangzhou.aliyuncs.com}
+  bucket: ${OSS_BUCKET:}
+  access-key-id: ${OSS_ACCESS_KEY_ID:}
+  access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+  # 对象 Key 前缀，形如 product/2026/11/18/xxx.png
+  dir: ${OSS_DIR:product}
+  # 留空则使用 https://{bucket}.{endpoint}；配置 CDN/自定义域名时填写完整前缀
+  public-url-prefix: ${OSS_PUBLIC_URL_PREFIX:}
+  max-size-mb: 5
+  allowed-types: image/jpeg,image/png,image/webp,image/gif
+  # 本地兜底存储：AK/SK 未配置时图片写入该目录，由 /files/local/** 静态映射对外提供
+  # 返回的 URL 为相对路径（经网关 /api/product/files/local 白名单读取），无需硬编码主机端口
+  local-dir: ${OSS_LOCAL_DIR:uploads}
+  local-url-prefix: ${OSS_LOCAL_URL_PREFIX:/api/product/files/local}
 
 logging:
   level:

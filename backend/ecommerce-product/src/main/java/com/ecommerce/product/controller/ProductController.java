@@ -1,6 +1,7 @@
 package com.ecommerce.product.controller;
 
 import com.ecommerce.common.Result;
+import com.ecommerce.product.dto.UpdateProductImageRequest;
 import com.ecommerce.product.entity.Product;
 import com.ecommerce.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,6 +71,16 @@ public class ProductController {
     @Operation(summary = "更新商品", description = "管理接口，根据商品 ID 更新商品信息")
     public Result<Product> updateProduct(@Parameter(description = "商品 ID") @PathVariable Long id, @Valid @RequestBody Product product) {
         return Result.success(productService.updateProduct(id, product));
+    }
+
+    /** 更新商品图片（管理接口，仅 ADMIN；只更新 image_url，避免整实体覆盖） */
+    @PutMapping("/{id}/image")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "更新商品图片", description = "管理接口，仅更新商品图片 URL；传空字符串表示清除图片，不删除 OSS 对象")
+    public Result<Product> updateProductImage(
+            @Parameter(description = "商品 ID") @PathVariable Long id,
+            @Valid @RequestBody UpdateProductImageRequest request) {
+        return Result.success(productService.updateProductImage(id, request.getImageUrl()));
     }
 
     /** 删除商品（管理接口，仅 ADMIN） */

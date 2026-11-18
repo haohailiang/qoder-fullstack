@@ -194,17 +194,37 @@ function ProductList() {
                   cover={
                     <div
                       style={{
+                        position: 'relative',
                         height: 200,
                         background: 'var(--ant-color-fill-tertiary, #f0f2f5)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        overflow: 'hidden',
                       }}
                     >
                       {item.category === 'flight'
                         ? <RocketOutlined style={{ fontSize: 48, color: 'var(--ant-color-primary, #1677ff)' }} />
                         : <ShoppingCartOutlined style={{ fontSize: 48, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
                       }
+                      {/* 有图片时覆盖图标；加载失败自动隐藏，回退到图标兜底 */}
+                      {item.imageUrl && (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          loading="lazy"
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      )}
                     </div>
                   }
                   actions={[

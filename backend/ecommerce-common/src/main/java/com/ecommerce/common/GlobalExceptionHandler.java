@@ -9,6 +9,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * 全局异常处理：所有异常统一包装为 Result 结构返回。
@@ -34,6 +35,23 @@ public class GlobalExceptionHandler {
                 .map(fieldError -> fieldError.getDefaultMessage())
                 .orElse("参数校验失败");
         return Result.error(400, message);
+    }
+
+    /**
+     * 上传文件超过 multipart 限制。
+     *
+     * <p>文件超限在进入业务层前即被容器拒绝，若不单独处理会落到兜底分支返回 500，
+     * 这里统一转成 400 并带上服务端限制，便于前端提示用户压缩图片。
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Result<Void> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
+        log.warn("上传文件超过大小限制: {}", e.getMessage());
+        long maxBytes = e.getMaxUploadSize();
+        if (maxBytes <= 0) {
+            return Result.error(400, "上传文件过大，请压缩后重试");
+        }
+        long maxMb = Math.max(1, maxBytes / (1024 * 1024));
+        return Result.error(400, "上传文件过大，单文件不能超过 " + maxMb + "MB");
     }
 
     /** 认证异常 */

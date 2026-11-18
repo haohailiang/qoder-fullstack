@@ -10,6 +10,9 @@
 # Redis dump
 *.rdb
 
+# 本地兜底图片存储（未配置 OSS 时的上传目录）
+backend/ecommerce-product/uploads/
+
 # 根目录调试截图
 /page_initial.png
 /tracker_console_output.png
