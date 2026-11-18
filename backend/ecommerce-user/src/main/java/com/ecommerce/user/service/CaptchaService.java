@@ -24,8 +24,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * - generate()：用纯 JDK AWT 绘制随机字符图片（干扰线数量、字符个数、图片尺寸均由
  *   {@link CaptchaProperties} 配置），输出 Base64 PNG Data URL；同时生成唯一 captchaKey，
  *   验证码原文与过期时间戳保存在内存 Map 中（{@code ConcurrentHashMap}，不落库，属于短时状态）。
- * - validate()：校验验证码是否存在、是否过期、是否已被使用、是否匹配；校验通过或未通过都会
- *   先移除该 key（一次性使用规则，无论成功失败同一个 key 都不能复用）。
+ * - validate()：消耗式校验，用于登录 / 注册等最终校验场景；校验是否存在、是否过期、是否匹配，
+ *   无论成功失败都会移除该 key（一次性使用规则，同一个 key 不能复用）。
+ * - verify()：非消耗式校验，用于发送短信等前置校验场景；不判断是否过期，校验通过后保留该 key，
+ *   便于用户沿用同一张图片验证码完成后续登录 / 注册；校验失败仍会移除该 key。
  *   captcha.enabled=false 时跳过校验（便于本地调试 / 自动化测试关闭该功能）。
  * - 生成新验证码前顺带清理已过期条目，避免内存无限增长（无需引入定时任务）。
  */
@@ -54,18 +56,40 @@ public class CaptchaService {
     }
 
     /**
-     * 校验验证码：不存在 / 已过期 / 已被使用 / 不匹配均视为失败，抛出统一的业务异常；
+     * 消耗式校验（登录 / 注册等最终校验场景）：
+     * 不存在 / 已过期 / 不匹配均视为失败并抛出统一业务异常；
      * 校验成功或失败都会立即移除该 key，保证一次性使用（失败后前端需重新获取验证码）。
      */
     public void validate(String key, String value) {
+        check(key, value, true, false);
+    }
+
+    /**
+     * 非消耗式校验（发送短信等前置校验场景）：
+     * 只看 key 是否存在、内容是否匹配，**不判断是否过期**（用户填完信息再点发送时可能已超过有效期）；
+     * 校验通过后保留该 key，使用户可沿用同一张图片验证码继续登录 / 注册；
+     * 校验失败仍会移除该 key，避免同一 key 被反复尝试。
+     */
+    public void verify(String key, String value) {
+        check(key, value, false, true);
+    }
+
+    private void check(String key, String value, boolean consume, boolean ignoreExpiry) {
         if (!properties.isEnabled()) {
             return;
         }
         if (key == null || key.isBlank() || value == null || value.isBlank()) {
             throw new BusinessException(400, "请输入验证码");
         }
-        CaptchaEntry entry = store.remove(key);
-        if (entry == null || entry.isExpired() || !entry.code().equalsIgnoreCase(value.trim())) {
+        CaptchaEntry entry = store.get(key);
+        boolean matched = entry != null
+                && (ignoreExpiry || !entry.isExpired())
+                && entry.code().equalsIgnoreCase(value.trim());
+        // 消耗场景（登录 / 注册）或校验失败：立即失效；非消耗场景校验通过：保留供后续使用
+        if (consume || !matched) {
+            store.remove(key);
+        }
+        if (!matched) {
             throw new BusinessException(400, "验证码错误或已过期，请重新获取");
         }
     }

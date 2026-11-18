@@ -141,8 +141,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void sendSmsCode(SendSmsCodeRequest request) {
-        // 图片验证码作为防滥发手段：校验不通过直接抛异常，短信不会发送
-        captchaService.validate(request.getCaptchaKey(), request.getCaptchaValue());
+        // 图片验证码作为防滥发手段：校验不通过直接抛异常，短信不会发送；
+        // 此处只校验不消耗，用户可沿用同一张验证码（无需重新输入）完成登录 / 注册
+        captchaService.verify(request.getCaptchaKey(), request.getCaptchaValue());
 
         String phone = resolveTargetPhone(request);
         // 验证码生成/存储与 60 秒频控均在 SmsService 内部完成

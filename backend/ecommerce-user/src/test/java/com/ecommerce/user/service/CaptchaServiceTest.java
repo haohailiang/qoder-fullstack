@@ -101,6 +101,49 @@ class CaptchaServiceTest {
     }
 
     @Test
+    @DisplayName("verify 非消耗：校验通过后同一 key 仍可用，最终 validate 消耗后才失效")
+    void verifyKeepsKeyAfterSuccess() {
+        captchaService.saveForTest("key-6", "AB3d", System.currentTimeMillis() + 60_000L);
+
+        // 模拟发送短信多次校验：均不消耗，且忽略大小写
+        assertThatCode(() -> captchaService.verify("key-6", "ab3D")).doesNotThrowAnyException();
+        assertThatCode(() -> captchaService.verify("key-6", "AB3d")).doesNotThrowAnyException();
+        // 登录 / 注册的消耗式校验仍能通过
+        assertThatCode(() -> captchaService.validate("key-6", "AB3d")).doesNotThrowAnyException();
+        // 消耗后再次使用失败
+        assertThatThrownBy(() -> captchaService.validate("key-6", "AB3d"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("验证码错误或已过期，请重新获取");
+    }
+
+    @Test
+    @DisplayName("verify 校验失败：仍会消费该 key，不允许重试同一个 key")
+    void verifyWrongCodeConsumesKey() {
+        captchaService.saveForTest("key-7", "ABCD", System.currentTimeMillis() + 60_000L);
+
+        assertThatThrownBy(() -> captchaService.verify("key-7", "WRONG"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", 400);
+
+        assertThatThrownBy(() -> captchaService.verify("key-7", "ABCD"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("验证码错误或已过期，请重新获取");
+    }
+
+    @Test
+    @DisplayName("verify 不校验有效期：已过期条目仍可校验通过，但登录 validate 仍失败")
+    void verifyIgnoresExpiry() {
+        captchaService.saveForTest("key-8", "ABCD", System.currentTimeMillis() - 1_000L);
+
+        // 发送短信只校验内容是否匹配，不受有效期限制
+        assertThatCode(() -> captchaService.verify("key-8", "ABCD")).doesNotThrowAnyException();
+        // 登录 / 注册仍要求验证码未过期
+        assertThatThrownBy(() -> captchaService.validate("key-8", "ABCD"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("验证码错误或已过期，请重新获取");
+    }
+
+    @Test
     @DisplayName("captcha.enabled=false 时跳过校验，不抛异常")
     void validateSkippedWhenDisabled() {
         properties.setEnabled(false);
