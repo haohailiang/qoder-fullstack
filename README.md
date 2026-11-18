@@ -101,18 +101,20 @@ qoder-fullstack/
 │   ├── ecommerce-order/                      # 订单微服务
 │   │   └── src/main/
 │   │       ├── java/com/ecommerce/order/
-│   │       │   ├── controller/               # OrderController（含 OpenAPI 注解）
-│   │       │   ├── service/                  # 订单服务（含秒杀订单异步消费）
-│   │       │   ├── entity/                   # Order 实体
-│   │       │   ├── repository/               # MyBatis Mapper 访问层
+│   │       │   ├── controller/               # OrderController / PaymentController（含 OpenAPI 注解）
+│   │       │   ├── service/                  # 订单服务 + 支付服务（PaymentService / PaymentStateManager）
+│   │       │   │   ├── alipay/               # AlipayProperties 密钥工具与客户端工厂
+│   │       │   │   └── impl/AlipayPaymentServiceImpl.java  # 创建支付 / 异步通知 / 主动查询
+│   │       │   ├── entity/                   # Order / PaymentRecord 实体
+│   │       │   ├── repository/               # MyBatis Mapper 访问层（含 PaymentRecordMapper + XML）
 │   │       │   ├── client/                   # ProductClient（OpenFeign 调用商品服务）
 │   │       │   ├── consumer/                 # SeckillOrderConsumer（RabbitMQ 秒杀消息消费者）
-│   │       │   ├── config/                   # 无（安全配置已由 common 模块统一提供）
-│   │       │   └── test/                     # JUnit 5 单元测试（5 个测试类）
+│   │       │   ├── config/                   # AlipayProperties（alipay.* 配置项）
+│   │       │   └── test/                     # JUnit 5 单元测试（11 个测试类，含支付回调验签/幂等）
 │   │       └── resources/
-│   │           ├── application.yml           # 端口 8083，context-path /order
-│   │           ├── db/schema.sql             # 订单表建表 SQL
-│   │           └── mapper/OrderMapper.xml    # 订单表 SQL
+│   │           ├── application.yml           # 端口 8083，context-path /order（含 alipay.* 配置）
+│   │           ├── db/schema.sql             # 订单表 + 支付流水表建表 SQL
+│   │           └── mapper/                   # OrderMapper.xml、PaymentRecordMapper.xml
 │   ├── Dockerfile.gateway                    # 网关 Docker 构建文件
 │   ├── Dockerfile.user                       # 用户服务 Docker 构建文件
 │   ├── Dockerfile.product                    # 商品服务 Docker 构建文件
@@ -155,25 +157,29 @@ qoder-fullstack/
 │   ├── order-app/                            # 订单子应用（原生 TypeScript）
 │   │   ├── src/
 │   │   │   ├── main.ts                       # 入口（qiankun 生命周期导出 + 独立运行支持 + 主题同步）
-│   │   │   └── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消 / 暗黑模式颜色适配）
-│   │   ├── __tests__/                        # Vitest 单元测试（app / i18n）
+│   │   │   ├── app.ts                        # OrderApp 类（订单列表 / 详情 / 取消 / 去支付 / 支付结果页 / 轮询）
+│   │   │   ├── payment.ts                    # 支付纯逻辑（结果页路径与订单号解析、状态映射）+ axios 调用
+│   │   │   └── route.ts                      # 轻量路由解析（/order/pay-result、/order/detail/{orderNo}）
+│   │   ├── __tests__/                        # Vitest 单元测试（app / i18n / payment / route）
 │   │   ├── vite.config.ts                    # Vite 配置（端口 7200，/api 代理到网关 8080）
 │   │   ├── vitest.config.ts                  # Vitest 单元测试配置
 │   │   └── package.json
 │   └── e2e/                                  # Playwright 端到端测试
 │       ├── fixtures/test-data.ts             # 测试数据夹具
 │       ├── helpers.ts                        # 通用测试辅助工具
-│       ├── mocks/                            # 接口 Mock（auth / order / product / user / flight）
+│       ├── mocks/                            # 接口 Mock（auth / order（含支付）/ product / user / flight）
 │       ├── login.spec.ts                     # 登录流程 E2E 测试
 │       ├── product-search.spec.ts            # 商品搜索 E2E 测试
 │       ├── flight-flow.spec.ts               # 机票浏览与详情 E2E 测试
 │       ├── order-flow.spec.ts                # 订单流程 E2E 测试
+│       ├── payment-flow.spec.ts              # 支付宝支付 E2E 测试（立即购买 / 去支付 / 503 / 秒杀不受影响）
 │       ├── micro-frontend.spec.ts            # 微前端加载 E2E 测试
 │       ├── theme-sync.spec.ts                # 主题同步 E2E 测试
 │       ├── playwright.config.ts              # Playwright 配置（自动启动三个子应用 dev server）
 │       └── package.json
 ├── init-sql/
-│   └── 01-init-database.sql                  # 数据库初始化脚本（建库 + 建表 + 演示数据）
+│   ├── 01-init-database.sql                  # 数据库初始化脚本（建库 + 建表 + 演示数据）
+│   └── 02-alipay-payment.sql                 # 支付宝支付流水表（可重复执行）
 ├── docker-compose.yml                        # 全栈 Docker 编排（基础设施 + 后端微服务 + 前端子应用）
 ├── docker-compose-infra.yml                  # 仅基础设施 Docker 编排（MySQL / Redis / Nacos / RabbitMQ / ES）
 ├── package.json                              # 根 package.json（npm workspaces 统一管理前端测试脚本）
@@ -200,6 +206,7 @@ qoder-fullstack/
 - `products` 表 — 商品数据（含秒杀字段 `is_seckill / seckill_price / seckill_start_time / seckill_end_time`；机票类商品 `category = 'flight'`）
 - `flights` 表 — 航班数据（机票商品特有字段：`product_id`、`departure_city / arrival_city`、经纬度、`flight_number`、`duration`、`frequency`、`route_coordinates` JSON，通过 `product_id` 关联 `products`）
 - `orders` 表 — 订单数据（状态流转使用 `OrderStatus` 枚举：`0待支付 → 1已支付 → 2已发货 → 3已完成 → 4已取消`，MyBatis 通过自定义 TypeHandler 自动转换）
+- `payment_record` 表 — 支付宝支付流水（见 [`init-sql/02-alipay-payment.sql`](init-sql/02-alipay-payment.sql)：唯一键 `(channel, order_no)` 与 `trade_no` 保证重复创建支付 / 重复通知不会产生重复流水）
 - 演示数据 — 3 个用户（admin / zhangsan / lisi，密码均为 `123456`）+ 6 个普通商品（含 3 个秒杀商品）+ 8 个机票商品及对应 8 条航班数据
 
 ```bash
@@ -208,6 +215,9 @@ qoder-fullstack/
 # 方式二：手动执行（必须带 --default-character-set=utf8mb4，
 #         否则 mysql 客户端默认 latin1，会把脚本里的中文二次编码成乱码）
 mysql -u root -p --default-character-set=utf8mb4 < init-sql/01-init-database.sql
+
+# 支付宝支付流水表（可重复执行，已存在则跳过）
+mysql -u root -p --default-character-set=utf8mb4 < init-sql/02-alipay-payment.sql
 ```
 
 各微服务的 `application.yml` 中 `spring.datasource.password` 需从占位符改为本机 MySQL 的真实密码（该配置仅供本地开发使用，不要把真实密码提交到仓库）。
@@ -254,7 +264,7 @@ mvn spring-boot:run
 | API 网关 | 8080 | / | 统一入口，JWT 鉴权，路由分发，Swagger 文档聚合 |
 | 用户服务 | 8081 | /user | 认证 / 用户 / 短信 / 验证码 / 主题偏好 |
 | 商品服务 | 8082 | /product | 商品 CRUD / 搜索 / 秒杀 |
-| 订单服务 | 8083 | /order | 订单管理 / 秒杀订单消费 |
+| 订单服务 | 8083 | /order | 订单管理 / 秒杀订单消费 / 支付宝支付（沙箱） |
 
 > 前端及外部调用统一走网关 `http://localhost:8080`，由网关按路径前缀路由到对应微服务。
 
@@ -350,14 +360,21 @@ cd frontend/base-app && npm run test:watch
 | `product-search.spec.ts` | 商品搜索与列表展示 |
 | `flight-flow.spec.ts` | 机票浏览与航线详情跳转链路 |
 | `order-flow.spec.ts` | 订单创建与状态流转 |
+| `payment-flow.spec.ts` | 支付宝支付链路（立即购买 / 去支付 / 503 降级 / 秒杀不受影响） |
 | `micro-frontend.spec.ts` | qiankun 子应用加载与切换 |
 | `theme-sync.spec.ts` | 全局主题同步（暗黑/亮色） |
 
 运行命令：
 
 ```bash
+# 首次运行前安装浏览器（仅需一次）
+npx --prefix frontend/e2e playwright install chromium
+
 # 运行 E2E 测试（自动启动三个子应用 dev server）
 npm run test:e2e
+
+# 只跑某个用例文件
+npm run test:e2e -- payment-flow.spec.ts
 
 # 打开 Playwright UI 模式（可视化调试）
 npm run test:e2e:ui
@@ -371,7 +388,7 @@ npm run test:e2e:ui
 |--------|-----------|--------------|
 | ecommerce-user | 9 个测试类 | 认证控制器、用户控制器、验证码/短信服务、全局异常处理 |
 | ecommerce-product | 7 个测试类 | 商品控制器、商品服务、秒杀库存服务、仓储层；航班 FlightController/Service/Repository |
-| ecommerce-order | 5 个测试类 | 订单控制器、订单服务、订单状态枚举、Feign 客户端、仓储层 |
+| ecommerce-order | 11 个测试类 | 订单控制器、订单服务、订单状态枚举、Feign 客户端、仓储层；支付控制器 / 支付服务（回调验签、幂等、异常分支）/ 支付状态流转 / 密钥工具 / 流水仓储 |
 
 运行命令：
 
@@ -439,6 +456,63 @@ cd backend
 | GET | /api/order/orders | 查询所有订单（管理用） | JWT |
 | POST | /api/order/orders/{orderId}/cancel | 取消订单 | JWT |
 | PUT | /api/order/orders/{orderId}/status | 更新订单状态（参数：0-4） | JWT |
+| POST | /api/order/payments/alipay/{orderNo} | 创建支付宝支付，返回收银台 `payUrl`（未配置时业务码 503） | JWT + 订单归属 |
+| GET | /api/order/payments/alipay/{orderNo}/status | 查询支付状态（`sync=true` 时主动向支付宝查询并同步，默认 true） | JWT + 订单归属 |
+| POST | /api/order/payments/alipay/notify | 支付宝异步通知（验签 + 金额/订单号校验 + 幂等），返回纯文本 `success`/`failure` | 支付宝验签（白名单） |
+
+## 支付宝沙箱支付
+
+商品详情页「立即购买」与订单列表「去支付」均走支付宝电脑网站支付（page pay）沙箱，链路：
+
+1. 前端创建订单（`POST /api/order/orders`）；
+2. 前端请求 `POST /api/order/payments/alipay/{orderNo}` 拿到 `payUrl`，`window.location.assign(payUrl)` 整页跳转收银台；
+3. 用户在沙箱收银台付款，支付宝回调 `notify_url`（异步）并同步回跳 `return_url`（`/order/pay-result`）；
+4. 支付结果页每 2 秒轮询 `status` 接口（`sync=true`），命中终态即停止；即使 `notify_url` 不可达也能通过主动查询确认结果；
+5. 订单状态仅在验签通过、`app_id` / 订单号 / 金额均匹配时由 `待支付(0)` 条件更新为 `已支付(1)`，重复通知不会二次变更。
+
+### 环境变量
+
+未配置任何变量时服务仍可正常启动，仅创建支付返回业务码 `503`（前端提示后可稍后在订单详情重试）。
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `ALIPAY_APP_ID` | 是 | 沙箱应用 APPID |
+| `ALIPAY_PRIVATE_KEY` | 是 | 应用私钥（PKCS8，支持单行 Base64 / 含 `\n` / PEM 头尾） |
+| `ALIPAY_PUBLIC_KEY` | 是 | 支付宝公钥（沙箱控制台「支付宝公钥」，非应用公钥） |
+| `ALIPAY_GATEWAY_URL` | 否 | 默认 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
+| `ALIPAY_NOTIFY_URL` | 建议 | 异步通知地址，必须是支付宝服务器可达的公网地址；为空时仅依赖主动查询 |
+| `ALIPAY_RETURN_URL` | 否 | 同步回跳地址，默认 `http://localhost:5173/order/pay-result` |
+| `ALIPAY_SIGN_TYPE` | 否 | 默认 `RSA2` |
+| `ALIPAY_TIMEOUT_EXPRESS` | 否 | 订单支付超时，默认 `30m` |
+
+本地开发若需要真实异步通知，可用内网穿透把公网地址指到网关：
+
+```text
+ALIPAY_NOTIFY_URL=https://<隧道域名>/api/order/payments/alipay/notify
+```
+
+> 网关已将 `/api/order/payments/alipay/notify` 加入鉴权白名单（支付宝回调不带 JWT）；创建支付 / 查询接口仍走 JWT。
+> 密钥一律通过环境变量注入，**禁止写入仓库**；根目录提供 [`.env.example`](.env.example) 占位模板，复制为 `.env` 后填写（`.env` 已在 `.gitignore` 中）。
+
+### 沙箱验证步骤
+
+1. 登录支付宝开放平台「沙箱控制台」，获取 `APPID`，用官方工具生成 RSA2 密钥对并上传应用公钥，复制「支付宝公钥」与沙箱买家账号。
+2. 导出环境变量（PowerShell 示例）：
+
+```powershell
+$env:ALIPAY_APP_ID="2021xxxxxxxxxxxx"
+$env:ALIPAY_PRIVATE_KEY="MIIEv..."
+$env:ALIPAY_PUBLIC_KEY="MIIBIj..."
+$env:ALIPAY_NOTIFY_URL="https://<公网地址>/api/order/payments/alipay/notify"
+$env:ALIPAY_RETURN_URL="http://localhost:5173/order/pay-result"
+```
+
+3. 执行 `init-sql/02-alipay-payment.sql`，启动订单服务；日志出现「支付宝沙箱支付已启用」即为配置成功（未配置时为「支付宝支付未配置」告警）。
+4. 启动三个前端 → 登录 → 商品详情 → 立即购买 → 跳转沙箱收银台 → 用沙箱买家账号付款。
+5. 回到 `/order/pay-result?orderNo=...`：结果页展示支付成功；订单列表 / 详情状态由「待支付」变为「已支付」；刷新或重复回调不会二次变更。
+6. 负向验证：临时改错 `ALIPAY_PUBLIC_KEY` → 回调返回 `failure` 且日志输出 `[ALIPAY-ALARM] 验签失败`，订单状态不变；清空所有 `ALIPAY_*` → 服务正常启动，创建支付返回 `code=503`。
+
+> 同步回跳（`return_url`）只代表用户回到了本站，真正的支付结果以异步通知或主动查询为准；两者共用同一幂等状态流转。
 
 ## 统一响应结构
 

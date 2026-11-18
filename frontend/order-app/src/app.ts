@@ -2,10 +2,22 @@ import axios from 'axios'
 import { t } from './i18n'
 import {
   createLoadingOverlay,
+  ensureLoadingStyles,
   tableSkeletonHtml,
   withButtonLoading,
   type LoadingOverlay,
 } from './loading'
+import {
+  createAlipayPayment,
+  isFinalPayState,
+  mapPaymentResult,
+  MAX_PAY_POLLS,
+  PAY_POLL_INTERVAL,
+  queryPaymentStatus,
+  type PaymentStatusResult,
+  type PaymentView,
+} from './payment'
+import { parseOrderRoute } from './route'
 
 interface Order {
   id: number
@@ -32,6 +44,9 @@ export class OrderApp {
   private overlay: LoadingOverlay | null = null
   // 请求令牌：只接受最新一次请求的结果
   private requestSeq = 0
+  // 支付结果页轮询定时器与次数
+  private pollTimer: number | null = null
+  private pollCount = 0
 
   constructor(container: HTMLElement, props: any = {}) {
     this.container = container
@@ -43,6 +58,14 @@ export class OrderApp {
     // 内容节点会被整体重建，旧遮罩需同步销毁
     this.overlay?.destroy()
     this.overlay = null
+    this.stopPolling()
+
+    const route = parseOrderRoute(window.location.pathname, window.location.search)
+    // 支付宝同步回跳：直接渲染支付结果页
+    if (route.view === 'payResult' && route.orderNo) {
+      await this.renderPayResult(route.orderNo)
+      return
+    }
 
     const isDark = this.theme === 'dark'
     const pageBg = isDark ? '#141414' : '#f5f5f5'
@@ -77,6 +100,11 @@ export class OrderApp {
 
     this.bindEvents()
     await this.loadOrders()
+
+    // 商品详情页「立即购买」失败后跳转过来：定位到对应订单详情
+    if (route.view === 'detail' && route.orderNo) {
+      this.showOrderDetailByNo(route.orderNo)
+    }
   }
 
   private bindEvents() {
@@ -244,6 +272,11 @@ export class OrderApp {
                     ${t('order.detail')}
                   </button>
                   ${order.status === 0 ? `
+                    <button class="btn-pay" data-no="${order.orderNo}" style="color: #52c41a; background: none; border: none; cursor: pointer; margin-left: 8px;">
+                      ${t('order.pay')}
+                    </button>
+                  ` : ''}
+                  ${order.status === 0 ? `
                     <button class="btn-cancel" data-id="${order.id}" style="color: #ff4d4f; background: none; border: none; cursor: pointer; margin-left: 8px;">
                       ${t('order.cancel')}
                     </button>
@@ -269,6 +302,14 @@ export class OrderApp {
       btn.addEventListener('click', (e) => {
         const id = parseInt((e.target as HTMLElement).dataset.id || '0')
         this.cancelOrder(id, btn as HTMLButtonElement)
+      })
+    })
+
+    // 绑定去支付按钮事件
+    content.querySelectorAll('.btn-pay').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const orderNo = (e.target as HTMLElement).dataset.no || ''
+        this.payOrder(orderNo, btn as HTMLButtonElement)
       })
     })
   }
@@ -299,6 +340,11 @@ export class OrderApp {
         <button id="btn-back" style="margin-bottom: 16px; padding: 6px 12px; background: ${btnDefaultBg}; color: ${textColor}; border: 1px solid ${btnDefaultBorder}; border-radius: 4px; cursor: pointer;">
           ${t('order.backToList')}
         </button>
+        ${order.status === 0 ? `
+          <button id="btn-detail-pay" style="margin-bottom: 16px; margin-left: 8px; padding: 6px 12px; background: #1890ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+            ${t('order.pay')}
+          </button>
+        ` : ''}
         <h3 style="margin-bottom: 16px;">${t('order.orderDetail')}</h3>
         <div style="display: grid; grid-template-columns: 120px 1fr; gap: 12px;">
           <span style="color: ${secondaryText};">${t('order.detailOrderNo')}</span>
@@ -323,6 +369,19 @@ export class OrderApp {
 
     const btnBack = content.querySelector('#btn-back')
     btnBack?.addEventListener('click', () => this.renderOrderList())
+
+    const btnPay = content.querySelector('#btn-detail-pay') as HTMLButtonElement | null
+    btnPay?.addEventListener('click', () => this.payOrder(order.orderNo, btnPay))
+  }
+
+  /** 按订单号展示详情（列表尚未加载完时兜底重新拉取） */
+  private showOrderDetailByNo(orderNo: string) {
+    const order = this.orders.find(o => o.orderNo === orderNo)
+    if (!order) {
+      this.renderError(t('order.notFound'))
+      return
+    }
+    this.showOrderDetail(order.id)
   }
 
   private async cancelOrder(id: number, button?: HTMLButtonElement | null) {
@@ -346,10 +405,186 @@ export class OrderApp {
     }
   }
 
+  /** 发起支付宝支付并整页跳转到收银台 */
+  private async payOrder(orderNo: string, button?: HTMLButtonElement | null) {
+    if (!orderNo) return
+    withButtonLoading(button ?? null, true)
+    try {
+      const response = await createAlipayPayment(orderNo, this.getToken())
+      const body = response.data
+      if (body?.code === 200 && body.data?.payUrl) {
+        this.navigateTo(body.data.payUrl)
+        return
+      }
+      alert(body?.code === 503 ? t('order.payUnavailable') : (body?.message || t('order.payFailed')))
+    } catch (error: any) {
+      const data = error?.response?.data
+      alert(data?.code === 503 ? t('order.payUnavailable') : (data?.message || t('order.payFailed')))
+    } finally {
+      withButtonLoading(button ?? null, false)
+    }
+  }
+
+  /** 整页跳转（抽成方法便于单元测试替换，qiankun 下需整页跳转换壳） */
+  protected navigateTo(url: string) {
+    window.location.assign(url)
+  }
+
+  /** 支付结果页：展示订单号 + 轮询确认结果 */
+  private async renderPayResult(orderNo: string) {
+    ensureLoadingStyles()
+    const isDark = this.theme === 'dark'
+    const pageBg = isDark ? '#141414' : '#f5f5f5'
+    const bgColor = isDark ? '#1f1f1f' : '#fff'
+    const textColor = isDark ? '#e5eaf3' : '#333'
+    const secondaryText = isDark ? '#a6a6a6' : '#999'
+    const borderColor = isDark ? '#424242' : '#f0f0f0'
+
+    this.container.innerHTML = `
+      <div style="min-height: 100vh; padding: 24px; background: ${pageBg}; --oa-text-secondary: ${secondaryText};">
+        <div style="max-width: 720px; margin: 0 auto;">
+          <div style="background: ${bgColor}; border-radius: 8px; padding: 32px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
+            <h2 style="margin: 0 0 8px 0; color: ${textColor};">${t('order.payResult')}</h2>
+            <p style="margin: 0 0 24px 0; color: ${secondaryText}; font-size: 13px;">
+              ${t('order.detailOrderNo')} <span style="color: ${textColor};">${this.escapeHtml(orderNo)}</span>
+            </p>
+            <div id="pay-status" style="min-height: 160px; display: flex; align-items: center; justify-content: center; color: ${secondaryText};">
+              <span class="oa-spinner"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    await this.startPayResultPolling(orderNo)
+  }
+
+  /** 首次查询后启动轮询，终态或查询失败时停止（避免无意义请求） */
+  private async startPayResultPolling(orderNo: string) {
+    this.stopPolling()
+    this.pollCount = 0
+    const shouldStop = await this.checkPayResult(orderNo)
+    if (shouldStop) return
+
+    this.pollTimer = window.setInterval(() => {
+      this.pollCount += 1
+      if (this.pollCount >= MAX_PAY_POLLS) {
+        this.stopPolling()
+        this.renderPayResultPending(orderNo)
+        return
+      }
+      void this.checkPayResult(orderNo)
+    }, PAY_POLL_INTERVAL)
+  }
+
+  /**
+   * 查询一次支付状态并渲染。
+   *
+   * @returns 是否应停止自动轮询（终态或查询失败）
+   */
+  private async checkPayResult(orderNo: string): Promise<boolean> {
+    try {
+      const response = await queryPaymentStatus(orderNo, this.getToken(), true)
+      if (response.data?.code === 200) {
+        const view = mapPaymentResult(response.data.data as PaymentStatusResult)
+        this.renderPayStatus(orderNo, view)
+        return isFinalPayState(view)
+      }
+      this.renderPayResultPending(orderNo, response.data?.message)
+      return true
+    } catch {
+      this.renderPayResultPending(orderNo)
+      return true
+    }
+  }
+
+  /** 查询失败或轮询超时：展示待确认状态，由用户手动刷新 */
+  private renderPayResultPending(orderNo: string, extra?: string) {
+    this.renderPayStatus(orderNo, {
+      state: 'PENDING',
+      titleKey: 'order.payPending',
+      descKey: extra ? 'order.payQueryFailed' : 'order.payPendingDesc',
+      canRetry: false,
+    }, extra)
+  }
+
+  private renderPayStatus(orderNo: string, view: PaymentView, extra?: string) {
+    const statusEl = this.container.querySelector<HTMLElement>('#pay-status')
+    if (!statusEl) return
+
+    const isDark = this.theme === 'dark'
+    const textColor = isDark ? '#e5eaf3' : '#333'
+    const secondaryText = isDark ? '#a6a6a6' : '#999'
+    const btnDefaultBg = isDark ? '#333' : '#fff'
+    const btnDefaultBorder = isDark ? '#555' : '#d9d9d9'
+    const stateColor: Record<string, string> = {
+      SUCCESS: '#52c41a',
+      PENDING: '#faad14',
+      CLOSED: '#faad14',
+      CANCELLED: '#999',
+      FAILED: '#ff4d4f',
+    }
+    const color = stateColor[view.state] || secondaryText
+    const outlineBtn = `padding: 8px 16px; background: ${btnDefaultBg}; color: ${textColor}; border: 1px solid ${btnDefaultBorder}; border-radius: 4px; cursor: pointer;`
+    const primaryBtn = 'padding: 8px 16px; background: #1890ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;'
+
+    statusEl.innerHTML = `
+      <div style="text-align: center; width: 100%;">
+        ${view.state === 'PENDING' ? '<span class="oa-spinner"></span>' : ''}
+        <div style="margin-top: 12px; font-size: 18px; font-weight: 600; color: ${color};">${t(view.titleKey)}</div>
+        <div style="margin-top: 8px; color: ${secondaryText};">${t(view.descKey)}</div>
+        ${extra ? `<div style="margin-top: 8px; color: #ff4d4f; font-size: 13px;">${this.escapeHtml(extra)}</div>` : ''}
+        <div style="margin-top: 24px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          ${view.state === 'PENDING' ? `<button id="btn-pay-refresh" style="${outlineBtn}">${t('order.payRefresh')}</button>` : ''}
+          ${view.canRetry ? `<button id="btn-pay-retry" style="${primaryBtn}">${t('order.payRetry')}</button>` : ''}
+          ${view.state === 'PENDING' ? `<button id="btn-pay-trouble" style="${outlineBtn}">${t('order.payTrouble')}</button>` : ''}
+          <button id="btn-pay-view-order" style="${view.state === 'SUCCESS' ? primaryBtn : outlineBtn}">${t('order.payViewOrder')}</button>
+          <button id="btn-pay-back" style="${outlineBtn}">${t('order.payBackToList')}</button>
+        </div>
+      </div>
+    `
+
+    const detailUrl = `/order/detail/${encodeURIComponent(orderNo)}`
+    statusEl.querySelector('#btn-pay-refresh')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLButtonElement
+      withButtonLoading(btn, true)
+      void this.checkPayResult(orderNo).finally(() => withButtonLoading(btn, false))
+    })
+    statusEl.querySelector('#btn-pay-retry')?.addEventListener('click', (e) => {
+      void this.payOrder(orderNo, e.currentTarget as HTMLButtonElement)
+    })
+    statusEl.querySelector('#btn-pay-trouble')?.addEventListener('click', () => {
+      this.navigateTo(detailUrl)
+    })
+    statusEl.querySelector('#btn-pay-view-order')?.addEventListener('click', () => {
+      this.navigateTo(detailUrl)
+    })
+    statusEl.querySelector('#btn-pay-back')?.addEventListener('click', () => {
+      this.navigateTo('/order/my')
+    })
+  }
+
+  private stopPolling() {
+    if (this.pollTimer !== null) {
+      window.clearInterval(this.pollTimer)
+      this.pollTimer = null
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }
+    return value.replace(/[&<>"']/g, (char) => entities[char])
+  }
+
   private renderError(message: string) {
     const content = this.container.querySelector('#order-content')
     if (content) {
-      const isDark = this.theme === 'dark'
       content.innerHTML = `<div style="text-align: center; color: #ff4d4f; padding: 40px;">${message}</div>`
     }
   }
@@ -364,6 +599,7 @@ export class OrderApp {
   }
 
   destroy() {
+    this.stopPolling()
     this.overlay?.destroy()
     this.overlay = null
     this.container.innerHTML = ''

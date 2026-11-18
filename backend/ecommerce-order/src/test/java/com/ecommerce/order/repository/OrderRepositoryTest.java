@@ -19,6 +19,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -191,6 +192,48 @@ class OrderRepositoryTest {
             int affected = orderRepository.updateStatus(999L, OrderStatus.CANCELLED);
 
             assertThat(affected).isEqualTo(0);
+        }
+    }
+
+    // ──────────────────── updateStatusIfCurrent ────────────────────
+
+    @Nested
+    @DisplayName("updateStatusIfCurrent - 条件更新订单状态（支付幂等）")
+    class UpdateStatusIfCurrent {
+
+        @Test
+        @DisplayName("正常场景：当前状态匹配时返回受影响行数 1")
+        void shouldUpdateWhenCurrentStatusMatches() {
+            when(orderMapper.updateStatusIfCurrent(1L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID)).thenReturn(1);
+
+            int affected = orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID);
+
+            assertThat(affected).isEqualTo(1);
+            verify(orderMapper).updateStatusIfCurrent(1L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID);
+        }
+
+        @Test
+        @DisplayName("幂等场景：重复通知时条件不匹配，返回 0 行")
+        void shouldReturnZeroWhenStatusAlreadyChanged() {
+            when(orderMapper.updateStatusIfCurrent(1L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID)).thenReturn(0);
+
+            int affected = orderRepository.updateStatusIfCurrent(1L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID);
+
+            assertThat(affected).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("参数传递：from/to 状态原样透传到 Mapper")
+        void shouldPassStatusesToMapper() {
+            when(orderMapper.updateStatusIfCurrent(2L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID)).thenReturn(1);
+
+            orderRepository.updateStatusIfCurrent(2L, OrderStatus.PENDING_PAYMENT, OrderStatus.PAID);
+
+            ArgumentCaptor<OrderStatus> fromCaptor = ArgumentCaptor.forClass(OrderStatus.class);
+            ArgumentCaptor<OrderStatus> toCaptor = ArgumentCaptor.forClass(OrderStatus.class);
+            verify(orderMapper).updateStatusIfCurrent(eq(2L), fromCaptor.capture(), toCaptor.capture());
+            assertThat(fromCaptor.getValue()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+            assertThat(toCaptor.getValue()).isEqualTo(OrderStatus.PAID);
         }
     }
 

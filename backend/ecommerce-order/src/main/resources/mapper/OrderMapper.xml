@@ -46,6 +46,13 @@
         UPDATE orders SET status = #{status,typeHandler=com.ecommerce.order.entity.enums.OrderStatusTypeHandler}, updated_date = NOW() WHERE id = #{id}
     </update>
 
+    <update id="updateStatusIfCurrent">
+        UPDATE orders
+        SET status = #{to,typeHandler=com.ecommerce.order.entity.enums.OrderStatusTypeHandler}, updated_date = NOW()
+        WHERE id = #{id}
+          AND status = #{from,typeHandler=com.ecommerce.order.entity.enums.OrderStatusTypeHandler}
+    </update>
+
     <select id="selectAll" resultMap="OrderResultMap">
         SELECT <include refid="BaseColumns"/> FROM orders ORDER BY id DESC
     </select>

@@ -64,6 +64,25 @@ security:
     verify-signature: ${TRUSTED_HEADER_VERIFY_SIGNATURE:false}
     max-age-seconds: 300
 
+# 支付宝沙箱支付配置
+# 所有密钥一律通过环境变量注入，禁止写入仓库；未配置时服务仍可正常启动，
+# 创建支付接口会返回业务码 503（支付宝支付未配置）。
+alipay:
+  app-id: ${ALIPAY_APP_ID:}
+  # 应用私钥（PKCS8）：支持单行 Base64、含 \n 转义、或带 PEM 头尾的完整内容
+  private-key: ${ALIPAY_PRIVATE_KEY:}
+  # 支付宝公钥（沙箱控制台「支付宝公钥」，非应用公钥）
+  alipay-public-key: ${ALIPAY_PUBLIC_KEY:}
+  gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi-sandbox.dl.alipaydev.com/gateway.do}
+  # 异步通知地址：必须是支付宝服务器可达的公网地址（内网穿透 / 公网网关）
+  notify-url: ${ALIPAY_NOTIFY_URL:}
+  # 支付完成后的同步回跳地址（本站支付结果页）
+  return-url: ${ALIPAY_RETURN_URL:http://localhost:5173/order/pay-result}
+  sign-type: ${ALIPAY_SIGN_TYPE:RSA2}
+  charset: UTF-8
+  # 订单支付超时时间，超时后支付宝侧交易关闭（TRADE_CLOSED）
+  timeout-express: ${ALIPAY_TIMEOUT_EXPRESS:30m}
+
 # OpenFeign 配置
 spring.cloud.openfeign:
   client:
@@ -82,7 +101,7 @@ springdoc:
   api-docs:
     title: 订单服务 API
     version: OPENAPI_3_0
-    description: 订单创建、查询、取消，调用商品服务扣减库存等接口
+    description: 订单创建、查询、取消、支付宝沙箱支付（创建支付 / 异步通知 / 主动查询）等接口
   swagger-ui:
     path: /swagger-ui.html
     tags-sorter: alpha

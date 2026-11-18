@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecommerce.order.repository.mapper.PaymentRecordMapper">
+
+    <sql id="BaseColumns">
+        id, order_no, channel, trade_no, amount, status, notify_payload, paid_time, created_date, updated_date
+    </sql>
+
+    <select id="selectByChannelAndOrderNo" resultType="com.ecommerce.order.entity.PaymentRecord">
+        SELECT <include refid="BaseColumns"/>
+        FROM payment_record
+        WHERE channel = #{channel} AND order_no = #{orderNo}
+    </select>
+
+    <insert id="insertIgnore" parameterType="com.ecommerce.order.entity.PaymentRecord">
+        INSERT IGNORE INTO payment_record (order_no, channel, trade_no, amount, status, created_date, updated_date)
+        VALUES (#{orderNo}, #{channel}, #{tradeNo}, #{amount}, #{status}, NOW(), NOW())
+    </insert>
+
+    <update id="markPaid">
+        UPDATE payment_record
+        SET status = 'PAID',
+            trade_no = #{tradeNo},
+            notify_payload = #{notifyPayload},
+            paid_time = COALESCE(paid_time, #{paidTime}),
+            updated_date = NOW()
+        WHERE channel = #{channel} AND order_no = #{orderNo} AND status &lt;&gt; 'PAID'
+    </update>
+
+    <update id="markClosed">
+        UPDATE payment_record
+        SET status = 'CLOSED', updated_date = NOW()
+        WHERE channel = #{channel} AND order_no = #{orderNo} AND status &lt;&gt; 'PAID'
+    </update>
+</mapper>

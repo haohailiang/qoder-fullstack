@@ -32,8 +32,8 @@ export async function setupProductMocks(page: Page): Promise<void> {
     })
   })
 
-  // 商品详情
-  await page.route('**/api/product/products/:id', (route) => {
+  // 商品详情（用正则匹配数字 ID；`:id` 不是 Playwright glob 语法，且 `*` 会把 search 请求一并吃掉）
+  await page.route(/\/api\/product\/products\/\d+(\?.*)?$/, (route) => {
     const url = route.request().url()
     const idMatch = url.match(/\/products\/(\d+)/)
     const id = idMatch ? parseInt(idMatch[1]) : 1

@@ -63,6 +63,11 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
+        <!-- 支付宝开放平台 SDK（沙箱支付） -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+        </dependency>
         <!-- LoadBalancer（Feign 需要） -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>

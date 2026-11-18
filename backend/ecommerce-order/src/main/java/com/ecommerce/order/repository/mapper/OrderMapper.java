@@ -20,5 +20,10 @@ public interface OrderMapper {
 
     int updateStatus(@Param("id") Long id, @Param("status") OrderStatus status);
 
+    /** 仅当当前状态等于 from 时才更新为 to，用于支付回调的幂等状态流转 */
+    int updateStatusIfCurrent(@Param("id") Long id,
+                              @Param("from") OrderStatus from,
+                              @Param("to") OrderStatus to);
+
     List<Order> selectAll();
 }

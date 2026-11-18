@@ -2,7 +2,7 @@
  * product-app 全局测试 setup
  */
 import '@testing-library/jest-dom'
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 
 // ---------- IntersectionObserver mock ----------
 class MockIntersectionObserver {

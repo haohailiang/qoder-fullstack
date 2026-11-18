@@ -163,6 +163,14 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      # 支付宝沙箱支付：全部通过环境变量注入，不配置时服务仍可启动，创建支付返回业务码 503
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-}
+      ALIPAY_PUBLIC_KEY: ${ALIPAY_PUBLIC_KEY:-}
+      ALIPAY_GATEWAY_URL: ${ALIPAY_GATEWAY_URL:-https://openapi-sandbox.dl.alipaydev.com/gateway.do}
+      ALIPAY_NOTIFY_URL: ${ALIPAY_NOTIFY_URL:-}
+      ALIPAY_RETURN_URL: ${ALIPAY_RETURN_URL:-http://localhost:5173/order/pay-result}
+      ALIPAY_TIMEOUT_EXPRESS: ${ALIPAY_TIMEOUT_EXPRESS:-30m}
 
   # ============ 前端 ============
   frontend-base:

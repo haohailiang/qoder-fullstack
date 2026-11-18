@@ -71,11 +71,19 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "/api/user/auth/register",
             "/api/user/auth/captcha",
             "/api/user/auth/send-sms-code",
-            "/api/user/health"
+            "/api/user/health",
+            // 支付宝异步通知由支付宝服务器直接调用，无 JWT，安全性由回调验签保证
+            "/api/order/payments/alipay/notify"
     );
 
-    /** 白名单前缀：匹配这些前缀的路径不需要 JWT 认证（Swagger UI / OpenAPI 文档） */
+    /**
+     * 白名单前缀：匹配这些前缀的路径不需要 JWT 认证（Swagger UI / OpenAPI 文档）。
+     *
+     * <p>/api/product/files/local 为本地兜底存储的图片读取路径，浏览器 img 标签不会携带
+     * Authorization 头，且商品图片本身是公开资源，故放行；上传/删除接口仍要求登录 + ADMIN。
+     */
     private static final List<String> WHITE_PREFIX_LIST = List.of(
+            "/api/product/files/local",
             "/api/user/swagger-ui",
             "/api/user/v3/api-docs",
             "/api/product/swagger-ui",

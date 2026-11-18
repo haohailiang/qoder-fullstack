@@ -37,6 +37,15 @@ public class OrderRepository {
         return orderMapper.updateStatus(id, status);
     }
 
+    /**
+     * 条件更新：仅当订单当前状态为 from 时才流转到 to。
+     *
+     * @return 受影响行数，0 表示状态已被其他流程改变（幂等/并发保护）
+     */
+    public int updateStatusIfCurrent(Long id, OrderStatus from, OrderStatus to) {
+        return orderMapper.updateStatusIfCurrent(id, from, to);
+    }
+
     public List<Order> findAll() {
         return orderMapper.selectAll();
     }

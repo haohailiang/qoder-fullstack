@@ -21,6 +21,8 @@ backend/ecommerce-product/uploads/
 # 本地凭据（VM_PASS 等环境变量文件不得入库）
 .env
 .env.*
+# 仅占位符模板必须入库，便于他人复制为 .env
+!.env.example
 
 # IDE
 .idea/

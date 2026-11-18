@@ -60,7 +60,8 @@ function ProductDetail() {
   }
 
   const handleBuy = async () => {
-    if (!product) return
+    // 防重复提交：loading 期间忽略重复点击
+    if (!product || submitting) return
     setSubmitting(true)
     try {
       const token = localStorage.getItem('qoder_token')
@@ -76,12 +77,49 @@ function ProductDetail() {
           headers: { Authorization: `Bearer ${token}` },
         }
       )
-      if (response.data.code === 200) {
-        message.success(t('product.buySuccess'))
-        navigate('/order/my')
+      if (response.data.code !== 200) {
+        message.error(response.data.message || t('product.buyFailed'))
+        return
       }
+
+      const orderNo: string = response.data.data?.orderNo
+      if (!orderNo) {
+        message.error(t('product.buyFailed'))
+        return
+      }
+
+      // 订单创建成功后再发起支付宝支付，拿到收银台地址后整页跳转
+      message.loading({ content: t('product.payCreating'), key: 'alipay-pay', duration: 0 })
+      const payResponse = await axios.post(
+        `/api/order/payments/alipay/${orderNo}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      const payResult = payResponse.data
+      if (payResult.code === 200 && payResult.data?.payUrl) {
+        message.loading({ content: t('product.redirectingToAlipay'), key: 'alipay-pay', duration: 0 })
+        window.location.assign(payResult.data.payUrl)
+        return
+      }
+
+      // 支付未配置（503）或下单失败：订单已生成，引导到订单详情页再次发起支付
+      message.destroy('alipay-pay')
+      if (payResult.code === 503) {
+        message.warning(t('product.payUnavailable'))
+      } else {
+        message.error(payResult.message || t('product.payFailed'))
+      }
+      window.location.assign(`/order/detail/${orderNo}`)
     } catch (error: any) {
-      message.error(error?.response?.data?.message || t('product.buyFailed'))
+      message.destroy('alipay-pay')
+      const data = error?.response?.data
+      if (data?.code === 503) {
+        message.warning(t('product.payUnavailable'))
+      } else {
+        message.error(data?.message || t('product.buyFailed'))
+      }
     } finally {
       setSubmitting(false)
     }
