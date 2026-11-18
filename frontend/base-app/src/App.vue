@@ -3,10 +3,15 @@ import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { logout } from '@/api/auth'
 import { clearAuth, currentUserRef, tokenRef } from '@/utils/auth'
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { themeRef, toggleTheme } from '@/utils/theme'
 import { useI18n } from 'vue-i18n'
 import { langRef, setLang, type Lang } from '@/utils/lang'
+import { subAppLoading, resetSubAppLoading } from '@/micro'
+import { requestLoading } from '@/api/request'
+import { useDelayedBusy } from '@/composables/useDelayedLoading'
+import LoadingBar from '@/components/LoadingBar.vue'
+import SubAppPlaceholder from '@/views/SubAppPlaceholder.vue'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import enUs from 'element-plus/es/locale/lang/en'
 
@@ -32,6 +37,27 @@ const isAdmin = computed(() => currentUserRef.value?.username === 'admin')
 
 // 当前是否为暗黑模式
 const isDark = computed(() => themeRef.value === 'dark')
+
+// 路由跳转（懒加载 chunk）进行中
+const routeLoading = ref(false)
+router.beforeEach(() => {
+  routeLoading.value = true
+})
+router.afterEach(() => {
+  routeLoading.value = false
+  // 离开子应用路由时兜底清理残留的占位标记（挂载中途被打断时 qiankun 不再回调）
+  if (!isInSubApp.value) resetSubAppLoading()
+})
+router.onError(() => {
+  routeLoading.value = false
+})
+
+// 全局细进度条：路由跳转或接口请求超过防闪烁阈值后展示
+const globalBusy = computed(() => routeLoading.value || requestLoading.value)
+const globalBusyVisible = useDelayedBusy(globalBusy)
+
+// 子应用加载占位（延迟展示，复用 SubAppPlaceholder）
+const subAppLoadingVisible = useDelayedBusy(subAppLoading)
 
 // 当前语言标签（用于按钮显示）
 const langLabel = computed(() => langRef.value === 'en' ? 'EN' : '中')
@@ -117,10 +143,14 @@ function navigateTo(index: unknown) {
         </div>
       </el-header>
       <el-main class="app-main">
+        <LoadingBar :visible="globalBusyVisible" />
         <!-- 基座应用的路由视图 -->
         <router-view v-if="!isInSubApp" />
-        <!-- 子应用容器 -->
-        <div id="subapp-container" v-show="isInSubApp"></div>
+        <!-- 子应用容器：qiankun 挂载到 #subapp-container，加载占位层作为兄弟节点覆盖其上 -->
+        <div v-show="isInSubApp" class="subapp-wrapper">
+          <div id="subapp-container"></div>
+          <SubAppPlaceholder v-if="subAppLoadingVisible" />
+        </div>
       </el-main>
     </el-container>
   </el-config-provider>
@@ -224,8 +254,13 @@ function navigateTo(index: unknown) {
   padding: 0;
 }
 
-#subapp-container {
+.subapp-wrapper {
+  position: relative;
   width: 100%;
   min-height: calc(100vh - 60px);
+}
+
+#subapp-container {
+  width: 100%;
 }
 </style>

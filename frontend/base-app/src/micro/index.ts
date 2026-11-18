@@ -2,7 +2,7 @@ import { registerMicroApps, start, initGlobalState, MicroAppStateActions } from 
 import { getToken, currentUserRef } from '@/utils/auth'
 import { getTheme, themeRef } from '@/utils/theme'
 import { getLang, langRef } from '@/utils/lang'
-import { watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 
 // 全局状态管理器
 const initialState = {
@@ -28,6 +28,29 @@ watch(themeRef, (newTheme) => {
 watch(langRef, (newLang) => {
   globalActions.setGlobalState({ lang: newLang })
 })
+
+/**
+ * 子应用加载状态：记录「已开始加载但尚未挂载」的应用名。
+ * 使用 Set 而非布尔值，避免切换子应用时 afterUnmount(旧应用) 晚于 beforeLoad(新应用)
+ * 导致加载占位被提前隐藏。
+ */
+export const subAppState = reactive({
+  pending: new Set<string>(),
+})
+
+/** 是否有子应用正在加载/挂载（立即态，UI 侧需再叠加防闪烁延时） */
+export const subAppLoading = computed(() => subAppState.pending.size > 0)
+
+/**
+ * 清理残留的加载标记。
+ * 子应用挂载过程中被路由切换打断时，qiankun 不会再回调 afterMount/afterUnmount，
+ * 需要由基座在离开子应用路由时兜底清理，避免占位层永久停留。
+ */
+export function resetSubAppLoading() {
+  if (subAppState.pending.size > 0) {
+    subAppState.pending.clear()
+  }
+}
 
 // 子应用配置
 const apps = [
@@ -61,6 +84,7 @@ const apps = [
 registerMicroApps(apps, {
   beforeLoad: [async (app) => {
     console.log('[qiankun] beforeLoad:', app.name)
+    subAppState.pending.add(app.name)
     // 在真实 window 上设置 React Refresh 兼容标志和桩函数
     // qiankun 沙箱中 eval() 设置的 window 是代理对象，而子应用组件
     // 通过 import() 加载后运行在模块作用域，访问的是真实 window
@@ -72,9 +96,16 @@ registerMicroApps(apps, {
   }],
   beforeMount: [async (app) => {
     console.log('[qiankun] beforeMount:', app.name)
+    subAppState.pending.add(app.name)
+  }],
+  afterMount: [async (app) => {
+    console.log('[qiankun] afterMount:', app.name)
+    // 挂载完成：占位层可以在数据请求/骨架屏接管后立即撤下
+    subAppState.pending.delete(app.name)
   }],
   afterUnmount: [async (app) => {
     console.log('[qiankun] afterUnmount:', app.name)
+    subAppState.pending.delete(app.name)
   }],
 })
 

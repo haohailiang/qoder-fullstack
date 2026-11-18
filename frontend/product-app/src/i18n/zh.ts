@@ -23,6 +23,7 @@ const zh = {
     back: '返回',
     fetchFailed: '获取商品列表失败',
     detailFailed: '获取商品详情失败',
+    empty: '暂无商品',
     buySuccess: '下单成功！',
     buyFailed: '下单失败',
     seckillSuccess: '抢购成功，排队中...',
@@ -49,6 +50,10 @@ const zh = {
     progress: '飞行进度',
     fetchFailed: '获取航班信息失败',
     comingSoon: '购票功能即将上线',
+  },
+  common: {
+    loading: '加载中...',
+    retry: '重试',
   },
 }
 

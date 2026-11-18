@@ -1,5 +1,11 @@
 import axios from 'axios'
 import { t } from './i18n'
+import {
+  createLoadingOverlay,
+  tableSkeletonHtml,
+  withButtonLoading,
+  type LoadingOverlay,
+} from './loading'
 
 interface Order {
   id: number
@@ -21,8 +27,11 @@ export class OrderApp {
   private currentView: 'list' | 'detail' = 'list'
   private orders: Order[] = []
   private selectedOrder: Order | null = null
-  private loading = false
   private theme: 'dark' | 'light' = 'dark'
+  // 延迟展示的加载态（首屏骨架 / 刷新遮罩）
+  private overlay: LoadingOverlay | null = null
+  // 请求令牌：只接受最新一次请求的结果
+  private requestSeq = 0
 
   constructor(container: HTMLElement, props: any = {}) {
     this.container = container
@@ -31,6 +40,10 @@ export class OrderApp {
   }
 
   async render() {
+    // 内容节点会被整体重建，旧遮罩需同步销毁
+    this.overlay?.destroy()
+    this.overlay = null
+
     const isDark = this.theme === 'dark'
     const pageBg = isDark ? '#141414' : '#f5f5f5'
     const bgColor = isDark ? '#1f1f1f' : '#fff'
@@ -44,7 +57,7 @@ export class OrderApp {
     const btnDefaultBorder = isDark ? '#555' : '#d9d9d9'
 
     this.container.innerHTML = `
-      <div style="min-height: 100vh; padding: 24px; background: ${pageBg};">
+      <div style="min-height: 100vh; padding: 24px; background: ${pageBg}; --oa-primary: #409eff; --oa-overlay-bg: ${isDark ? 'rgba(20,20,20,0.72)' : 'rgba(255,255,255,0.75)'}; --oa-text-secondary: ${secondaryText}; --oa-skeleton-bg: ${isDark ? '#2a2a2a' : '#f0f2f5'}; --oa-skeleton-highlight: ${isDark ? '#3a3a3a' : '#e4e7ed'};">
         <div style="max-width: 1200px; margin: 0 auto;">
           <div style="background: ${bgColor}; border-radius: 8px; padding: 24px; margin-bottom: 16px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
             <h2 style="margin: 0 0 16px 0; color: ${textColor};">${t('order.title')}</h2>
@@ -57,9 +70,7 @@ export class OrderApp {
               </button>
             </div>
           </div>
-          <div id="order-content" style="background: ${bgColor}; border-radius: 8px; padding: 24px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};">
-            <div style="text-align: center; color: ${secondaryText}; padding: 40px;">${t('order.loading')}</div>
-          </div>
+          <div id="order-content" style="position: relative; min-height: 320px; background: ${bgColor}; border-radius: 8px; padding: 24px; border: 1px solid ${borderColor}; box-shadow: 0 2px 8px ${isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)'};"></div>
         </div>
       </div>
     `
@@ -78,62 +89,104 @@ export class OrderApp {
     const btnAll = this.container.querySelector('#btn-all-orders') as HTMLButtonElement
 
     btnMy?.addEventListener('click', () => {
-      this.loadOrders()
       btnMy.style.background = btnPrimaryBg
       btnMy.style.color = '#fff'
       if (btnAll) {
         btnAll.style.background = btnDefaultBg
         btnAll.style.color = btnDefaultText
       }
+      this.loadOrders(btnMy)
     })
 
     btnAll?.addEventListener('click', () => {
-      this.loadAllOrders()
       btnAll.style.background = btnPrimaryBg
       btnAll.style.color = '#fff'
       if (btnMy) {
         btnMy.style.background = btnDefaultBg
         btnMy.style.color = btnDefaultText
       }
+      this.loadAllOrders(btnAll)
     })
   }
 
-  private async loadOrders() {
-    this.loading = true
+  private getContentEl(): HTMLElement | null {
+    return this.container.querySelector<HTMLElement>('#order-content')
+  }
+
+  /** 首屏用骨架、已有数据用遮罩；两者均延迟 200ms 出现 */
+  private beginLoading() {
+    const content = this.getContentEl()
+    if (!content) return
+    if (!this.overlay) {
+      this.overlay = createLoadingOverlay(content, {
+        text: t('order.loading'),
+        skeletonHtml: tableSkeletonHtml(5),
+      })
+    }
+    this.overlay.show(content.dataset.loaded === '1' ? 'overlay' : 'skeleton')
+  }
+
+  private markLoaded() {
+    const content = this.getContentEl()
+    if (content) content.dataset.loaded = '1'
+  }
+
+  private async loadOrders(button?: HTMLButtonElement | null) {
+    const seq = ++this.requestSeq
+    this.beginLoading()
+    withButtonLoading(button ?? null, true)
     try {
       const token = this.getToken()
       const response = await axios.get('/api/order/orders/my', {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
-      if (response.data.code === 200) {
-        this.orders = response.data.data || []
-        this.renderOrderList()
-      }
-    } catch (error) {
-      this.renderError(t('order.fetchFailed'))
-    } finally {
-      this.loading = false
-    }
-  }
-
-  /** 全部订单为后端管理接口（仅 ADMIN），普通用户会得到 403，需把后端提示展示出来 */
-  private async loadAllOrders() {
-    this.loading = true
-    try {
-      const token = this.getToken()
-      const response = await axios.get('/api/order/orders', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
+      if (seq !== this.requestSeq) return
       if (response.data.code === 200) {
         this.orders = response.data.data || []
         this.renderOrderList()
       } else {
         this.renderError(response.data.message || t('order.fetchFailed'))
       }
-    } catch (error) {
-      this.renderError(t('order.fetchFailed'))
+    } catch {
+      if (seq === this.requestSeq) {
+        this.renderError(t('order.fetchFailed'))
+      }
     } finally {
-      this.loading = false
+      if (seq === this.requestSeq) {
+        this.overlay?.hide()
+        this.markLoaded()
+      }
+      withButtonLoading(button ?? null, false)
+    }
+  }
+
+  /** 全部订单为后端管理接口（仅 ADMIN），普通用户会得到 403，需把后端提示展示出来 */
+  private async loadAllOrders(button?: HTMLButtonElement | null) {
+    const seq = ++this.requestSeq
+    this.beginLoading()
+    withButtonLoading(button ?? null, true)
+    try {
+      const token = this.getToken()
+      const response = await axios.get('/api/order/orders', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (seq !== this.requestSeq) return
+      if (response.data.code === 200) {
+        this.orders = response.data.data || []
+        this.renderOrderList()
+      } else {
+        this.renderError(response.data.message || t('order.fetchFailed'))
+      }
+    } catch {
+      if (seq === this.requestSeq) {
+        this.renderError(t('order.fetchFailed'))
+      }
+    } finally {
+      if (seq === this.requestSeq) {
+        this.overlay?.hide()
+        this.markLoaded()
+      }
+      withButtonLoading(button ?? null, false)
     }
   }
 
@@ -215,7 +268,7 @@ export class OrderApp {
     content.querySelectorAll('.btn-cancel').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = parseInt((e.target as HTMLElement).dataset.id || '0')
-        this.cancelOrder(id)
+        this.cancelOrder(id, btn as HTMLButtonElement)
       })
     })
   }
@@ -272,9 +325,11 @@ export class OrderApp {
     btnBack?.addEventListener('click', () => this.renderOrderList())
   }
 
-  private async cancelOrder(id: number) {
+  private async cancelOrder(id: number, button?: HTMLButtonElement | null) {
     if (!confirm(t('order.confirmCancel'))) return
 
+    // 提交类操作用按钮自身 loading，不叠加区域遮罩
+    withButtonLoading(button ?? null, true)
     try {
       const token = this.getToken()
       const response = await axios.post(`/api/order/orders/${id}/cancel`, {}, {
@@ -284,8 +339,10 @@ export class OrderApp {
         alert(t('order.cancelSuccess'))
         await this.loadOrders()
       }
-    } catch (error) {
+    } catch {
       alert(t('order.cancelFailed'))
+    } finally {
+      withButtonLoading(button ?? null, false)
     }
   }
 
@@ -307,6 +364,8 @@ export class OrderApp {
   }
 
   destroy() {
+    this.overlay?.destroy()
+    this.overlay = null
     this.container.innerHTML = ''
   }
 }

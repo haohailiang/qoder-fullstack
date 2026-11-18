@@ -4,13 +4,15 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import * as echarts from 'echarts'
 import { getFlightFrequency, type CityFrequency, type FrequencyData } from '@/api/flight'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 
 const { t } = useI18n()
 
 const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
-const loading = ref(false)
+// 延迟展示，避免快请求导致遮罩闪烁
+const { visible: loading, wrap: withLoading } = useDelayedLoading()
 const allFrequency = ref<CityFrequency[]>([])
 
 // 筛选器
@@ -46,16 +48,15 @@ const maxFrequency = computed(() => {
 })
 
 async function loadData() {
-  loading.value = true
   try {
-    const resp = await getFlightFrequency()
-    allFrequency.value = (resp as unknown as FrequencyData).cityFrequency || []
-    await nextTick()
-    updateChart()
+    await withLoading(async () => {
+      const resp = await getFlightFrequency()
+      allFrequency.value = (resp as unknown as FrequencyData).cityFrequency || []
+      await nextTick()
+      updateChart()
+    })
   } catch {
     ElMessage.error(t('flightMap.loadFailed'))
-  } finally {
-    loading.value = false
   }
 }
 
@@ -319,7 +320,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flight-map-page">
-    <el-card shadow="never" v-loading="loading">
+    <el-card shadow="never" v-loading="loading" :element-loading-text="t('common.loading')">
       <div class="toolbar">
         <div class="filters">
           <el-select

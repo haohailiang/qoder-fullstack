@@ -124,3 +124,40 @@ export async function mockApiResponse(
     })
   })
 }
+
+/**
+ * 延迟返回 mock 响应，用于模拟慢接口并验证 loading 展示/关闭。
+ *
+ * 注意：需在 setup*Mocks 之后注册，Playwright 以最后注册的 handler 为准。
+ */
+export async function delayApiResponse(
+  page: Page,
+  urlPattern: string | RegExp,
+  delayMs: number,
+  responseBody: unknown,
+  status = 200,
+): Promise<void> {
+  await page.route(urlPattern, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify(responseBody),
+    })
+  })
+}
+
+/**
+ * 延迟匹配 URL 的请求后继续（不修改响应）。
+ * 用于拖慢 qiankun 子应用 entry 资源，验证子应用加载占位。
+ */
+export async function delayUrl(
+  page: Page,
+  urlPattern: string | RegExp,
+  delayMs: number,
+): Promise<void> {
+  await page.route(urlPattern, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+    await route.continue()
+  })
+}

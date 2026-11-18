@@ -23,6 +23,7 @@ const en = {
     back: 'Back',
     fetchFailed: 'Failed to fetch products',
     detailFailed: 'Failed to fetch product details',
+    empty: 'No products',
     buySuccess: 'Order placed!',
     buyFailed: 'Order failed',
     seckillSuccess: 'Flash sale successful, queuing...',
@@ -49,6 +50,10 @@ const en = {
     progress: 'Progress',
     fetchFailed: 'Failed to fetch flight info',
     comingSoon: 'Ticket purchase coming soon',
+  },
+  common: {
+    loading: 'Loading...',
+    retry: 'Retry',
   },
 }
 

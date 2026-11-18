@@ -1,33 +1,48 @@
 <template>
-  <!-- 子应用占位组件：实际内容由 qiankun 渲染到 #subapp-container -->
+  <!-- 子应用加载占位层：覆盖在 #subapp-container 之上，挂载完成后由父组件移除 -->
   <div class="subapp-loading">
-    <el-icon class="loading-icon"><Loading /></el-icon>
-    <p>正在加载子应用...</p>
+    <div class="subapp-loading__content">
+      <el-icon class="is-loading subapp-loading__icon"><Loading /></el-icon>
+      <p class="subapp-loading__text">{{ t('common.loadingSubApp') }}</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Loading } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 </script>
 
 <style scoped>
 .subapp-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--el-bg-color, #fff);
+  transition: background-color 0.3s;
+}
+
+.subapp-loading__content {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
-  color: #909399;
+  gap: 12px;
 }
 
-.loading-icon {
-  font-size: 40px;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+.subapp-loading__icon {
+  font-size: 24px;
+  color: var(--el-color-primary, #409eff);
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.subapp-loading__text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--el-text-color-secondary, #909399);
 }
 </style>

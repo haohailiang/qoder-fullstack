@@ -12,6 +12,8 @@ import FlightMap2D from '../components/FlightMap2D'
 import FlightMap3D from '../components/FlightMap3D'
 import FlightInfoPanel from '../components/FlightInfoPanel'
 import FlightAnimationController from '../components/FlightAnimationController'
+import { useDelayedLoading } from '../hooks/useDelayedLoading'
+import { DetailSkeleton, EmptyState } from '../components/PageSkeleton'
 
 interface RouteCity {
   name: string
@@ -51,6 +53,8 @@ function FlightDetail() {
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
   const [animProgress, setAnimProgress] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [error, setError] = useState(false)
+  const { visible: loadingVisible, wrap: withLoading } = useDelayedLoading()
 
   const isDark = (localStorage.getItem('qoder_theme') || 'dark') === 'dark'
   const pageBg = isDark ? '#141414' : '#f5f5f5'
@@ -60,15 +64,20 @@ function FlightDetail() {
   }, [id])
 
   const fetchFlight = async () => {
+    setError(false)
     try {
-      const token = localStorage.getItem('qoder_token')
-      const response = await axios.get(`/api/product/flights/${id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      await withLoading(async () => {
+        const token = localStorage.getItem('qoder_token')
+        const response = await axios.get(`/api/product/flights/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        if (response.data.code === 200) {
+          setFlight(response.data.data)
+        }
       })
-      if (response.data.code === 200) {
-        setFlight(response.data.data)
-      }
     } catch {
+      // 失败后退出骨架态，避免无限加载
+      setError(true)
       message.error(t('flight.fetchFailed'))
     }
   }
@@ -90,11 +99,20 @@ function FlightDetail() {
     setIsPlaying((prev) => !prev)
   }, [])
 
+  // 首屏：骨架屏（延迟展示）或失败兜底，两者互斥，避免白屏与无限骨架
   if (!flight) {
     return (
       <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <Card loading />
+          {error ? (
+            <EmptyState
+              description={t('flight.fetchFailed')}
+              onRetry={fetchFlight}
+              onBack={() => navigate(-1)}
+            />
+          ) : (
+            loadingVisible && <DetailSkeleton />
+          )}
         </div>
       </div>
     )

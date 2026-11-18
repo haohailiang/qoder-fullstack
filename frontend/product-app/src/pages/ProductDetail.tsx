@@ -4,6 +4,8 @@ import { ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useDelayedLoading } from '../hooks/useDelayedLoading'
+import { DetailSkeleton, EmptyState } from '../components/PageSkeleton'
 
 interface Product {
   id: number
@@ -26,7 +28,10 @@ function ProductDetail() {
   const navigate = useNavigate()
   const [product, setProduct] = useState<Product | null>(null)
   const [quantity, setQuantity] = useState(1)
-  const [loading, setLoading] = useState(false)
+  // 提交按钮自身的 loading（立即态），与页面级骨架互不影响
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(false)
+  const { visible: loadingVisible, wrap: withLoading } = useDelayedLoading()
 
   const isDark = (localStorage.getItem('qoder_theme') || 'dark') === 'dark'
   const pageBg = isDark ? '#141414' : '#f5f5f5'
@@ -36,22 +41,27 @@ function ProductDetail() {
   }, [id])
 
   const fetchProduct = async () => {
+    setError(false)
     try {
-      const token = localStorage.getItem('qoder_token')
-      const response = await axios.get(`/api/product/products/${id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      await withLoading(async () => {
+        const token = localStorage.getItem('qoder_token')
+        const response = await axios.get(`/api/product/products/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+        if (response.data.code === 200) {
+          setProduct(response.data.data)
+        }
       })
-      if (response.data.code === 200) {
-        setProduct(response.data.data)
-      }
     } catch (error) {
+      // 失败后退出骨架态，避免无限加载
+      setError(true)
       message.error(t('product.detailFailed'))
     }
   }
 
   const handleBuy = async () => {
     if (!product) return
-    setLoading(true)
+    setSubmitting(true)
     try {
       const token = localStorage.getItem('qoder_token')
       const response = await axios.post(
@@ -73,13 +83,13 @@ function ProductDetail() {
     } catch (error: any) {
       message.error(error?.response?.data?.message || t('product.buyFailed'))
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   const handleSeckill = async () => {
     if (!product) return
-    setLoading(true)
+    setSubmitting(true)
     try {
       const token = localStorage.getItem('qoder_token')
       const response = await axios.post(
@@ -97,15 +107,24 @@ function ProductDetail() {
     } catch (error: any) {
       message.error(error?.response?.data?.message || t('product.seckillFailed'))
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
+  // 首屏：骨架屏（延迟展示）或失败兜底，两者互斥，避免白屏与无限骨架
   if (!product) {
     return (
       <div style={{ minHeight: '100vh', padding: 24, background: pageBg }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <Card loading />
+          {error ? (
+            <EmptyState
+              description={t('product.detailFailed')}
+              onRetry={fetchProduct}
+              onBack={() => navigate(-1)}
+            />
+          ) : (
+            loadingVisible && <DetailSkeleton />
+          )}
         </div>
       </div>
     )
@@ -182,7 +201,8 @@ function ProductDetail() {
                   size="large"
                   icon={<ThunderboltOutlined />}
                   onClick={handleSeckill}
-                  loading={loading}
+                  loading={submitting}
+                  disabled={submitting}
                 >
                   {t('product.seckillNow')}
                 </Button>
@@ -192,7 +212,8 @@ function ProductDetail() {
                   size="large"
                   icon={<ShoppingCartOutlined />}
                   onClick={handleBuy}
-                  loading={loading}
+                  loading={submitting}
+                  disabled={submitting}
                 >
                   {t('product.buyNow')}
                 </Button>

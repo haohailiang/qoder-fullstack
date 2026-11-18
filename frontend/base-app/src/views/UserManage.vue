@@ -4,19 +4,27 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { createUser, deleteUser, listUsers, updateUser, type User } from '@/api/user'
 import { getSmsRecords, type SmsRecord } from '@/api/sms'
+import { useDelayedLoading } from '@/composables/useDelayedLoading'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
-const loading = ref(false)
+// 立即态：驱动刷新按钮自身的 loading（按钮不需要防闪烁）
+const refreshing = ref(false)
+const recordsRefreshing = ref(false)
+
+// 区域态：延迟展示，避免快请求导致表格遮罩闪烁
+const { visible: tableLoading, wrap: withTableLoading } = useDelayedLoading()
+const { visible: recordsTableLoading, wrap: withRecordsTableLoading } = useDelayedLoading()
+
 const keyword = ref('')
 const users = ref<User[]>([])
 
-const recordsLoading = ref(false)
 const records = ref<SmsRecord[]>([])
 
 const dialogVisible = ref(false)
 const submitting = ref(false)
+const deletingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
 
@@ -46,14 +54,18 @@ const filteredUsers = computed(() => {
   return users.value.filter((u) => u.name.includes(kw) || u.email.includes(kw))
 })
 
+// 首屏无数据时用骨架屏替代表格遮罩，同一区域不叠加两种 loading
+const showTableSkeleton = computed(() => tableLoading.value && users.value.length === 0)
+const showRecordsSkeleton = computed(() => recordsTableLoading.value && records.value.length === 0)
+
 async function loadUsers() {
-  loading.value = true
+  refreshing.value = true
   try {
-    users.value = await listUsers()
+    users.value = await withTableLoading(() => listUsers())
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理
   } finally {
-    loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -114,9 +126,17 @@ async function handleDelete(row: User) {
   } catch {
     return // 用户取消
   }
-  await deleteUser(row.id)
-  ElMessage.success(t('users.deleteSuccess'))
-  await loadUsers()
+  // 删除使用按钮自身 loading，不叠加区域遮罩
+  deletingId.value = row.id
+  try {
+    await deleteUser(row.id)
+    ElMessage.success(t('users.deleteSuccess'))
+    await loadUsers()
+  } catch {
+    // 错误提示已在 axios 响应拦截器中统一处理
+  } finally {
+    deletingId.value = null
+  }
 }
 
 /** 将后端 ISO 时间字符串（LocalDateTime 序列化）格式化为 YYYY-MM-DD HH:mm:ss */
@@ -126,13 +146,13 @@ function formatSentAt(sentAt: string) {
 }
 
 async function loadRecords() {
-  recordsLoading.value = true
+  recordsRefreshing.value = true
   try {
-    records.value = await getSmsRecords()
+    records.value = await withRecordsTableLoading(() => getSmsRecords())
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理
   } finally {
-    recordsLoading.value = false
+    recordsRefreshing.value = false
   }
 }
 
@@ -148,7 +168,7 @@ onMounted(() => {
       <div class="toolbar">
         <div>
           <el-button type="primary" :icon="Plus" @click="openCreateDialog">{{ t('users.addUser') }}</el-button>
-          <el-button :icon="Refresh" @click="loadUsers">{{ t('users.refresh') }}</el-button>
+          <el-button :icon="Refresh" :loading="refreshing" @click="loadUsers">{{ t('users.refresh') }}</el-button>
         </div>
         <el-input
           v-model="keyword"
@@ -159,7 +179,9 @@ onMounted(() => {
         />
       </div>
 
-      <el-table v-loading="loading" :data="filteredUsers" border stripe>
+      <!-- 首屏加载用骨架屏，已有数据刷新时用表格遮罩，两者互斥 -->
+      <el-skeleton v-if="showTableSkeleton" class="table-skeleton" :rows="5" animated />
+      <el-table v-else v-loading="tableLoading" :data="filteredUsers" border stripe>
         <el-table-column prop="id" :label="t('users.colId')" width="80" />
         <el-table-column :label="t('users.colUsername')" min-width="120">
           <template #default="{ row }">
@@ -175,7 +197,7 @@ onMounted(() => {
         <el-table-column :label="t('users.colActions')" width="140" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEditDialog(row)">{{ t('users.actionEdit') }}</el-button>
-            <el-button link type="danger" @click="handleDelete(row)">{{ t('users.actionDelete') }}</el-button>
+            <el-button link type="danger" :loading="deletingId === row.id" @click="handleDelete(row)">{{ t('users.actionDelete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -184,10 +206,18 @@ onMounted(() => {
     <el-card shadow="never" class="sms-records-card">
       <div class="toolbar">
         <span class="section-title">{{ t('users.smsRecords') }}</span>
-        <el-button :icon="Refresh" :loading="recordsLoading" @click="loadRecords">{{ t('users.refresh') }}</el-button>
+        <el-button :icon="Refresh" :loading="recordsRefreshing" @click="loadRecords">{{ t('users.refresh') }}</el-button>
       </div>
 
-      <el-table v-loading="recordsLoading" :data="records" border stripe :empty-text="t('users.smsEmpty')">
+      <el-skeleton v-if="showRecordsSkeleton" class="table-skeleton" :rows="3" animated />
+      <el-table
+        v-else
+        v-loading="recordsTableLoading"
+        :data="records"
+        border
+        stripe
+        :empty-text="t('users.smsEmpty')"
+      >
         <el-table-column prop="phone" :label="t('users.smsColPhone')" width="140" />
         <el-table-column prop="code" :label="t('users.smsColCode')" width="120" />
         <el-table-column :label="t('users.smsColStatus')" width="100">
@@ -245,6 +275,10 @@ onMounted(() => {
 
 .sms-records-card {
   margin-top: 16px;
+}
+
+.table-skeleton {
+  padding: 8px 0;
 }
 
 .section-title {
