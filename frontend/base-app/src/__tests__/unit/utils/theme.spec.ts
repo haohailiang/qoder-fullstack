@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getTheme, setTheme, toggleTheme, applyTheme, themeRef } from '@/utils/theme'
-import type { ThemeMode } from '@/utils/theme'
+import { tokenRef } from '@/utils/auth'
 
 // mock @/api/request（theme.ts 导入了 request 用于持久化）
 vi.mock('@/api/request', () => ({
@@ -21,6 +21,9 @@ describe('utils/theme', () => {
     document.documentElement.classList.remove('dark')
     // 重置 themeRef 到默认值
     themeRef.value = 'dark'
+    // 未登录状态：不触发后端偏好接口
+    tokenRef.value = null
+    vi.clearAllMocks()
   })
 
   // ---------- getTheme ----------
@@ -69,14 +72,25 @@ describe('utils/theme', () => {
       expect(document.documentElement.classList.contains('dark')).toBe(false)
     })
 
-    it('应异步调用后端 API 持久化主题偏好', async () => {
+    it('已登录时应异步调用后端 API 持久化主题偏好', async () => {
       const request = (await import('@/api/request')).default
+      tokenRef.value = 'test-token'
       await setTheme('light')
       expect(request.put).toHaveBeenCalledWith('/user/users/theme', { theme: 'light' })
     })
 
+    it('未登录时不应调用后端 API（避免 401 未授权提示）', async () => {
+      const request = (await import('@/api/request')).default
+      await setTheme('light')
+      expect(request.put).not.toHaveBeenCalled()
+      // 本地状态与 DOM 仍需更新
+      expect(themeRef.value).toBe('light')
+      expect(localStorage.getItem('qoder_theme')).toBe('light')
+    })
+
     it('后端 API 失败时不应抛出异常（静默失败）', async () => {
       const request = (await import('@/api/request')).default
+      tokenRef.value = 'test-token'
       vi.mocked(request.put).mockRejectedValueOnce(new Error('Network Error'))
       await expect(setTheme('dark')).resolves.toBeUndefined()
     })

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getLang, setLang, langRef } from '@/utils/lang'
-import type { Lang } from '@/utils/lang'
+import { tokenRef } from '@/utils/auth'
 
 // mock @/api/request
 vi.mock('@/api/request', () => ({
@@ -32,6 +32,9 @@ describe('utils/lang', () => {
   beforeEach(() => {
     localStorage.clear()
     langRef.value = 'zh'
+    // 未登录状态：不触发后端偏好接口
+    tokenRef.value = null
+    vi.clearAllMocks()
   })
 
   // ---------- getLang ----------
@@ -64,14 +67,25 @@ describe('utils/lang', () => {
       expect(i18n.global.locale.value).toBe('en')
     })
 
-    it('应异步调用后端 API 持久化语言偏好', async () => {
+    it('已登录时应异步调用后端 API 持久化语言偏好', async () => {
       const request = (await import('@/api/request')).default
+      tokenRef.value = 'test-token'
       await setLang('en')
       expect(request.put).toHaveBeenCalledWith('/user/users/language', { language: 'en' })
     })
 
+    it('未登录时不应调用后端 API（避免 401 未授权提示）', async () => {
+      const request = (await import('@/api/request')).default
+      await setLang('en')
+      expect(request.put).not.toHaveBeenCalled()
+      // 本地状态仍需更新
+      expect(langRef.value).toBe('en')
+      expect(localStorage.getItem('qoder_lang')).toBe('en')
+    })
+
     it('后端 API 失败时不应抛出异常', async () => {
       const request = (await import('@/api/request')).default
+      tokenRef.value = 'test-token'
       vi.mocked(request.put).mockRejectedValueOnce(new Error('Network Error'))
       await expect(setLang('zh')).resolves.toBeUndefined()
     })

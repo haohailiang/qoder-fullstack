@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import request from '@/api/request'
+import { getToken } from '@/utils/auth'
 
 /** 主题类型：dark（暗黑模式）或 light（亮色模式） */
 export type ThemeMode = 'dark' | 'light'
@@ -33,6 +34,11 @@ export async function setTheme(theme: ThemeMode) {
   themeRef.value = theme
   localStorage.setItem(THEME_KEY, theme)
   applyTheme(theme)
+
+  // 未登录时只更新本地状态：后端偏好接口需要鉴权，请求会返回 401 并弹出“未授权访问”提示
+  if (!getToken()) {
+    return
+  }
 
   // 异步持久化到数据库（不阻塞 UI）
   try {

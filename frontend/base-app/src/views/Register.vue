@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getCaptcha, register, sendSmsCode } from '@/api/auth'
@@ -15,6 +15,8 @@ const router = useRouter()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const sending = ref(false)
+// 验证码图片加载（小区域，立即展示，不叠加页面级 loading）
+const captchaLoading = ref(false)
 
 // 字段与后端 dto.RegisterRequest 一一对应
 const form = reactive({
@@ -62,7 +64,8 @@ function validateConfirmPassword(_rule: unknown, value: string, callback: (error
   }
 }
 
-const rules: FormRules = {
+// 使用 computed 使校验文案随语言切换实时更新（rules 变化不会触发校验，见 el-form 的 validate-on-rule-change）
+const rules = computed<FormRules>(() => ({
   username: [
     { required: true, message: t('register.usernameRequired'), trigger: 'blur' },
     { min: 3, max: 32, message: t('register.usernameLength'), trigger: 'blur' },
@@ -84,9 +87,10 @@ const rules: FormRules = {
   age: [{ required: true, message: t('register.ageRequired'), trigger: 'blur' }],
   captchaValue: [{ required: true, message: t('register.captchaRequired'), trigger: 'blur' }],
   smsCode: [{ required: true, message: t('register.smsCodeRequired'), trigger: 'blur' }],
-}
+}))
 
 async function refreshCaptcha() {
+  captchaLoading.value = true
   try {
     const result = await getCaptcha()
     captchaKey.value = result.captchaKey
@@ -94,12 +98,15 @@ async function refreshCaptcha() {
     form.captchaValue = ''
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理
+  } finally {
+    captchaLoading.value = false
   }
 }
 
 /**
  * 发送短信验证码：先携带图片验证码 key/value + 手机号提交，后端校验图片验证码通过后才真正发送。
- * 发送成功后进入倒计时，并刷新图片验证码（一次性）。
+ * 发送成功后进入倒计时；后端对图片验证码只校验不消耗，因此保留已填写的验证码与图片，
+ * 用户无需重新输入即可直接提交注册。
  */
 async function handleSendSmsCode() {
   if (countdown.value > 0 || sending.value) return
@@ -120,8 +127,6 @@ async function handleSendSmsCode() {
     })
     ElMessage.success(t('register.smsSent'))
     startCountdown()
-    // 图片验证码一次性使用，发送成功后自动刷新
-    await refreshCaptcha()
   } catch {
     // 图片验证码错误 / 频控等提示已由拦截器统一处理；刷新验证码便于重新输入
     await refreshCaptcha()
@@ -171,7 +176,7 @@ onUnmounted(() => {
         </div>
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-form ref="formRef" :model="form" :rules="rules" :validate-on-rule-change="false" label-width="90px">
         <el-form-item :label="t('register.username')" prop="username">
           <el-input v-model="form.username" :placeholder="t('register.usernamePlaceholder')" />
         </el-form-item>
@@ -201,17 +206,24 @@ onUnmounted(() => {
         <el-form-item :label="t('register.captcha')" prop="captchaValue">
           <div class="captcha-row">
             <el-input v-model="form.captchaValue" :placeholder="t('register.captchaPlaceholder')" />
-            <el-image
-              v-if="captchaImage"
-              :src="captchaImage"
-              class="captcha-image"
-              :alt="t('login.captchaAlt')"
-              fit="fill"
-              @click="refreshCaptcha"
-            />
-            <el-link v-else type="primary" :underline="false" @click="refreshCaptcha">
-              {{ t('login.getCaptcha') }}
-            </el-link>
+            <div
+              class="captcha-image-wrapper"
+              v-loading="captchaLoading"
+              element-loading-background="transparent"
+              element-loading-size="16"
+            >
+              <el-image
+                v-if="captchaImage"
+                :src="captchaImage"
+                class="captcha-image"
+                :alt="t('login.captchaAlt')"
+                fit="fill"
+                @click="refreshCaptcha"
+              />
+              <el-link v-else type="primary" :underline="false" @click="refreshCaptcha">
+                {{ t('login.getCaptcha') }}
+              </el-link>
+            </div>
           </div>
         </el-form-item>
         <el-form-item :label="t('register.smsCode')" prop="smsCode">
@@ -281,6 +293,16 @@ onUnmounted(() => {
   cursor: pointer;
   border: 1px solid var(--el-border-color, #dcdfe6);
   border-radius: 4px;
+}
+
+.captcha-image-wrapper {
+  position: relative;
+  width: 130px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sms-row {

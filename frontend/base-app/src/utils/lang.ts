@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import request from '@/api/request'
 import i18n, { LANG_KEY } from '@/i18n'
+import { getToken } from '@/utils/auth'
 
 /** 语言类型 */
 export type Lang = 'zh' | 'en'
@@ -32,6 +33,11 @@ export async function setLang(lang: Lang) {
   localStorage.setItem(LANG_KEY, lang)
   // 更新 vue-i18n locale
   i18n.global.locale.value = lang
+
+  // 未登录时只更新本地状态：后端偏好接口需要鉴权，请求会返回 401 并弹出“未授权访问”提示
+  if (!getToken()) {
+    return
+  }
 
   // 异步持久化到数据库（不阻塞 UI）
   try {
