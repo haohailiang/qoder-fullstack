@@ -19,6 +19,8 @@ export const currentUserRef = ref<AuthUserInfo | null>(readStoredUser())
 export interface AuthUserInfo {
   id?: number
   username?: string
+  /** 角色：ADMIN（管理员）/ USER（普通用户），登录响应中由后端返回 */
+  role?: string
   name: string
   email: string
   /** 手机号，注册、用户新增/编辑均必填，用于接收短信验证码 */
@@ -56,4 +58,19 @@ export function clearAuth() {
   currentUserRef.value = null
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+}
+
+/**
+ * 是否为管理员：优先使用后端返回的 role，兼容早期只存了用户名且没有 role 的本地数据。
+ */
+export function isAdminUser(user: AuthUserInfo | null = currentUserRef.value): boolean {
+  return user?.role === 'ADMIN' || user?.username === 'admin'
+}
+
+/**
+ * 登录后的默认落地页：管理员进入用户管理，普通用户进入商品中心。
+ * 用户管理 / 航线地图为管理员专属，普通用户直接跳过可避免落到无权限页面时报“权限不足”。
+ */
+export function resolveHomePath(): string {
+  return isAdminUser() ? '/users' : '/product'
 }

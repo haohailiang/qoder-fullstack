@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Lock, Message, Picture, User } from '@element-plus/icons-vue'
 import { getCaptcha, login, sendSmsCode } from '@/api/auth'
-import { setAuth } from '@/utils/auth'
+import { setAuth, resolveHomePath } from '@/utils/auth'
 import { setTheme, type ThemeMode } from '@/utils/theme'
 import { useI18n } from 'vue-i18n'
 import { setLang, type Lang } from '@/utils/lang'
@@ -23,6 +23,8 @@ const route = useRoute()
 const formRef = ref<FormInstance>()
 const loading = ref(false)
 const sending = ref(false)
+// 验证码图片加载（小区域，立即展示，不叠加页面级 loading）
+const captchaLoading = ref(false)
 
 const form = reactive({
   username: '',
@@ -80,6 +82,7 @@ watch(isAdmin, () => {
 })
 
 async function refreshCaptcha() {
+  captchaLoading.value = true
   try {
     const result = await getCaptcha()
     captchaKey.value = result.captchaKey
@@ -87,13 +90,16 @@ async function refreshCaptcha() {
     form.captchaValue = ''
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理
+  } finally {
+    captchaLoading.value = false
   }
 }
 
 /**
  * 发送短信验证码（两步验证第一步之后的动作）：
  * 先携带图片验证码 key/value + 用户名提交，后端校验图片验证码通过后才真正发送。
- * 发送成功后进入倒计时，并刷新图片验证码（一次性）。
+ * 发送成功后进入倒计时；后端对图片验证码只校验不消耗，因此保留已填写的验证码与图片，
+ * 用户无需重新输入即可直接点登录。
  */
 async function handleSendSmsCode() {
   if (countdown.value > 0 || sending.value) return
@@ -114,8 +120,6 @@ async function handleSendSmsCode() {
     })
     ElMessage.success(t('login.smsSent'))
     startCountdown()
-    // 图片验证码一次性使用，发送成功后自动刷新
-    await refreshCaptcha()
   } catch {
     // 图片验证码错误 / 频控等提示已由拦截器统一处理；刷新验证码便于重新输入
     await refreshCaptcha()
@@ -147,9 +151,9 @@ async function handleLogin() {
       await setLang(result.user.languagePreference as Lang)
     }
     ElMessage.success(t('login.loginSuccess'))
-    // 支持路由守卫记录的 redirect 参数，默认跳用户管理页
+    // 支持路由守卫记录的 redirect 参数；否则按角色分流（管理员→用户管理，普通用户→商品中心）
     const redirect = route.query.redirect as string | undefined
-    router.push(redirect || '/users')
+    router.push(redirect || resolveHomePath())
   } catch {
     // 错误提示已在 axios 响应拦截器中统一处理（如"验证码错误或已过期"）
     // 验证码为一次性使用，失败后自动刷新，允许用户重新输入（admin 无需刷新）
@@ -183,7 +187,7 @@ onUnmounted(() => {
         </div>
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0">
+      <el-form ref="formRef" :model="form" :rules="rules" :validate-on-rule-change="false" label-width="0">
         <el-form-item prop="username">
           <el-input
             v-model="form.username"
@@ -209,17 +213,24 @@ onUnmounted(() => {
               :prefix-icon="Picture"
               @keyup.enter="handleLogin"
             />
-            <el-image
-              v-if="captchaImage"
-              :src="captchaImage"
-              class="captcha-image"
-              :alt="t('login.captchaAlt')"
-              fit="fill"
-              @click="refreshCaptcha"
-            />
-            <el-link v-else type="primary" :underline="false" @click="refreshCaptcha">
-              {{ t('login.getCaptcha') }}
-            </el-link>
+            <div
+              class="captcha-image-wrapper"
+              v-loading="captchaLoading"
+              element-loading-background="transparent"
+              element-loading-size="16"
+            >
+              <el-image
+                v-if="captchaImage"
+                :src="captchaImage"
+                class="captcha-image"
+                :alt="t('login.captchaAlt')"
+                fit="fill"
+                @click="refreshCaptcha"
+              />
+              <el-link v-else type="primary" :underline="false" @click="refreshCaptcha">
+                {{ t('login.getCaptcha') }}
+              </el-link>
+            </div>
           </div>
         </el-form-item>
         <el-form-item prop="smsCode" v-if="!isAdmin">
@@ -296,6 +307,16 @@ onUnmounted(() => {
   cursor: pointer;
   border: 1px solid var(--el-border-color, #dcdfe6);
   border-radius: 4px;
+}
+
+.captcha-image-wrapper {
+  position: relative;
+  width: 130px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sms-row {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
-import { logout } from '@/api/auth'
-import { clearAuth, currentUserRef, tokenRef } from '@/utils/auth'
-import { computed, ref, watch } from 'vue'
+import { getCurrentUser, logout } from '@/api/auth'
+import { clearAuth, currentUserRef, isAdminUser, tokenRef } from '@/utils/auth'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { themeRef, toggleTheme } from '@/utils/theme'
 import { useI18n } from 'vue-i18n'
 import { langRef, setLang, type Lang } from '@/utils/lang'
@@ -24,7 +24,7 @@ const epLocale = computed(() => langRef.value === 'en' ? enUs : zhCn)
 
 // 动态更新页面标题（跟随语言切换）
 watch(langRef, (lang) => {
-  document.title = lang === 'en' ? 'E-Commerce · Users' : '全栈示例 · 用户管理'
+  document.title = lang === 'en' ? 'E-Commerce Platform' : '郝海亮电商平台'
 }, { immediate: true })
 
 // 判断当前是否在子应用路由中
@@ -32,8 +32,60 @@ const isInSubApp = computed(() => {
   return route.path.startsWith('/product') || route.path.startsWith('/order')
 })
 
-// 当前是否为管理员
-const isAdmin = computed(() => currentUserRef.value?.username === 'admin')
+// 当前是否为管理员（角色优先，兼容仅凭用户名判断的历史数据）
+const isAdmin = computed(() => isAdminUser())
+
+/** 会话心跳间隔：周期校验 Redis 会话，被其他设备挤下线时自动跳出登录页 */
+const SESSION_HEARTBEAT_MS = 30_000
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * 校验当前会话是否仍然有效。
+ * 后端网关会对比 JWT 与 Redis 中的会话，被其他设备登录顶替时返回 40101，
+ * 响应拦截器会统一清除本地登录态并跳转登录页，此处只需静默捕获即可。
+ */
+async function checkSession(): Promise<void> {
+  if (!tokenRef.value || document.visibilityState === 'hidden') return
+  try {
+    await getCurrentUser()
+  } catch {
+    // 会话失效提示与跳转已由 axios 拦截器处理
+  }
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer !== null) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
+
+function startHeartbeat() {
+  stopHeartbeat()
+  heartbeatTimer = setInterval(checkSession, SESSION_HEARTBEAT_MS)
+}
+
+// 登录后开启心跳，退出登录/被挤下线时停止
+watch(tokenRef, (token) => {
+  if (token) {
+    startHeartbeat()
+  } else {
+    stopHeartbeat()
+  }
+}, { immediate: true })
+
+// 切回该标签页立即校验一次，缩短“被挤下线”到跳转登录页的感知延迟
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    void checkSession()
+  }
+}
+document.addEventListener('visibilitychange', handleVisibilityChange)
+
+onUnmounted(() => {
+  stopHeartbeat()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 
 // 当前是否为暗黑模式
 const isDark = computed(() => themeRef.value === 'dark')
@@ -107,7 +159,7 @@ function navigateTo(index: unknown) {
             class="nav-menu"
             @select="navigateTo"
           >
-            <el-menu-item index="/users">{{ t('app.menuUsers') }}</el-menu-item>
+            <el-menu-item v-if="isAdmin" index="/users">{{ t('app.menuUsers') }}</el-menu-item>
             <el-menu-item index="/product">{{ t('app.menuProducts') }}</el-menu-item>
             <el-menu-item index="/order">{{ t('app.menuOrders') }}</el-menu-item>
             <el-menu-item v-if="isAdmin" index="/admin/flights">{{ t('app.menuFlightMap') }}</el-menu-item>

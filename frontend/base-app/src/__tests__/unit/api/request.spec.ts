@@ -1,10 +1,9 @@
 /**
  * axios 请求封装单元测试
  *
- * 覆盖：请求拦截器（自动注入 token）、响应拦截器（解包 / 401 / 403 / 40101 挤下线）
+ * 覆盖：请求拦截器（自动注入 token）、响应拦截器（解包 / 401 / 403 权限不足 / 40101 挤下线）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import axios from 'axios'
 
 // ---------- mock 依赖 ----------
 vi.mock('@/utils/auth', () => ({
@@ -134,17 +133,20 @@ describe('api/request 拦截器', () => {
       )
     })
 
-    it('403 响应应清除 auth 并跳转登录页', async () => {
+    it('403 响应（权限不足）应仅提示且保留登录态', async () => {
+      const { ElMessage } = await import('element-plus')
       const mockAdapter = vi.fn().mockRejectedValue({
         response: {
           status: 403,
-          data: { code: 403, message: '未授权', data: null },
+          data: { code: 403, message: '权限不足，无法访问该资源', data: null },
         },
       })
       request.defaults.adapter = mockAdapter
 
       await expect(request.get('/test')).rejects.toBeTruthy()
-      expect(clearAuth).toHaveBeenCalled()
+      expect(ElMessage.error).toHaveBeenCalledWith('权限不足，无法访问该资源')
+      // 403 表示已登录但无权限，不能清除登录态把用户踢回登录页
+      expect(clearAuth).not.toHaveBeenCalled()
     })
 
     it('业务码 40101（挤下线）应使用 replace 跳转且不保留 redirect', async () => {

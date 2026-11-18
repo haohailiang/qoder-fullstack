@@ -9,6 +9,7 @@ export function mockUser(overrides: Partial<MockUser> = {}): MockUser {
   return {
     id: 1,
     username: 'testuser',
+    role: 'USER',
     name: '测试用户',
     email: 'test@example.com',
     phone: '13800138000',
@@ -23,6 +24,7 @@ export function mockAdminUser(): MockUser {
   return mockUser({
     id: 0,
     username: 'admin',
+    role: 'ADMIN',
     name: '管理员',
     email: 'admin@example.com',
   })
@@ -31,6 +33,8 @@ export function mockAdminUser(): MockUser {
 export interface MockUser {
   id: number
   username: string
+  /** 角色：ADMIN（管理员）/ USER（普通用户），前端据此决定落地页与菜单 */
+  role?: 'ADMIN' | 'USER'
   name: string
   email: string
   phone: string

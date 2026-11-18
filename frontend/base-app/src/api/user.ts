@@ -5,6 +5,8 @@ export interface User {
   id?: number
   /** 登录认证标识，仅注册/登录后有值，旧 CRUD 数据可能为空 */
   username?: string
+  /** 角色：ADMIN（管理员）/ USER（普通用户），用户管理接口仅管理员可调 */
+  role?: string
   name: string
   email: string
   /** 手机号，注册、用户新增/编辑均必填，用于接收短信验证码 */

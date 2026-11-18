@@ -68,7 +68,6 @@ describe('router 路由守卫', () => {
     it('已登录用户访问受保护页面时应放行', () => {
       vi.mocked(getToken).mockReturnValue('valid-token')
 
-      const to = { path: '/users', meta: { requiresAuth: true }, fullPath: '/users' }
       const token = getToken()
 
       if (token) {

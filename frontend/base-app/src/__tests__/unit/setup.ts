@@ -5,7 +5,7 @@
  * - mock localStorage
  * - mock window.matchMedia（Element Plus 依赖）
  */
-import { vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 
 // ---------- Element Plus ElMessage mock ----------
 vi.mock('element-plus', async () => {

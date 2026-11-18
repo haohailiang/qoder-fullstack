@@ -1,8 +1,22 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { computed, ref } from 'vue'
 import router from '@/router'
 import { clearAuth, getToken } from '@/utils/auth'
 import i18n from '@/i18n'
+
+/**
+ * 进行中的请求数量，供全局进度条等使用。
+ * 请求拦截器自增，响应成功/失败（含超时、取消）拦截器自减，保证不泄漏。
+ */
+export const pendingRequestCount = ref(0)
+
+/** 是否有请求进行中（立即态，UI 侧需再叠加防闪烁延时） */
+export const requestLoading = computed(() => pendingRequestCount.value > 0)
+
+function releasePendingRequest() {
+  pendingRequestCount.value = Math.max(0, pendingRequestCount.value - 1)
+}
 
 /** 后端统一响应结构 */
 export interface ApiResult<T = unknown> {
@@ -23,6 +37,7 @@ request.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  pendingRequestCount.value += 1
   return config
 })
 
@@ -50,6 +65,7 @@ function handleKickOut(message: string) {
 // 响应拦截器：统一解包 Result，业务失败时弹出错误提示
 request.interceptors.response.use(
   (response) => {
+    releasePendingRequest()
     const result = response.data as ApiResult
     if (result.code !== 200) {
       ElMessage.error(result.message || i18n.global.t('common.requestFailed'))
@@ -58,21 +74,28 @@ request.interceptors.response.use(
     return result.data as unknown as typeof response
   },
   (error) => {
+    releasePendingRequest()
     const status = error.response?.status as number | undefined
     if (status === 401 || status === 403) {
       // 后端 Security 过滤链返回的统一 Result 结构
       const result = error.response?.data as ApiResult | undefined
       const code = result?.code
       const message = result?.message
-      
+
       // 业务码 40101 表示账号在其他设备登录，已被迫下线
       if (code === 40101) {
         handleKickOut(message || i18n.global.t('common.kickedOut'))
         return Promise.reject(error)
       }
-      
+
+      // 403：已登录但权限不足，只提示不清登录态（否则普通用户访问管理接口会被踢回登录页）
+      if (status === 403) {
+        ElMessage.error(message || i18n.global.t('common.forbidden'))
+        return Promise.reject(error)
+      }
+
       // 普通的 Token 无效/过期/未授权
-      handleAuthFailure(message || (status === 401 ? i18n.global.t('common.loginExpired') : i18n.global.t('common.unauthorized')))
+      handleAuthFailure(message || i18n.global.t('common.loginExpired'))
       return Promise.reject(error)
     }
     ElMessage.error(error.message || i18n.global.t('common.networkError'))

@@ -1,10 +1,10 @@
 /**
  * auth 工具函数单元测试
  *
- * 覆盖：setAuth / clearAuth / getToken / tokenRef / currentUserRef
+ * 覆盖：setAuth / clearAuth / getToken / tokenRef / currentUserRef / isAdminUser / resolveHomePath
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setAuth, clearAuth, getToken, tokenRef, currentUserRef } from '@/utils/auth'
+import { setAuth, clearAuth, getToken, tokenRef, currentUserRef, isAdminUser, resolveHomePath } from '@/utils/auth'
 import type { AuthUserInfo } from '@/utils/auth'
 
 const mockUser: AuthUserInfo = {
@@ -97,6 +97,27 @@ describe('utils/auth', () => {
       localStorage.setItem('qoder_user', 'not-json')
       clearAuth()
       expect(currentUserRef.value).toBeNull()
+    })
+  })
+
+  // ---------- 角色判定与落地页 ----------
+  describe('isAdminUser / resolveHomePath', () => {
+    it('role 为 ADMIN 的用户判定为管理员并落地用户管理页', () => {
+      setAuth('t', { ...mockUser, role: 'ADMIN' })
+      expect(isAdminUser()).toBe(true)
+      expect(resolveHomePath()).toBe('/users')
+    })
+
+    it('普通用户落地商品中心，避免进入无权限的用户管理页', () => {
+      setAuth('t', { ...mockUser, role: 'USER' })
+      expect(isAdminUser()).toBe(false)
+      expect(resolveHomePath()).toBe('/product')
+    })
+
+    it('缺少 role 的历史数据可按用户名 admin 兼容识别为管理员', () => {
+      setAuth('t', { ...mockUser, username: 'admin' })
+      expect(isAdminUser()).toBe(true)
+      expect(resolveHomePath()).toBe('/users')
     })
   })
 })

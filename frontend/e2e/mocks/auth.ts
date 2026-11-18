@@ -4,7 +4,7 @@
  * 用于 Playwright page.route() 拦截，模拟后端认证接口。
  */
 import { type Page } from '@playwright/test'
-import { mockLoginResult, mockCaptcha, mockUser, apiSuccess } from '../fixtures/test-data'
+import { mockLoginResult, mockAdminUser, mockCaptcha, mockUser, apiSuccess } from '../fixtures/test-data'
 
 /**
  * 注册认证相关的 API mock 路由拦截。
@@ -36,7 +36,7 @@ export async function setupAuthMocks(page: Page): Promise<void> {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(apiSuccess(mockLoginResult(mockUser({ username: 'admin', name: '管理员' })))),
+        body: JSON.stringify(apiSuccess(mockLoginResult(mockAdminUser()))),
       })
     } else {
       route.fulfill({
