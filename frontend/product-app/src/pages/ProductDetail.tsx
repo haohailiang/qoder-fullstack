@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Card, Button, Tag, Space, InputNumber, message, Divider } from 'antd'
-import { ShoppingCartOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Card, Button, Tag, Space, InputNumber, message, Divider, Alert } from 'antd'
+import { ShoppingCartOutlined, ThunderboltOutlined, RobotOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDelayedLoading } from '../hooks/useDelayedLoading'
 import { DetailSkeleton, EmptyState } from '../components/PageSkeleton'
+import InsuranceChatDrawer from '../components/insurance/InsuranceChatDrawer'
 
 interface Product {
   id: number
@@ -30,6 +31,7 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1)
   // 提交按钮自身的 loading（立即态），与页面级骨架互不影响
   const [submitting, setSubmitting] = useState(false)
+  const [botOpen, setBotOpen] = useState(false)
   const [error, setError] = useState(false)
   const { visible: loadingVisible, wrap: withLoading } = useDelayedLoading()
 
@@ -216,9 +218,20 @@ function ProductDetail() {
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: 24, marginBottom: 12 }}>
               {product.name}
+              {product.category === 'insurance' && (
+                <Tag color="green" style={{ marginLeft: 8 }}>{t('product.insuranceTag')}</Tag>
+              )}
               {product.isSeckill === 1 && <Tag color="red" style={{ marginLeft: 8 }}>{t('product.seckill')}</Tag>}
             </h1>
             <p style={{ color: 'var(--ant-color-text-secondary, #666)', marginBottom: 16 }}>{product.description}</p>
+            {product.category === 'insurance' && (
+              <Alert
+                type="success"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={t('product.insuranceDesc')}
+              />
+            )}
             <Divider />
             <div style={{ marginBottom: 16 }}>
               <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>{t('product.price')}:</span>
@@ -243,7 +256,9 @@ function ProductDetail() {
             </div>
             <div style={{ marginBottom: 16 }}>
               <span style={{ color: 'var(--ant-color-text-tertiary, #999)', marginRight: 8 }}>{t('product.category')}:</span>
-              <Tag>{product.category || t('product.uncategorized')}</Tag>
+              {product.category === 'insurance'
+                ? <Tag color="green">{t('product.insuranceTag')}</Tag>
+                : <Tag>{product.category || t('product.uncategorized')}</Tag>}
             </div>
             <Divider />
             <Space>
@@ -279,10 +294,29 @@ function ProductDetail() {
                 {t('product.back')}
               </Button>
             </div>
+            {product.category === 'insurance' && (
+              <div style={{ marginTop: 16 }}>
+                <Button
+                  size="large"
+                  icon={<RobotOutlined />}
+                  onClick={() => setBotOpen(true)}
+                >
+                  {t('product.openBot')}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Card>
       </div>
+      {product.category === 'insurance' && (
+        <InsuranceChatDrawer
+          open={botOpen}
+          productId={product.id}
+          productName={product.name}
+          onClose={() => setBotOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Card, Input, Select, Button, List, Tag, Space, Spin, message } from 'antd'
-import { SearchOutlined, ShoppingCartOutlined, RocketOutlined } from '@ant-design/icons'
+import { SearchOutlined, ShoppingCartOutlined, RocketOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
@@ -167,6 +167,7 @@ function ProductList() {
               { label: t('product.categoryFood'), value: 'food' },
               { label: t('product.categoryBooks'), value: 'books' },
               { label: t('product.categoryFlight'), value: 'flight' },
+              { label: t('product.categoryInsurance'), value: 'insurance' },
             ]}
           />
           <Button type="primary" onClick={handleSearch} loading={fetching}>
@@ -205,7 +206,9 @@ function ProductList() {
                     >
                       {item.category === 'flight'
                         ? <RocketOutlined style={{ fontSize: 48, color: 'var(--ant-color-primary, #1677ff)' }} />
-                        : <ShoppingCartOutlined style={{ fontSize: 48, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
+                        : item.category === 'insurance'
+                          ? <SafetyCertificateOutlined style={{ fontSize: 48, color: 'var(--ant-color-success, #52c41a)' }} />
+                          : <ShoppingCartOutlined style={{ fontSize: 48, color: 'var(--ant-color-text-quaternary, #bfbfbf)' }} />
                       }
                       {/* 有图片时覆盖图标；加载失败自动隐藏，回退到图标兜底 */}
                       {item.imageUrl && (
@@ -237,6 +240,7 @@ function ProductList() {
                     title={
                       <Space>
                         {item.name}
+                        {item.category === 'insurance' && <Tag color="green">{t('product.insuranceTag')}</Tag>}
                         {item.isSeckill === 1 && <Tag color="red">{t('product.seckill')}</Tag>}
                       </Space>
                     }
