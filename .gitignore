@@ -44,3 +44,12 @@ Thumbs.db
 **/test-results/
 **/playwright-report/
 **/coverage/
+
+# Python（ai-service）
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/.pytest_cache/
+# 保险 PDF 上传落盘目录与解析中间产物
+ai-service/data/
+ai-service/.cache/
