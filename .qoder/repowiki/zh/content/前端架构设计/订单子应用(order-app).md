@@ -361,6 +361,55 @@ I18n-->>Order : "Orders"
 - [frontend/order-app/src/main.ts:31-49](file://frontend/order-app/src/main.ts#L31-L49)
 - [frontend/order-app/src/app.ts:1-310](file://frontend/order-app/src/app.ts#L1-L310)
 
+## 支付流程（支付宝沙箱）
+
+订单子应用把支付相关逻辑拆到 `src/payment.ts`，便于纯函数单测；`app.ts` 只负责渲染与交互。
+
+- 路由与工具函数
+  - `isPayResultPath()` / `getPayResultOrderNo()`：识别 `/pay-result` 页面，优先取本站追加的 `orderNo`，兼容支付宝同步回跳携带的 `out_trade_no`
+  - `mapPaymentResult()`：把后端 `{payStatus, orderStatus}` 映射为结果页状态（SUCCESS/PENDING/CLOSED/CANCELLED/FAILED）与文案 key、是否可重试
+  - `isFinalPayState()`：非 PENDING 即停止轮询
+  - `createAlipayPayment()` / `queryPaymentStatus()`：调用 `POST /api/order/payments/alipay/{orderNo}` 与 `GET .../status?sync=true`
+- 交互链路
+  - 列表/详情“去支付”按钮 → `payOrder()` → 拿到 `payUrl` 后 `window.location.assign()` 整页跳转收银台（qiankun 沙箱内也必须整页跳转）
+  - 回跳进入 `/order/pay-result` → `renderPayResult()` 先查一次；未到终态则每 **2 秒**轮询、最多 **10 次**（约 20 秒），超时转为“待确认 + 手动刷新”
+  - 结果页提供“刷新状态”“重新支付”“查看订单”“遇到问题”入口
+- 资源清理
+  - `destroy()` 与页面切换调用 `stopPolling()`，避免定时器泄漏；单测覆盖“清理支付结果页轮询定时器”
+
+```mermaid
+sequenceDiagram
+participant U as "用户"
+participant APP as "OrderApp"
+participant P as "payment.ts"
+participant API as "订单服务"
+participant AL as "支付宝沙箱"
+U->>APP : 点击“去支付”
+APP->>P : createAlipayPayment(orderNo, token)
+P->>API : POST /api/order/payments/alipay/{orderNo}
+API-->>P : {payUrl}
+P-->>APP : payUrl
+APP->>AL : window.location.assign(payUrl)
+AL-->>APP : 回跳 /order/pay-result?orderNo=...
+APP->>P : queryPaymentStatus(orderNo, sync=true)
+P->>API : GET .../status
+API-->>P : {payStatus, orderStatus}
+P-->>APP : mapPaymentResult()
+alt 未到终态且次数 < 10
+APP->>APP : 2s 后再次轮询
+else 已支付/已关闭/已取消
+APP->>APP : 停止轮询并渲染结果
+end
+```
+
+**图表来源**
+- [payment.ts:41-144](file://frontend/order-app/src/payment.ts#L41-L144)
+- [app.ts:408-560](file://frontend/order-app/src/app.ts#L408-L560)
+
+**章节来源**
+- [payment.ts:1-144](file://frontend/order-app/src/payment.ts#L1-L144)
+- [payment.spec.ts:1-130](file://frontend/order-app/src/__tests__/unit/payment.spec.ts#L1-L130)
+
 ## 微前端适配方案
 - 子应用侧
   - 使用 vite-plugin-qiankun 插件，注册 qiankun 子应用名称与开发模式

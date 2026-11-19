@@ -16,6 +16,10 @@
 - [Result.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/Result.java)
 - [BusinessException.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java)
 - [Product.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/entity/Product.java)
+- [FileController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FileController.java)
+- [FileStorageServiceRouter.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/FileStorageServiceRouter.java)
+- [ImageUploadSupport.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/support/ImageUploadSupport.java)
+- [OssProperties.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/properties/OssProperties.java)
 </cite>
 
 ## 目录
@@ -33,6 +37,7 @@
 ## 简介
 本文件面向“商品服务”的 API 文档，覆盖以下能力：
 - 商品管理接口（CRUD、分类查询、ES 同步）
+- 商品图片接口（上传/删除图片、单独回写图片 URL）
 - 商品搜索接口（基于 Elasticsearch 的多条件检索）
 - 秒杀接口（Redis Lua 原子预扣减 + RabbitMQ 异步下单）
 
@@ -104,7 +109,8 @@ SOC --> OS
 - [SeckillOrderConsumer.java:21-69](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L21-L69)
 
 ## 核心组件
-- ProductController：提供商品 CRUD、分类查询、ES 全量同步、普通库存扣减等接口。
+- ProductController：提供商品 CRUD、分类查询、ES 全量同步、普通库存扣减、单独回写图片 URL 等接口。
+- FileController：管理员专用的图片上传/删除接口，底层由 FileStorageServiceRouter 在 OSS 与本地磁盘间切换。
 - SeckillController：提供秒杀初始化、抢购、剩余库存查询等接口。
 - ProductService/Impl：商品领域服务，负责数据库操作与 ES 数据同步。
 - SeckillStockService：基于 Redis + Lua 的秒杀库存原子预扣减与防重购买标记。
@@ -213,11 +219,45 @@ SOC-->>Client : 最终订单结果(可轮询)
   - 路径：/products/deduct-stock
   - 查询参数：productId(Long)、quantity(Integer)
   - 响应：Result<Boolean>
+- 更新商品图片（管理接口，仅 ADMIN）
+  - 方法：PUT
+  - 路径：/products/{id}/image
+  - 请求体：`{ "imageUrl": "https://..." }`（空字符串表示清除图片）
+  - 响应：Result<Product>；只更新 `image_url` 并同步 ES，不覆盖其它字段
 
 章节来源
 - [ProductController.java:26-95](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L26-L95)
 - [ProductService.java:8-38](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/ProductService.java#L8-L38)
 - [ProductServiceImpl.java:33-110](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/ProductServiceImpl.java#L33-L110)
+
+### 商品图片上传接口
+
+图片不经数据库，而是写入对象存储后仅保存 URL；上传与回写分两步，便于前端预览与失败重试。
+
+- 上传图片（仅 ADMIN）
+  - 方法：POST
+  - 路径：/files/images
+  - Content-Type：`multipart/form-data`，字段名固定为 `file`
+  - 限制：JPG/PNG/WEBP/GIF，默认不超过 5MB；服务端按魔数校验真实类型
+  - 响应：`Result<UploadResult>`，包含 `url / objectKey / originalName / size / contentType`
+- 删除图片（仅 ADMIN，运维用途）
+  - 方法：DELETE
+  - 路径：/files/images
+  - 查询参数：objectKey（必须位于 `oss.dir` 前缀内且不含 `..`）
+  - 响应：Result<Void>
+
+存储路由与对象 Key：
+
+- `FileStorageServiceRouter` 按 `oss.isConfigured()` 选择实现：凭证就绪写阿里云 OSS，否则写本地 `oss.local-dir`。
+- 对象 Key 统一为 `{dir}/yyyy/MM/dd/{uuid}.{ext}`，扩展名由魔数识别的真实类型决定，不信任原始文件名。
+- 本地兜底返回相对 URL `/api/product/files/local/{objectKey}`，由网关白名单放行，浏览器可直接加载；OSS 返回 `https://{bucket}.{endpoint}/...` 或 `oss.public-url-prefix` 拼接的地址。
+- 未配置 OSS 且请求进入 OSS 分支时返回业务码 503；体积超限由前端、multipart 与 nginx 三层共同拦截。
+
+**章节来源**
+- [FileController.java:1-55](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FileController.java#L1-L55)
+- [FileStorageServiceRouter.java:1-43](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/impl/FileStorageServiceRouter.java#L1-L43)
+- [ImageUploadSupport.java:1-115](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/service/support/ImageUploadSupport.java#L1-L115)
+- [OssProperties.java:1-142](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/config/properties/OssProperties.java#L1-L142)
 
 ### 商品搜索接口（Elasticsearch 集成）
 - 搜索入口：/products/search
@@ -425,6 +465,11 @@ SeckillOrderConsumer --> OrderServiceImpl : "创建订单"
   - 检查 RabbitMQ 队列是否可用，消费者是否正常消费。
   - 核对 ES 索引与映射是否与 ProductDocument 一致。
   - 查看日志定位异常堆栈与关键步骤输出。
+- 图片上传异常
+  - 400「仅支持 JPG / PNG / WEBP / GIF」：魔数校验失败，文件不是真实图片。
+  - 413：nginx `client_max_body_size` 小于请求体（当前为 6m）。
+  - 503「OSS 未配置」：AK/SK 或 bucket 为空，但走了 OSS 分支；补全变量或清空凭证走本地兜底。
+  - 本地图片 404：`oss.local-dir` 与服务工作目录不一致，或网关未放行 `/api/product/files/local`。
 
 章节来源
 - [BusinessException.java:6-22](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L6-L22)
@@ -451,6 +496,7 @@ SeckillOrderConsumer --> OrderServiceImpl : "创建订单"
 - 401：未授权访问
 - 404：资源不存在
 - 500：服务端错误或库存未初始化
+- 503：依赖未配置或不可用（如支付宝未配置、OSS 未配置）
 
 章节来源
 - [BusinessException.java:6-22](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/BusinessException.java#L6-L22)
@@ -487,6 +533,18 @@ SeckillOrderConsumer --> OrderServiceImpl : "创建订单"
 
 章节来源
 - [SeckillController.java:45-148](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java#L45-L148)
+
+### 商品图片上传示例
+- 上传图片（仅 ADMIN）
+  - POST /files/images，`multipart/form-data`，字段 `file`
+  - 响应：`{code:200, data:{url:"https://cdn/.../a.png", objectKey:"product/2026/11/18/a.png", size:10240, contentType:"image/png"}}`
+- 回写图片 URL（仅 ADMIN）
+  - PUT /products/1/image，请求体 `{"imageUrl":"https://cdn/.../a.png"}`
+  - 响应：`{code:200, data:{...imageUrl:"https://cdn/.../a.png"}}`
+
+**章节来源**
+- [FileController.java:34-53](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/FileController.java#L34-L53)
+- [ProductController.java:76-84](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java#L76-L84)
 
 ### 订单查询示例
 - 查询我的订单

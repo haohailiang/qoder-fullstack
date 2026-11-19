@@ -17,6 +17,11 @@
 - [SeckillMessage.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/SeckillMessage.java)
 - [ProductController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/ProductController.java)
 - [SeckillController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java)
+- [PaymentController.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/PaymentController.java)
+- [AlipayPaymentServiceImpl.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/AlipayPaymentServiceImpl.java)
+- [PaymentStateManager.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/PaymentStateManager.java)
+- [PaymentRecord.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/PaymentRecord.java)
+- [init-sql/02-alipay-payment.sql](file://init-sql/02-alipay-payment.sql)
 </cite>
 
 ## 更新摘要
@@ -41,6 +46,7 @@
 ## 简介
 本文件面向订单服务的 API 文档，覆盖以下能力：
 - 订单管理接口：创建、查询（按用户、按单号、全部）、取消、状态更新。
+- 支付接口：创建支付宝沙箱支付、支付状态查询（可主动同步）、支付宝异步通知。
 - 秒杀订单消费接口：基于 RabbitMQ 的异步消息处理，完成秒杀下单。
 - 与商品服务的 OpenFeign 集成：库存扣减、商品信息校验。
 - 订单状态流转、秒杀异步处理流程、分布式事务处理的技术说明。
@@ -80,12 +86,12 @@ DB --> TypeHandler["MyBatis类型处理器(OrderStatusTypeHandler)"]
 - [SeckillOrderConsumer.java:35-67](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/consumer/SeckillOrderConsumer.java#L35-L67)
 
 ## 核心组件
-- 控制器层：OrderController 提供订单相关 HTTP 接口。
+- 控制器层：OrderController 提供订单相关 HTTP 接口；PaymentController 提供支付创建/查询/通知接口。
 - 服务层：OrderService 定义业务契约；OrderServiceImpl 实现订单创建、查询、取消、状态更新等逻辑。
 - 外部依赖：
   - OpenFeign 客户端 ProductClient 调用商品服务扣减库存。
   - RabbitMQ 消费者 SeckillOrderConsumer 处理秒杀订单消息。
-- 数据模型：Order 实体对应 orders 表；统一响应 Result；业务异常 BusinessException；秒杀消息 SeckillMessage。
+- 数据模型：Order 实体对应 orders 表；PaymentRecord 对应支付流水表；统一响应 Result；业务异常 BusinessException；秒杀消息 SeckillMessage。
 - **新增**：OrderStatus 枚举定义了所有订单状态；OrderStatusTypeHandler 实现了 MyBatis 类型自动转换。
 
 章节来源
@@ -307,6 +313,47 @@ SeckillOrderConsumer --> ProductClient : "Feign调用"
 - [OrderController.java:67-78](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L67-L78)
 - [OrderServiceImpl.java:101-106](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/OrderServiceImpl.java#L101-L106)
 - [OrderStatus.java:30-47](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L30-L47)
+
+### 支付接口（支付宝沙箱）
+
+创建支付与查询需要登录态（网关注入的 X-User-Id）且只能操作自己的订单（ADMIN 放行）；异步通知由支付宝服务器直接调用，不带 JWT，安全性由验签保证。
+
+#### 创建支付
+- 方法：POST
+- URL：/payments/alipay/{orderNo}
+- 路径参数：orderNo（String）
+- 成功响应：`Result<PaymentCreateResponse>`，data 中包含收银台 `payUrl`
+- 失败场景：
+  - 订单不存在：404
+  - 订单不属于当前用户：403
+  - 订单状态不是 PENDING_PAYMENT：400「当前订单状态不可支付」
+  - 未配置 `ALIPAY_*`：503「支付宝支付未配置」
+
+#### 查询支付状态
+- 方法：GET
+- URL：/payments/alipay/{orderNo}/status
+- 查询参数：sync（Boolean，默认 true）——是否先向支付宝主动查询并同步本地状态
+- 成功响应：`Result<PaymentStatusResponse>`，包含订单状态与支付状态
+- 用途：支付结果页每 2 秒轮询，最多 10 次，命中终态即停止
+
+#### 支付宝异步通知
+- 方法：POST
+- URL：/payments/alipay/notify
+- 鉴权：网关白名单，无 JWT；依赖支付宝验签 + app_id + 金额校验
+- 响应：`text/plain`，校验通过返回 `success`，否则 `failure`（必须为纯文本，否则支付宝会持续重试）
+
+幂等与校验要点：
+
+- 回调校验顺序：参数未配置 → 验签 → app_id → out_trade_no → trade_status → 金额 → markPaid。
+- `PaymentStateManager` 使用 `WHERE status = PENDING_PAYMENT` 条件更新，只有更新成功才写流水；重复通知返回 `ALREADY_PAID`，不会二次变更。
+- 订单已处于 PAID/SHIPPED/COMPLETED 时仅尝试补齐 `trade_no`；金额不一致或并发冲突返回 `CONFLICT`。
+- `payment_record` 以 `UNIQUE(channel, order_no)` 与 `UNIQUE(trade_no)` 保证同一订单/交易号只有一条流水。
+
+**章节来源**
+- [PaymentController.java:28-95](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/PaymentController.java#L28-L95)
+- [AlipayPaymentServiceImpl.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/impl/AlipayPaymentServiceImpl.java)
+- [PaymentStateManager.java](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/service/PaymentStateManager.java)
+- [init-sql/02-alipay-payment.sql](file://init-sql/02-alipay-payment.sql)
 
 ### 秒杀订单消费接口（RabbitMQ）
 - 类型：RabbitMQ 消费者监听
@@ -566,6 +613,10 @@ OTH --> DB
 - 订单不存在：核对 orderNo 或 orderId 是否正确。
 - 秒杀排队中：等待消费者处理完成，再查询订单获取最终结果。
 - 消费者失败：查看日志定位异常；检查 RabbitMQ 死信队列；必要时人工补偿。
+- 支付相关：
+  - 创建支付 503：确认 `ALIPAY_APP_ID`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY` 是否全部配置。
+  - 回调返回 failure：查看验签日志（`[ALIPAY-ALARM]`），重点确认使用「支付宝公钥」而非应用公钥、`app_id` 与金额一致。
+  - 已付款但订单未变：检查 `ALIPAY_NOTIFY_URL` 是否公网可达；或调用 `status?sync=true` 主动查询兼容。
 - **新增**：状态更新失败：检查传入的状态码是否在有效范围内（0-4），确认 OrderStatus.fromCode() 能正确解析状态值。
 
 章节来源
@@ -576,7 +627,7 @@ OTH --> DB
 - [OrderStatus.java:30-47](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/entity/enums/OrderStatus.java#L30-L47)
 
 ## 结论
-订单服务提供了完整的订单管理能力，并通过 OpenFeign 与商品服务协作完成库存扣减；同时借助 RabbitMQ 实现了高并发秒杀下单的异步化处理。**新增的枚举类型机制显著提升了代码的类型安全性和可维护性**。建议在现有基础上完善幂等、重试与补偿机制，进一步提升系统的健壮性与可观测性。
+订单服务提供了完整的订单管理能力，并通过 OpenFeign 与商品服务协作完成库存扣减；同时借助 RabbitMQ 实现了高并发秒杀下单的异步化处理，并通过支付宝沙箱支付补齐了交易闭环。**新增的枚举类型机制显著提升了代码的类型安全性和可维护性**。建议在现有基础上完善幂等、重试与补偿机制，进一步提升系统的健壮性与可观测性。
 
 [本节为总结性内容，不涉及具体文件分析]
 

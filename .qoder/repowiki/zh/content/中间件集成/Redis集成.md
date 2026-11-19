@@ -13,6 +13,10 @@
 - [SeckillController.java](file://backend/ecommerce-product/src/main/java/com/ecommerce/product/controller/SeckillController.java)
 - [README.md](file://README.md)
 - [docker-compose-infra.yml](file://docker-compose-infra.yml)
+- [AuthGlobalFilter.java](file://backend/ecommerce-gateway/src/main/java/com/ecommerce/gateway/filter/AuthGlobalFilter.java)
+- [ecommerce-gateway/application.yml](file://backend/ecommerce-gateway/src/main/resources/application.yml)
+- [request.ts（前端请求封装）](file://frontend/base-app/src/api/request.ts)
+- [App.vue（主应用）](file://frontend/base-app/src/App.vue)
 </cite>
 
 ## 目录
@@ -186,6 +190,47 @@ AuthServiceImpl --> RedisSessionService : "依赖"
 - [RedisSessionServiceImpl.java:1-107](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/service/impl/RedisSessionServiceImpl.java#L1-L107)
 - [AuthServiceImpl.java:87-124](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/service/impl/AuthServiceImpl.java#L87-L124)
 
+### 网关侧会话比对与 40101（被挤下线）
+用户服务写入的 Token 需要一个"读方"才能产生互踢效果，这个读方就是网关。网关持有 JWT 密文与 Redis 最新会话值，只要两者不一致即判定旧会话失效。
+
+- 依赖与实现
+  - 网关引入 `spring-boot-starter-data-redis-reactive`，用 `ReactiveStringRedisTemplate` 在反应式过滤器中非阻塞地读 Key。
+  - 每次请求先剥离客户端伪造的 `X-User-*`/签名头，再解析 JWT，最后 `GET login:token:{userId}` 与请求 Token 比对。
+- 三种结果
+  - 值一致：注入身份头（含角色）转发下游。
+  - Key 不存在（`SESSION_ABSENT`，已登出）：HTTP 401 + `code=40101`。
+  - 值不同（新登录已覆盖）：HTTP 401 + `code=40101`，日志提示"疑似被其他设备挤下线"。
+- 两个很重要的细节
+  - 必须区分"Redis 中确实没有"与"Redis 挂了"：实现用 `SESSION_UNAVAILABLE` 哨兵后置降级放行。若统一当作不存在，会导致 Redis 抖动时全站强制下线。
+  - 比对开关 `gateway.session-check.enabled`（默认 `true`）用于极端场景临时关闭，生产不应关闭，否则登出与互踢都会失效。
+- 前端闭环
+  - `request.ts` 识别 `40101` 后清登录态并 `router.replace('/login')`（不带 redirect）。
+  - `App.vue` 每 30 秒调一次 `getCurrentUser()` 做心跳，使闲置页面也能在半个周期内感知被顶替。
+
+```mermaid
+sequenceDiagram
+  participant FE as "前端"
+  participant GW as "网关（Reactive）"
+  participant RDS as "Redis"
+  participant US as "用户服务"
+  US->>RDS: SET login:token:{userId} EX ttl（新登录覆盖）
+  FE->>GW: 请求（旧 Token）
+  GW->>GW: 解析 JWT 得到 userId
+  GW->>RDS: GET login:token:{userId}
+  RDS-->>GW: 新 Token（与旧不一致）
+  GW-->>FE: 401 + code=40101
+  FE->>FE: 清登录态 → /login
+```
+
+**图表来源**
+- [AuthGlobalFilter.java:120-220](file://backend/ecommerce-gateway/src/main/java/com/ecommerce/gateway/filter/AuthGlobalFilter.java#L120-L220)
+- [ecommerce-gateway/application.yml:83-91](file://backend/ecommerce-gateway/src/main/resources/application.yml#L83-L91)
+- [request.ts（前端请求封装）:55-115](file://frontend/base-app/src/api/request.ts#L55-L115)
+
+**章节来源**
+- [RedisSessionServiceImpl.java:47-54](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/service/impl/RedisSessionServiceImpl.java#L47-L54)
+- [App.vue（主应用）:28-100](file://frontend/base-app/src/App.vue#L28-L100)
+
 ### 秒杀库存与 Lua 原子操作
 - 目标
   - 使用 Redis + Lua 脚本原子预扣减库存，防止超卖。
@@ -311,6 +356,7 @@ SC --> MQ["RabbitMQ"]
 - Redis 不可用
   - 建议增加熔断与重试（如 Resilience4j），对写操作进行幂等保障。
   - 对于读路径，允许短暂降级（返回默认值或提示稍后重试）。
+  - 网关会话校验已内置降级：Redis 访问异常时本次请求放行（与"Key 不存在"严格区分）。可见性代价是：故障期间登出/互踢不生效。
 
 **章节来源**
 - [RedisSessionServiceImpl.java:85-106](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/service/impl/RedisSessionServiceImpl.java#L85-L106)
@@ -324,9 +370,11 @@ SC --> MQ["RabbitMQ"]
   - 用户服务与商品服务均输出关键操作日志（登录、锁获取、库存扣减、消息发送）。
 - 指标采集
   - 建议接入 Micrometer + Prometheus，暴露 Redis 连接池、命令耗时、错误率等指标。
+  - 业务指标：40101 响应数（被挤下线）、登录锁获取失败数、会话 Key 缺失次数。
 - 调试建议
   - 使用 redis-cli 查看 Key 是否存在、TTL 是否正确。
   - 针对热点 Key（如库存 Key）观察命中率与延迟。
+  - 排查"莫名被踢"：比对 `login:token:{userId}` 与客户端 Token 是否一致；注意多实例共用同一 Redis 时，测试环境的登录会覆盖生产用户的会话。
 
 **章节来源**
 - [docker-compose-infra.yml:44-50](file://docker-compose-infra.yml#L44-L50)
@@ -349,4 +397,4 @@ SC --> MQ["RabbitMQ"]
 [本节为通用指导，不直接分析具体文件]
 
 ## 结论
-本项目在用户服务中使用 Redis 实现了会话 Token 存储与单设备登录，并通过分布式锁控制并发登录；在商品服务中使用 Redis + Lua 脚本实现了秒杀库存的原子预扣减与防重复购买，结合 RabbitMQ 完成异步下单。整体方案具备清晰的 Key 命名规范、合理的 TTL 设计与良好的可观测性。在生产环境中，建议进一步引入连接池调优、限流熔断、集群化与监控指标采集，以提升系统稳定性与可扩展性。
+本项目在用户服务中使用 Redis 实现了会话 Token 存储与单设备登录，并由网关通过反应式 Redis 客户端完成会话比对，把"写方"与"读方"串成完整的互踢闭环；在商品服务中使用 Redis + Lua 脚本实现了秒杀库存的原子预扣减与防重复购买，结合 RabbitMQ 完成异步下单。整体方案具备清晰的 Key 命名规范、合理的 TTL 设计、哨兵式降级与良好的可观测性。在生产环境中，建议进一步引入连接池调优、限流熔断、集群化与监控指标采集，以提升系统稳定性与可扩展性。

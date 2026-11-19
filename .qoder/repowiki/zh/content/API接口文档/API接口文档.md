@@ -408,6 +408,39 @@ SendMQ --> ReturnQueuing["返回排队中(orderNo,status=QUEUING)"]
 章节来源
 - [OrderController.java:27-72](file://backend/ecommerce-order/src/main/java/com/ecommerce/order/controller/OrderController.java#L27-L72)
 
+### 支付接口（/api/order/payments/**）
+- POST /api/order/payments/alipay/{orderNo}
+  - 说明：创建支付宝沙箱支付单。
+  - 鉴权：JWT（需订单归属人）。
+  - 响应：Result<PaymentCreateResponse>（orderNo、channel、amount、payUrl、timeoutExpress）。
+  - 错误：403 非订单归属人；400 订单非待支付；503 支付未配置。
+- GET /api/order/payments/alipay/{orderNo}/status?sync=true
+  - 说明：查询支付状态；sync=true 时后端先主动向支付宝确认再回写。
+  - 响应：Result<PaymentStatusResponse>（payStatus、orderStatus、tradeNo、amount、paidTime）。
+- POST /api/order/payments/alipay/notify
+  - 说明：支付宝异步通知入口，produces text/plain，返回 success/failure。
+  - 鉴权：网关白名单（无 JWT），依赖支付宝验签。
+  - 校验顺序：参数未配置 → 验签 → app_id → out_trade_no → trade_status → 金额 → 条件更新。
+
+### 商品图片接口（/api/product/files/**、/api/product/products/{id}/image）
+- POST /api/product/files/images
+  - 说明：上传商品图片（multipart 字段名 file）。
+  - 鉴权：JWT + ADMIN。
+  - 限制：jpeg/png/gif/webp，≤ 5MB。
+  - 响应：Result<UploadResult>（url、objectKey、originalName、size、contentType）。
+- DELETE /api/product/files/images?objectKey=...
+  - 说明：删除存储对象（运维用途）。鉴权：JWT + ADMIN。
+- PUT /api/product/products/{id}/image
+  - 说明：仅回写商品图片地址（空字符串表示清除），成功后同步 ES。鉴权：JWT + ADMIN。
+
+### AI 问答与保险咨询接口（/api/ai/**）
+网关将 `/api/ai/**` 经 `StripPrefix=2` 转发到 Python ai-service（8084），业务请求需携带 JWT。
+- 会话：`GET/POST /api/ai/sessions`、`DELETE /api/ai/sessions/{id}`、`GET /api/ai/sessions/{id}/messages`
+- 回溯：`GET /api/ai/sessions/{id}/checkpoints`、`POST /api/ai/sessions/{id}/restore`（body: checkpointId）
+- 知识库（ADMIN 写）：`GET /api/ai/documents?productId=`、`POST /api/ai/documents/upload`、`POST /api/ai/documents/{id}/reindex`、`DELETE /api/ai/documents/{id}`
+- 问答：`POST /api/ai/chat`（SSE，事件序为 `meta` → `token`* → `done`/`error`）
+- 健康检查：直连 `GET http://localhost:8084/health`
+
 ### 秒杀消费接口（后台异步）
 - 秒杀消费由订单服务的消费者监听RabbitMQ队列，接收SeckillMessage并创建订单。该过程不直接暴露REST接口，属于后台异步处理链路。
 

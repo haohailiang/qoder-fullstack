@@ -8,6 +8,7 @@
 - [bootstrap.yml](file://backend/ecommerce-gateway/src/main/resources/bootstrap.yml)
 - [pom.xml（网关模块）](file://backend/ecommerce-gateway/pom.xml)
 - [JwtTokenProvider.java](file://backend/ecommerce-user/src/main/java/com/ecommerce/user/security/JwtTokenProvider.java)
+- [GatewaySignature.java](file://backend/ecommerce-common/src/main/java/com/ecommerce/common/security/GatewaySignature.java)
 - [README.md](file://README.md)
 </cite>
 
@@ -23,7 +24,7 @@
 9. [结论](#结论)
 
 ## 简介
-本章节面向 API 网关的读者，说明该网关在电商微服务中的职责：统一入口、路由转发、跨域处理、JWT 鉴权、以及为下游服务透传用户身份。文档将围绕启动类、全局过滤器、路由配置、安全机制、限流策略、监控日志、集成方式与性能优化展开，并给出架构图、过滤器链流程图和路由示例。
+本章节面向 API 网关的读者，说明该网关在电商微服务中的职责：统一入口、路由转发、跨域处理、JWT 鉴权、会话校验、身份透传与内部接口隔离。除 Java 微服务外，网关还负责把 `/api/ai/**` 转发给 Python 的 ai-service（8084），并为其生成 HMAC 签名头。文档将围绕启动类、全局过滤器、路由配置、安全机制、限流策略、监控日志、集成方式与性能优化展开，并给出架构图、过滤器链流程图和路由示例。
 
 ## 项目结构
 API 网关位于后端模块 ecommerce-gateway，采用 Spring Cloud Gateway + WebFlux 的非阻塞模型；通过 application.yml 定义端口、Nacos 注册发现、全局跨域、路由规则与 Swagger 聚合；通过 bootstrap.yml 预留 Nacos 配置中心接入点；通过 pom.xml 引入网关、Nacos 与公共 Result 类型。
@@ -41,6 +42,7 @@ subgraph "下游服务"
 USER["ecommerce-user<br/>用户服务"]
 PRODUCT["ecommerce-product<br/>商品服务"]
 ORDER["ecommerce-order<br/>订单服务"]
+AI["ai-service<br/>Python 问答服务"]
 end
 GA --> AF
 GA --> CFG
@@ -49,6 +51,7 @@ GA --> POM
 CFG --> USER
 CFG --> PRODUCT
 CFG --> ORDER
+CFG --> AI
 ```
 
 图表来源
@@ -67,8 +70,11 @@ CFG --> ORDER
 ## 核心组件
 - 启动类 GatewayApplication：使用 @SpringBootApplication 启动 Spring Boot 应用，加载网关相关自动配置。
 - 全局过滤器 AuthGlobalFilter：实现 GlobalFilter 与 Ordered，负责白名单放行、OPTIONS 预检放行、Authorization Bearer Token 解析与校验、失败时返回统一 JSON 错误、成功时将 userId 与 username 注入请求头传递给下游。
-- 路由与跨域配置 application.yml：定义全局 CORS、按服务前缀的路由规则、StripPrefix 过滤、Swagger UI 与 OpenAPI 文档聚合。
-- JWT 密钥配置：jwt.secret 与用户服务保持一致，用于网关侧校验 Token。
+- 路由与跨域配置 application.yml：定义全局 CORS、按服务前缀的路由规则、StripPrefix 过滤、Swagger UI 与 OpenAPI 文档聚合、16MB 编解码缓冲与会话校验开关。
+- JWT 密钥配置：jwt.secret 与用户服务保持一致，用于网关侧校验 Token，并作为网关签名（HMAC）的密钥。
+- 会话校验：鉴权通过后再比对 Redis `login:token:{uid}` 与当前 Token，实现登出立即生效与单设备互踢；Redis 不可用时降级为仅校验 JWT。
+- 身份头与签名：剥离客户端自带的 `X-User-*` 与签名头，再注入 `X-User-Id / X-User-Name / X-User-Role` 及 `X-Gateway-Timestamp / X-Gateway-Signature`。
+- 内部接口防护：`deduct-stock`、`seckill/rollback` 仅允许服务间直连，经网关访问一律 403。
 
 章节来源
 - [GatewayApplication.java:1-16](file://backend/ecommerce-gateway/src/main/java/com/ecommerce/gateway/GatewayApplication.java#L1-L16)
@@ -76,7 +82,7 @@ CFG --> ORDER
 - [application.yml:1-131](file://backend/ecommerce-gateway/src/main/resources/application.yml#L1-L131)
 
 ## 架构总览
-网关作为统一入口，对外暴露 /api/user/**、/api/product/**、/api/order/** 等路径，内部根据路由规则转发到对应微服务。所有请求在进入业务路由前，先经过全局鉴权过滤器进行 JWT 校验。
+网关作为统一入口，对外暴露 /api/user/**、/api/product/**、/api/order/**、/api/ai/** 等路径，内部根据路由规则转发到对应微服务。所有请求在进入业务路由前，先经过全局鉴权过滤器：剥离伪造身份头 → 拦截内部接口 → 白名单/OPTIONS 放行 → JWT 校验 → Redis 会话比对 → 注入身份头与签名。
 
 ```mermaid
 graph TB
@@ -85,10 +91,12 @@ GW["Spring Cloud Gateway<br/>端口 8080"]
 U["ecommerce-user<br/>端口 8081"]
 P["ecommerce-product<br/>端口 8082"]
 O["ecommerce-order<br/>端口 8083"]
+AI["ai-service<br/>端口 8084"]
 Client --> GW
 GW --> |/api/user/**| U
 GW --> |/api/product/**| P
 GW --> |/api/order/**| O
+GW --> |/api/ai/**| AI
 ```
 
 图表来源
@@ -106,18 +114,22 @@ GW --> |/api/order/**| O
 
 ### 全局鉴权过滤器 AuthGlobalFilter
 - 职责
-  - 白名单路径直接放行（登录、注册、验证码、短信发送、健康检查）。
+  - 先剥离客户端自带的 `X-User-Id / X-User-Name / X-User-Role / X-Gateway-*`，防止伪造下游信任凭据。
+  - 内部接口（`/api/product/products/deduct-stock`、`/api/product/products/seckill/rollback`）直接 403，不对外暴露。
+  - 白名单路径直接放行（登录、注册、验证码、短信、健康检查、支付宝异步通知）。
+  - 白名单前缀放行 Swagger 文档与本地图片静态资源 `/api/product/files/local`。
   - OPTIONS 预检请求放行，配合全局跨域配置。
-  - 从 Authorization: Bearer token 提取 JWT。
-  - 使用 HS256 与 jwt.secret 校验签名与有效期。
-  - 校验通过后，将 X-User-Id、X-User-Name 写入请求头，透传给下游服务。
+  - 从 Authorization: Bearer token 提取 JWT，使用 HS256 与 jwt.secret 校验签名与有效期。
+  - 校验通过后比对 Redis `login:token:{uid}`：不存在或与当前 Token 不一致时返回业务码 **40101**（HTTP 401），前端据此清 token 并跳登录页；Redis 访问异常时本次请求降级放行。
+  - 注入 `X-User-Id / X-User-Name / X-User-Role` 与网关签名头（`userId|username|role|timestamp` 的 HMAC），供下游及 ai-service 验签。
   - 校验失败返回 401 的统一 JSON 响应。
 - 执行顺序
   - 实现 Ordered，order = -100，保证在多数默认过滤器之前执行。
 - 关键数据结构
-  - 白名单列表：精确匹配路径。
-  - 白名单前缀列表：匹配 Swagger UI 与 OpenAPI 文档路径。
-  - 常量：Bearer 前缀、用户 ID/名称请求头名。
+  - 白名单列表：精确匹配路径（含支付宝异步通知）。
+  - 白名单前缀列表：匹配 Swagger、本地图片静态资源与 OpenAPI 文档路径。
+  - 内部接口前缀列表：禁止外部访问的服务间接口。
+  - 常量：Bearer 前缀、用户 ID/名称/角色请求头名、会话 Key 前缀 `login:token:`、会话失效业务码 40101。
 - 异常处理
   - 过期：记录警告日志，返回“Token 已过期”。
   - 无效：记录警告日志，返回“Token 无效”。
@@ -125,7 +137,10 @@ GW --> |/api/order/**| O
 
 ```mermaid
 flowchart TD
-Start(["进入过滤器"]) --> CheckPath["判断是否白名单路径"]
+Start(["进入过滤器"]) --> Strip["剥离客户端伪造的 X-User-* 与签名头"]
+Strip --> Internal{"是否为内部接口?"}
+Internal --> |是| Return403["403 内部接口禁止外部访问"]
+Internal --> |否| CheckPath["判断是否白名单路径"]
 CheckPath --> |是| PassThrough["直接放行"]
 CheckPath --> |否| CheckOptions{"是否为 OPTIONS 预检"}
 CheckOptions --> |是| PassThrough
@@ -135,10 +150,14 @@ HasHeader --> |否| Return401["返回 401 未授权"]
 HasHeader --> |是| ParseJWT["解析并校验 JWT"]
 ParseJWT --> Valid{"校验通过?"}
 Valid --> |否| HandleError["记录日志并返回 401"]
-Valid --> |是| InjectHeaders["注入 X-User-Id/X-User-Name 请求头"]
+Valid --> |是| Session{"Redis 会话与当前 Token 一致?"}
+Session --> |否| Return40101["401 + 业务码 40101<br/>会话已失效/被挤下线"]
+Session --> |是| InjectHeaders["注入 X-User-Id/Name/Role + 网关签名"]
 InjectHeaders --> Chain["继续过滤器链并转发到下游"]
 PassThrough --> End(["结束"])
 Return401 --> End
+Return40101 --> End
+Return403 --> End
 HandleError --> End
 Chain --> End
 ```
@@ -156,10 +175,13 @@ Chain --> End
   - 用户服务：/api/user/auth/**、/api/user/users/**、/api/user/sms/**、/api/user/health
   - 商品服务：/api/product/**
   - 订单服务：/api/order/**
-  - 各路由均使用 StripPrefix=1，去除 /api 前缀后转发至下游服务。
+  - AI 服务：/api/ai/** → `http://localhost:8084`，StripPrefix=2（`/api/ai/chat` → `/chat`）
+  - 各路由均使用 StripPrefix 去除 /api 前缀后转发至下游服务（ai-service 额外去掉 /ai 一段）。
 - Swagger 聚合
   - 网关自身提供 /swagger-ui.html，聚合用户、商品、订单服务的 OpenAPI 文档。
   - 同时为各服务提供 /swagger-ui/** 与 /v3/api-docs/** 的路由转发。
+- 编解码缓冲
+  - `spring.codec.max-in-memory-size: 16MB`，为 PDF 上传（multipart）与 SSE 长文本响应留出余量，避免 WebFlux 默认缓冲上限报错。
 
 ```mermaid
 flowchart TD
@@ -192,7 +214,10 @@ Strip2 --> Forward2["转发到 http://localhost:8082/product/**"]
 - 令牌校验
   - 网关 AuthGlobalFilter 使用相同 jwt.secret 解析并校验签名与有效期。
 - 身份透传
-  - 校验成功后，网关将 userId 与 username 写入请求头 X-User-Id、X-User-Name，下游服务可从请求头获取当前用户信息。
+  - 校验成功后，网关将 userId、username、role 写入请求头 X-User-Id、X-User-Name、X-User-Role，下游服务可从请求头获取当前用户信息。
+- 下游信任边界
+  - 下游服务通过“受信头 + 网关签名”认定身份，不解析 JWT；ai-service 侧校验 HMAC 签名与时间戳，避免绕过网关直连 8084 伪造身份。
+  - 网关先剥离客户端自带的同名头，所有 `X-User-*` 与签名头只能由网关写入。
 
 ```mermaid
 sequenceDiagram
@@ -282,6 +307,14 @@ GW --> COMMON["ecommerce-common(Result)"]
   - 检查 Authorization 头是否正确携带 Bearer token。
   - 核对 jwt.secret 是否与用户服务一致。
   - 查看过滤器日志中“Token 已过期”“Token 无效”提示。
+- 业务码 40101（会话失效 / 被挤下线）
+  - 确认 Redis `login:token:{uid}` 是否存在且与请求 Token 一致；多端登录时后登录者会覆盖该 Key。
+  - 若中间件故障导致误报，可临时设置 `gateway.session-check.enabled=false` 降级。
+- 403「内部接口，禁止外部访问」
+  - 说明请求命中了 INTERNAL_ONLY 前缀列表，应改为服务间直连调用。
+- AI 服务 502/504
+  - 确认 ai-service 已启动且监听 8084；检查 `/api/ai/**` 路由与 StripPrefix=2 是否符合下游路径。
+  - 知识库 PDF 较大时观察是否触发编解码或上传体积限制。
 - 路由不生效
   - 确认请求路径与 application.yml 中 predicates 匹配。
   - 检查 StripPrefix 配置是否符合下游服务期望路径。
@@ -298,4 +331,4 @@ GW --> COMMON["ecommerce-common(Result)"]
 - [application.yml:22-110](file://backend/ecommerce-gateway/src/main/resources/application.yml#L22-L110)
 
 ## 结论
-该 API 网关通过 Spring Cloud Gateway 提供了统一入口、路由转发、跨域处理与 JWT 鉴权能力。AuthGlobalFilter 实现了严格的令牌校验与用户身份透传，application.yml 定义了清晰的服务路由与 Swagger 聚合。当前版本未实现限流与动态负载均衡，可按需扩展。建议在生产环境完善限流、监控与链路追踪，以提升系统的安全性与可观测性。
+该 API 网关通过 Spring Cloud Gateway 提供了统一入口、路由转发、跨域处理与 JWT 鉴权能力。AuthGlobalFilter 实现了严格的令牌校验、Redis 会话校验、内部接口隔离与用户身份/签名透传；application.yml 定义了清晰的服务路由（含 Python ai-service）、Swagger 聚合与 16MB 编解码缓冲。当前版本未实现限流与动态负载均衡，可按需扩展。建议在生产环境完善限流、监控与链路追踪，以提升系统的安全性与可观测性。

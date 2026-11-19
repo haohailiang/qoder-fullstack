@@ -15,6 +15,14 @@
 - [FlightAnimationController.tsx](file://frontend/product-app/src/components/FlightAnimationController.tsx)
 - [tracker.ts](file://frontend/product-app/src/utils/tracker.ts)
 - [tracker.spec.ts](file://frontend/product-app/src/__tests__/unit/utils/tracker.spec.ts)
+- [api/insuranceAgent.ts](file://frontend/product-app/src/api/insuranceAgent.ts)
+- [components/insurance/InsuranceChatDrawer.tsx](file://frontend/product-app/src/components/insurance/InsuranceChatDrawer.tsx)
+- [ChatPanel.tsx](file://frontend/product-app/src/components/insurance/ChatPanel.tsx)
+- [CheckpointPanel.tsx](file://frontend/product-app/src/components/insurance/CheckpointPanel.tsx)
+- [KnowledgePanel.tsx](file://frontend/product-app/src/components/insurance/KnowledgePanel.tsx)
+- [MarkdownMessage.tsx](file://frontend/product-app/src/components/insurance/MarkdownMessage.tsx)
+- [PageSkeleton.tsx](file://frontend/product-app/src/components/PageSkeleton.tsx)
+- [hooks/useDelayedLoading.ts](file://frontend/product-app/src/hooks/useDelayedLoading.ts)
 - [i18n/index.ts](file://frontend/product-app/src/i18n/index.ts)
 - [i18n/zh.ts](file://frontend/product-app/src/i18n/zh.ts)
 - [i18n/en.ts](file://frontend/product-app/src/i18n/en.ts)
@@ -33,6 +41,10 @@
 - 添加了完整的中英文翻译资源文件
 - 完善了微前端环境下的语言状态同步机制
 - 更新了所有页面组件以使用新的国际化系统
+- **新增** 保险咨询机器人抽屉（InsuranceChatDrawer）：会话管理 + SSE 流式问答 + 检查点回溯 + 知识库（仅 ADMIN）
+- **新增** 商品图片真实展示（`imageUrl`，加载失败自动回退到分类图标）与保险商品标签/提示
+- **新增** 页骨架屏与防闪烁 loading（PageSkeleton / useDelayedLoading）
+- **调整** qiankun 环境内改用 MemoryRouter，独立运行仍使用 BrowserRouter(basename=/product)
 
 ## 目录
 1. [简介](#简介)
@@ -49,13 +61,14 @@
 本文件面向"商品子应用 product-app"，基于 React 18 + Ant Design，采用 vite-plugin-qiankun 接入 qiankun 微前端基座。文档覆盖：
 - 应用初始化、路由配置、国际化与主题适配
 - 商品列表页的数据获取、筛选展示逻辑
-- 商品详情页的信息展示、图片占位、购买与秒杀流程
+- 商品详情页的信息展示、图片展示与回退、购买与秒杀流程
 - **新增** 航班详情页面的 2D/3D 可视化展示，支持 ECharts 和 Cesium 双引擎
+- **新增** 保险类商品的 RAG 咨询机器人（抽屉式，SSE 流式输出，支持回溯与知识库）
 - **新增** 用户行为追踪系统，包括页面访问、商品曝光和用户点击埋点
 - 与主应用的通信机制、状态同步（主题/语言）
 - 在微前端环境下的特殊配置与优化策略
 
-**更新** 本次更新重点新增了航班详情可视化功能，提供了丰富的 2D 和 3D 地图展示体验，同时增强了国际化功能和用户行为追踪能力。
+**更新** 本次更新除航班可视化外，新增了保险咨询机器人（对接 Python ai-service 的 RAG 服务）与商品真实图片展示；列表/详情页统一接入骨架屏与防闪烁 loading，微前端环境下路由改为 MemoryRouter 以避免与基座 history 竞争。
 
 ## 项目结构
 product-app 是一个独立的 Vite + React 工程，作为 qiankun 子应用运行。关键目录与职责如下：
@@ -68,6 +81,12 @@ product-app 是一个独立的 Vite + React 工程，作为 qiankun 子应用运
 - **src/components/FlightMap3D.tsx：基于 Cesium 的 3D 地球可视化组件**
 - **src/components/FlightInfoPanel.tsx：飞行信息面板，显示实时飞行状态**
 - **src/components/FlightAnimationController.tsx：动画控制器，提供播放控制和进度调节**
+- **src/components/insurance/InsuranceChatDrawer.tsx：保险咨询机器人抽屉，编排会话/流式问答/回溯/知识库**
+- **src/components/insurance/ChatPanel.tsx：会话列表 + 消息流 + 输入区（Markdown 渲染与来源展示）**
+- **src/components/insurance/CheckpointPanel.tsx：检查点列表与回溯操作**
+- **src/components/insurance/KnowledgePanel.tsx：知识库文档上传/重建索引/删除（仅 ADMIN）**
+- **src/api/insuranceAgent.ts：ai-service 的 REST + SSE 客户端**
+- **src/components/PageSkeleton.tsx 与 src/hooks/useDelayedLoading.ts：骨架屏与防闪烁延时加载**
 - src/utils/tracker.ts：用户行为追踪工具，提供页面访问、商品曝光、用户点击埋点功能
 - src/i18n/index.ts：i18next 初始化与语言持久化
 - src/i18n/zh.ts：中文翻译资源文件（包含产品与航班相关翻译）
@@ -87,6 +106,10 @@ F --> M3D["components/FlightMap3D.tsx<br/>Cesium 3D地球"]
 F --> IP["components/FlightInfoPanel.tsx<br/>飞行信息面板"]
 F --> AC["components/FlightAnimationController.tsx<br/>动画控制"]
 L --> T["utils/tracker.ts<br/>用户行为追踪"]
+D --> AG["api/insuranceAgent.ts<br/>REST + SSE 客户端"]
+D --> DR["components/insurance/InsuranceChatDrawer.tsx<br/>保险咨询抽屉"]
+DR --> CP["ChatPanel / CheckpointPanel"]
+DR --> KP["KnowledgePanel<br/>仅 ADMIN"]
 A --> I18N["i18n/index.ts<br/>国际化配置"]
 I18N --> ZH["i18n/zh.ts<br/>中文翻译"]
 I18N --> EN["i18n/en.ts<br/>英文翻译"]
@@ -107,7 +130,7 @@ B --> M
 - [micro/index.ts:32-45](file://frontend/base-app/src/micro/index.ts#L32-L45)
 
 **章节来源**
-- [main.tsx:1-61](file://frontend/product-app/src/main.tsx#L1-L61)
+- [main.tsx:1-59](file://frontend/product-app/src/main.tsx#L1-L59)
 - [App.tsx:1-88](file://frontend/product-app/src/App.tsx#L1-L88)
 - [vite.config.ts:1-107](file://frontend/product-app/vite.config.ts#L1-L107)
 - [package.json:1-41](file://frontend/product-app/package.json#L1-L41)
@@ -134,6 +157,13 @@ B --> M
   - 使用 IntersectionObserver 实现商品曝光检测
   - 支持 navigator.sendBeacon 进行异步非阻塞上报
   - 内置批量发送机制，100ms 内的事件合并上报
+- **保险咨询机器人**
+  - InsuranceChatDrawer.tsx 作为编排层：打开时拉取会话列表并回显最近会话历史，关闭时中断未完成的流式请求
+  - 标签页顺序：对话（chat）→ 回溯（checkpoints）→ 知识库（knowledge，仅 ADMIN 可见）
+  - 流式输出：`streamChat()` 使用 fetch + ReadableStream 解析 SSE，`token` 追加内容、`done` 挂载 sources、`error` 标记失败
+  - 用户可随时停止生成（AbortController），已生成内容保留；首轮问答后标题更新，前端重拉会话列表
+- **加载体验**
+  - ProductList/ProductDetail 使用 PageSkeleton（骨架屏）与 useDelayedLoading（超时阈值后才显示 loading），避免闪烁
 
 **更新** 新增了完整的航班详情可视化功能，包括 2D ECharts 和 3D Cesium 双引擎支持，同时保持了原有的国际化支持和用户行为追踪系统。
 
@@ -223,11 +253,12 @@ RenderDirect --> End
 - [main.tsx:21-54](file://frontend/product-app/src/main.tsx#L21-L54)
 
 **章节来源**
-- [main.tsx:1-61](file://frontend/product-app/src/main.tsx#L1-L61)
+- [main.tsx:1-59](file://frontend/product-app/src/main.tsx#L1-L59)
 
 ### 路由与主题/语言配置
 - 路由
-  - App.tsx 使用 BrowserRouter basename="/product"，将子应用路由限定在 /product 前缀下
+  - App.tsx 在 qiankun 环境下使用 MemoryRouter（initialEntries=['/list']），避免子应用 pushState 覆盖基座 vue-router 的 history.state
+  - 独立运行（非 qiankun）时使用 BrowserRouter basename="/product"，保持 /product/* 前缀
   - 默认重定向到 /list，同时提供 /detail/:id 与 /flight/:id 两个额外路由
 - 主题
   - 通过 ConfigProvider 的 theme.algorithm 切换 darkAlgorithm/defaultAlgorithm
@@ -248,7 +279,7 @@ class App {
 +useEffect 监听documentElement.class
 +useEffect 监听i18n.languageChanged
 +ConfigProvider(locale, theme)
-+BrowserRouter(basename="/product")
++BrowserRouter(basename="/product") 或 MemoryRouter(qiankun 内)
 +Routes(/ -> /list, /list, /detail/ : id, /flight/ : id)
 }
 ```
@@ -359,6 +390,68 @@ AnimController --> ProgressSlider["进度条调节"]
 - [FlightInfoPanel.tsx:1-108](file://frontend/product-app/src/components/FlightInfoPanel.tsx#L1-L108)
 - [FlightAnimationController.tsx:1-59](file://frontend/product-app/src/components/FlightAnimationController.tsx#L1-L59)
 
+### 保险咨询机器人（InsuranceChatDrawer）
+
+**适用场景**：商品 `category === 'insurance'` 时，详情页展示“保险条款咨询”按钮，点击打开抽屉（宽 720，`destroyOnClose=false` 保留内部状态）。
+
+#### 组成与职责
+- InsuranceChatDrawer.tsx：编排层，持有会话列表、当前会话、消息数组与发送状态；`abortRef` 保存当前流式请求的 AbortController
+- ChatPanel.tsx：左侧会话列表（新建/选择/删除）与右侧消息流、输入区、停止按钮；消息经 MarkdownMessage 渲染
+- CheckpointPanel.tsx：列出会话检查点（step/createdAt/messageCount/preview），支持回溯到指定检查点
+- KnowledgePanel.tsx：知识库文档管理（上传 PDF、重建索引、删除），仅 ADMIN 渲染
+- api/insuranceAgent.ts：REST + SSE 客户端
+  - REST：`/api/ai/sessions`、`/api/ai/sessions/{id}/messages`、`/api/ai/sessions/{id}/checkpoints`、`/api/ai/sessions/{id}/restore`、`/api/ai/documents*`
+  - SSE：`POST /api/ai/chat`，`createSseParser` 按空行分帧（兼容 `\r\n` 与多行 data），`consumeSseStream` 逐块解码
+  - 鉴权：从 localStorage 读取 `qoder_token` 注入 `Authorization: Bearer`；网关完成 JWT 校验并注入 `X-User-Id/X-User-Role`
+
+#### 角色控制
+- 前端根据 localStorage 的 `qoder_user` 判断 `role === 'ADMIN'`（或 username=admin）决定是否渲染“知识库”页签
+- 后端 ai-service 同样按角色校验知识库写操作，前端隐藏仅作为体验优化，不能替代服务端鉴权
+
+#### 关键约束
+- 切换会话、新建、删除、回溯与关闭抽屉都会先 abort 进行中的流式请求，避免消息串流到错误会话
+- 错误对象兼容两种响应体：ai-service 的 `{detail}` 与网关的 `{code,message}`
+
+```mermaid
+sequenceDiagram
+participant U as "用户"
+participant D as "InsuranceChatDrawer"
+participant C as "ChatPanel"
+participant A as "insuranceAgent.ts"
+participant G as "网关 /api/ai/**"
+participant S as "ai-service"
+U->>D : 点击“保险条款咨询”
+D->>A : listSessions(productId)
+A->>G : GET /api/ai/sessions?productId
+G->>S : 转发（StripPrefix=2）
+S-->>D : 会话列表 + 首条历史消息
+U->>C : 输入问题并发送
+C->>D : handleSend(text)
+D->>D : 插入 user + 空的 assistant(streaming)
+D->>A : streamChat({sessionId, productId, message})
+A->>G : POST /api/ai/chat
+G->>S : 转发
+loop SSE
+S-->>A : event: token {text}
+A-->>D : 追加 assistant.content
+S-->>A : event: done {sources}
+A-->>D : 挂载来源并结束 streaming
+end
+D->>A : listSessions() 刷新标题
+```
+
+**图表来源**
+- [InsuranceChatDrawer.tsx:42-332](file://frontend/product-app/src/components/insurance/InsuranceChatDrawer.tsx#L42-L332)
+- [insuranceAgent.ts:143-244](file://frontend/product-app/src/api/insuranceAgent.ts#L143-L244)
+
+**章节来源**
+- [InsuranceChatDrawer.tsx:1-332](file://frontend/product-app/src/components/insurance/InsuranceChatDrawer.tsx#L1-L332)
+- [ChatPanel.tsx:1-208](file://frontend/product-app/src/components/insurance/ChatPanel.tsx#L1-L208)
+- [CheckpointPanel.tsx:1-113](file://frontend/product-app/src/components/insurance/CheckpointPanel.tsx#L1-L113)
+- [KnowledgePanel.tsx:1-214](file://frontend/product-app/src/components/insurance/KnowledgePanel.tsx#L1-L214)
+- [MarkdownMessage.tsx:1-329](file://frontend/product-app/src/components/insurance/MarkdownMessage.tsx#L1-L329)
+- [insuranceAgent.ts:1-244](file://frontend/product-app/src/api/insuranceAgent.ts#L1-L244)
+
 ### 用户行为追踪系统(tracker)
 - 核心功能
   - trackEvent：通用埋点函数，支持自定义事件名称和业务属性
@@ -407,6 +500,9 @@ UserClick["用户点击"] --> TrackClick["trackClick"]
 - 筛选与展示
   - 提供关键词输入框与分类下拉框，点击搜索按钮或回车触发查询
   - 使用 Ant Design List 网格布局展示商品卡片，显示名称、描述摘要、价格（含秒杀价）、库存
+  - 图片区：`imageUrl` 存在时渲染 `<img loading="lazy">`，加载失败自动隐藏并回退到分类图标（flight→RocketOutlined、insurance→SafetyCertificateOutlined、其余→ShoppingCartOutlined）
+  - 保险商品额外展示绿色“保险”标签（`product.insuranceTag`），分类下拉包含 insurance
+  - 首次加载与请求中展示骨架屏（PageSkeleton），并用 useDelayedLoading 避免快速响应的 loading 闪烁
   - 点击"查看详情"跳转到 /detail/:id
   - 所有界面文本使用 t() 函数进行国际化
 - 分页处理
@@ -445,13 +541,16 @@ TrackClick --> Navigate["navigate('/detail/:id')"]
 - [ProductList.tsx:117-124](file://frontend/product-app/src/pages/ProductList.tsx#L117-L124)
 
 **章节来源**
-- [ProductList.tsx:1-220](file://frontend/product-app/src/pages/ProductList.tsx#L1-L220)
+- [ProductList.tsx:1-273](file://frontend/product-app/src/pages/ProductList.tsx#L1-L273)
 
 ### 商品详情页(ProductDetail)
 - 数据获取与展示
   - 根据路由参数 id 调用 GET /api/product/products/:id 获取详情
   - 展示商品名、描述、价格（区分秒杀价与普通价）、库存、分类
-  - 图片区域使用占位图标与 CSS 变量背景色，避免外部图片不可用导致的布局抖动
+  - 图片区域：优先展示 `imageUrl`（加载失败自动隐藏并回退到占位图标与 CSS 变量背景色），避免布局抖动
+  - 保险商品：标题旁展示绿色“保险”标签，描述下方展示 `product.insuranceDesc` 提示
+  - 页底“保险条款咨询”按钮（仅 insurance 分类）打开 InsuranceChatDrawer，传递 productId/productName
+  - 加载态：DetailSkeleton + useDelayedLoading，失败时展示 EmptyState 并支持返回
   - 所有界面文本使用 t() 函数进行国际化
 - 购买与秒杀
   - 普通购买：POST /api/order/orders，提交 productId、productName、quantity、totalAmount，成功后跳转到订单页
@@ -461,7 +560,7 @@ TrackClick --> Navigate["navigate('/detail/:id')"]
 - 相关商品推荐
   - 当前实现未包含"相关商品推荐"模块；可基于 category 字段在后端扩展推荐接口，并在详情页底部展示
 
-**更新** 所有用户交互文本和消息提示都已集成国际化支持。
+**更新** 新增商品真实图片（带失败回退）、保险标签与咨询入口，并接入骨架屏与防闪烁 loading。
 
 ```mermaid
 sequenceDiagram
@@ -490,7 +589,7 @@ end
 - [ProductDetail.tsx:114-120](file://frontend/product-app/src/pages/ProductDetail.tsx#L114-L120)
 
 **章节来源**
-- [ProductDetail.tsx:1-213](file://frontend/product-app/src/pages/ProductDetail.tsx#L1-L213)
+- [ProductDetail.tsx:1-324](file://frontend/product-app/src/pages/ProductDetail.tsx#L1-L324)
 
 ## 依赖关系分析
 - 运行时依赖
@@ -508,6 +607,9 @@ end
   - **vite-plugin-cesium：Cesium 构建支持**
 - 基座侧
   - qiankun：微前端框架，负责子应用注册、生命周期管理、全局状态分发
+- 新增能力依赖
+  - 保险咨询：无新增 npm 依赖，直接使用原生 `fetch` + `ReadableStream` + `TextDecoder` 解析 SSE
+  - 与后端 ai-service 的接口统一走网关 `/api/ai/**`
 
 **更新** 新增了 echarts 和 cesium 作为核心可视化依赖，以及 vite-plugin-cesium 构建支持。
 
@@ -529,6 +631,10 @@ PA --> TR["product-app tracker.ts"]
 PA --> FD["product-app FlightDetail.tsx"]
 FD --> FM2D["product-app FlightMap2D.tsx"]
 FD --> FM3D["product-app FlightMap3D.tsx"]
+PA --> PD["product-app ProductDetail.tsx"]
+PD --> DRW["InsuranceChatDrawer.tsx"]
+DRW --> IAG["api/insuranceAgent.ts"]
+IAG --> AI["网关 /api/ai/** → ai-service"]
 ```
 
 **图表来源**
@@ -539,7 +645,7 @@ FD --> FM3D["product-app FlightMap3D.tsx"]
 **章节来源**
 - [package.json:1-41](file://frontend/product-app/package.json#L1-L41)
 - [vite.config.ts:1-107](file://frontend/product-app/vite.config.ts#L1-L107)
-- [micro/index.ts:1-89](file://frontend/base-app/src/micro/index.ts#L1-L89)
+- [micro/index.ts:1-158](file://frontend/base-app/src/micro/index.ts#L1-L158)
 
 ## 性能与优化
 - 构建与热更新
@@ -566,6 +672,11 @@ FD --> FM3D["product-app FlightMap3D.tsx"]
   - Cesium 资源优化：禁用不需要的 UI 组件和功能，减少内存占用
   - 动画帧率控制：使用 requestAnimationFrame 实现平滑动画，避免过度渲染
   - 相机移动优化：平滑过渡动画，避免突兀的视角切换
+- **咨询与加载优化**
+  - SSE 增量渲染：每个 token 只更新最后一条 assistant 消息，避免全量重渲染
+  - 离开/切会话即 abort：防止已废弃请求继续占用连接与触发 setState
+  - 知识库与回溯面板按需挂载（Tabs 惰性渲染，知识库仅 ADMIN）
+  - 骨架屏 + 延时阈值：快接口不出现 loading 闪烁，慢接口才展示骨架
 
 **更新** 新增了 Cesium 构建配置和可视化性能优化策略，包括地图懒加载、动画帧率控制和相机移动优化。
 
@@ -600,8 +711,18 @@ FD --> FM3D["product-app FlightMap3D.tsx"]
   - 检查 models/plane.glb 模型文件是否正确部署
   - 确认 Cesium Ion token 配置（已清空以避免 401 错误）
   - 检查高德地图瓦片服务是否可访问
+- **保险咨询机器人问题**
+  - 按钮不出现：确认商品 `category` 为 `insurance`（来自 03-insurance-agent.sql 演示数据或后台录入）
+  - 问答 401：确认 localStorage 存在 `qoder_token`，且网关对 `/api/ai/**` 已启用鉴权
+  - 回答不流式/一次性出现：检查网关或代理是否缓冲响应（需关闭 buffering）、确认 `consumeSseStream` 正常读到 chunk
+  - 看不到“知识库”页签：当前登录用户非 ADMIN（前端按 `qoder_user.role` 隐藏）
+  - 切换会话后旧回答串入：确认切换/新建/删除/关闭都调用了 `abortRef.current?.abort()`
+  - 上传文档后检索不到：确认文档 status 为 ready（需 MinerU 解析 + embedding 入库完成），失败时看 `errorMessage` 或重建索引
+- **商品图片不显示**
+  - 检查 `imageUrl` 是否为绝对地址；本地存储模式返回 `/api/product/files/local/...`，网关白名单已放行匿名读取
+  - 图片加载失败会自动回退到分类图标，不会阻断页面
 
-**更新** 新增了航班详情可视化的故障排查指南，包括 ECharts 和 Cesium 的常见问题解决方法。
+**更新** 新增了保险咨询与商品图片相关的排错项。
 
 **章节来源**
 - [micro/index.ts:62-71](file://frontend/base-app/src/micro/index.ts#L62-L71)
@@ -622,6 +743,9 @@ product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与
 - **新增** sophisticated 的用户行为追踪系统，支持页面访问、商品曝光和用户点击埋点
 - **新增** 丰富的航班详情可视化功能，支持 2D ECharts 和 3D Cesium 双引擎
 - **新增** 专业的地图组件，提供航线可视化、飞机模型和动画控制
+- **新增** 保险咨询机器人：抽屉式会话 + SSE 流式问答 + 检查点回溯 + 知识库（ADMIN）
+- **新增** 商品真实图片展示（带失败回退）与保险商品标签/咨询入口
+- **新增** 骨架屏与防闪烁 loading，微前端内改用 MemoryRouter 避免 history 竞争
 
 **更新** 本次更新显著增强了应用的功能丰富性，新增了完整的航班详情可视化系统，提供了更好的多语言用户体验和数据收集能力，同时保持了原有的商品管理功能。
 
@@ -638,3 +762,5 @@ product-app 以 React 18 + Ant Design 为基础，借助 vite-plugin-qiankun 与
 - **增强航班详情页面的交互功能，如航线编辑、多航班对比等**
 - **优化 Cesium 性能，支持更多航线和更复杂的动画效果**
 - **实现航班数据的实时更新和WebSocket推送**
+- **咨询体验增强：引用片段跳转、多轮上下文编辑、消息重新生成**
+- **知识库解析进度可视化与失败重试入口**

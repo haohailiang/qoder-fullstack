@@ -13,6 +13,9 @@
 - [frontend/base-app/nginx.conf](file://frontend/base-app/nginx.conf)
 - [frontend/base-app/.dockerignore](file://frontend/base-app/.dockerignore)
 - [docker-compose.yml](file://docker-compose.yml)
+- [docker-compose.milvus.yml](file://docker-compose.milvus.yml)
+- [ai-service/run.ps1](file://ai-service/run.ps1)
+- [ai-service/README.md](file://ai-service/README.md)
 - [README.md](file://README.md)
 </cite>
 
@@ -25,8 +28,9 @@
 6. [环境变量、端口映射与数据持久化](#环境变量端口映射与数据持久化)
 7. [健康检查与服务启动顺序](#健康检查与服务启动顺序)
 8. [镜像优化与安全加固](#镜像优化与安全加固)
-9. [常见问题排查](#常见问题排查)
-10. [结论](#结论)
+9. [AI 服务与向量库的部署边界](#ai-服务与向量库的部署边界)
+10. [常见问题排查](#常见问题排查)
+11. [结论](#结论)
 
 ## 引言
 本文件面向使用 Docker 和 Docker Compose 部署该前后端分离微电商项目的读者，重点说明：
@@ -37,6 +41,8 @@
 - 基于现有 `docker-compose.yml` 的一键部署流程与访问地址。
 
 该项目采用 Spring Cloud 微服务架构与 qiankun 微前端架构，基础设施包含 MySQL、Redis、Nacos、RabbitMQ、Elasticsearch；后端提供 API 网关与用户、商品、订单三个业务微服务；前端由主应用与两个子应用组成，统一通过 Nginx 托管静态资源并代理后端接口。
+
+需要特别说明两个"不在主 compose 内"的依赖：支付回调必须能从公网到达订单服务；保险咨询的 `ai-service`（Python）与 `Milvus` 需要单独部署（见「AI 服务与向量库的部署边界」）。
 
 **章节来源**
 - [README.md:1-15](file://README.md#L1-L15)
@@ -283,6 +289,8 @@ BaseApp-->>Client : 渲染页面
   - Nacos 注册中心地址。
   - Elasticsearch 地址（商品服务）。
   - RabbitMQ 主机名（商品服务、订单服务）。
+  - 对象存储（商品服务）：`OSS_ENDPOINT`、`OSS_BUCKET`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET`、`OSS_DIR`；未配置时自动回落本地磁盘。
+  - 支付宝沙箱（订单服务）：`ALIPAY_APP_ID`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY`、`ALIPAY_GATEWAY_URL`、`ALIPAY_NOTIFY_URL`、`ALIPAY_RETURN_URL`、`ALIPAY_TIMEOUT_EXPRESS`；未配置时服务仍可启动，创建支付返回码 503。
 - 基础设施服务也通过环境变量控制行为，例如 MySQL 字符集、Nacos 内存参数、Elasticsearch 单节点与安全开关、RabbitMQ 默认账号。
 
 ### 端口映射
@@ -306,7 +314,7 @@ BaseApp-->>Client : 渲染页面
 - MySQL 数据卷：`mysql-data:/var/lib/mysql`。
 - Redis 数据卷：`redis-data:/data`。
 - Elasticsearch 数据卷：`es-data:/usr/share/elasticsearch/data`。
-- 初始化 SQL：`./init-sql` 挂载到 MySQL 初始化目录，首次启动自动建库建表。
+- 初始化 SQL：`./init-sql` 挂载到 MySQL 初始化目录，首次启动自动建库建表（`02-alipay-payment.sql` 建 `payment_record`，`03-insurance-agent.sql` 建 AI 会话/文档表）。
 
 ```mermaid
 flowchart TD
@@ -414,6 +422,46 @@ Optimize --> Security["安全加固与最小权限"]
 - [frontend/product-app/Dockerfile:1-12](file://frontend/product-app/Dockerfile#L1-L12)
 - [frontend/order-app/Dockerfile:1-12](file://frontend/order-app/Dockerfile#L1-L12)
 
+## AI 服务与向量库的部署边界
+保险咨询不在主 `docker-compose.yml` 里，原因是它与 Java 技术栈的构建/运行方式差异较大，且依赖独立的向量库。当前部署形态如下：
+
+- **ai-service（未容器化）**：以 Python 虚拟环境在本机或 VM 运行（`ai-service/run.ps1` → `uvicorn` 监听 `127.0.0.1:8084`）。网关用固定 `uri: http://localhost:8084` 反向代理 `/api/ai/**`，因此**容器内的网关无法用 `localhost` 找到宿主机服务**，容器化部署时需改为 `host.docker.internal:8084` 或为 ai-service 补 Dockerfile 并入同一网络。
+- **Milvus（独立 compose）**：`docker-compose.milvus.yml` 拉起 `milvus-etcd` + `milvus-minio` + `milvus-standalone:2.4.15`，gRPC 端口 `19530`、指标 `9091`，数据挂载 `/opt/milvus`。建议部署在固定主机上，由 ai-service 通过 `MILVUS_URI` 直连。
+- **网络与鉴权**：ai-service 不注册 Nacos，不参与网关负载均衡；身份仍由网关注入 `X-User-Id/Name/Role` + HMAC 签名头，ai-service 侧可选验签（`VERIFY_GATEWAY_SIGNATURE` + `GATEWAY_JWT_SECRET`）。
+- **开机顺序**：MySQL（业务表）→ Milvus（依赖 etcd/MinIO）→ ai-service → 网关。ai-service 在 Milvus 不可用时仍能启动，只是上传/问答降级。
+- **前端上传大小**：Nginx 已设置 `client_max_body_size 6m` 以匹配后端 multipart，商品图片与保险 PDF（上限 20MB）需按实际场景调整；AI 文档上传若超过 6m 会先被 Nginx 拦截。
+
+```mermaid
+flowchart LR
+  subgraph "主 compose"
+    GW["gateway:8080"]
+    OS["order:8083"]
+    PS["product:8082"]
+    DB[("MySQL")]
+  end
+  subgraph "独立 compose"
+    MV["milvus-standalone:19530"]
+    ETCD["etcd"]
+    MINIO["MinIO"]
+  end
+  AI["ai-service:8084<br/>（宿主机 Python）"]
+  GW -->|"/api/ai/**"| AI
+  AI --> MV
+  AI --> DB
+  MV --> ETCD
+  MV --> MINIO
+  OS -->|"公网回调"| ALIPAY["支付宝沙箱"]
+```
+
+**图表来源**
+- [docker-compose.milvus.yml:1-70](file://docker-compose.milvus.yml#L1-L70)
+- [ai-service/run.ps1:1-10](file://ai-service/run.ps1#L1-L10)
+- [frontend/base-app/nginx.conf:7-8](file://frontend/base-app/nginx.conf#L7-L8)
+
+**章节来源**
+- [ai-service/README.md](file://ai-service/README.md)
+- [docker-compose.yml:83-91](file://docker-compose.yml#L83-L91)
+
 ## 常见问题排查
 ### 前端无法访问后端接口
 - 确认 base-app 的 Nginx 是否将 `/api/` 正确代理到 `ecommerce-gateway:8080`。
@@ -451,5 +499,23 @@ Optimize --> Security["安全加固与最小权限"]
 **章节来源**
 - [frontend/base-app/nginx.conf:7-10](file://frontend/base-app/nginx.conf#L7-L10)
 
+### 支付回调收不到
+- 现象：支付后订单一直待支付，只能等前端 `sync=true` 查询。
+- 排查：`ALIPAY_NOTIFY_URL` 是否为支付宝可达的公网地址（容器内 `localhost` 不可用）；公网入口是否把 `/api/order/payments/alipay/notify` 放行到网关（该路径在网关白名单中，安全性由验签保证）。
+
+**章节来源**
+- [docker-compose.yml:166-173](file://docker-compose.yml#L166-L173)
+
+### 图片上传 413
+- 现象：上传返回 413 Request Entity Too Large。
+- 排查：Nginx `client_max_body_size`（当前 6m）、后端 multipart 上限、前端 `ImageUploader` 的 `maxSizeMb` 三处需一致；AI 文档上传则需另外调整上限。
+
+**章节来源**
+- [frontend/base-app/nginx.conf:7-8](file://frontend/base-app/nginx.conf#L7-L8)
+
+### 容器内网关访问不到 ai-service
+- 现象：`/api/ai/**` 返回 502。
+- 排查：网关路由为 `http://localhost:8084`，在容器内指向自身；改为 `host.docker.internal:8084`（Windows/Mac）或服务名（若为 ai-service 补了 Dockerfile 并入同一网络）。
+
 ## 结论
-本项目通过清晰的分层镜像构建与 Docker Compose 编排，实现了前后端微服务的一体化部署。后端采用多阶段构建与 Alpine 运行镜像，前端采用 Node 构建与 Nginx 运行镜像，整体镜像体积小、启动快。通过环境变量、端口映射、数据卷与健康检查，保证了服务可观测性与数据持久化。建议在生产环境中进一步引入安全加固、资源限制、日志收集与监控告警，以提升系统的稳定性与可维护性。
+本项目通过清晰的分层镜像构建与 Docker Compose 编排，实现了前后端微服务的一体化部署。后端采用多阶段构建与 Alpine 运行镜像，前端采用 Node 构建与 Nginx 运行镜像，整体镜像体积小、启动快。通过环境变量、端口映射、数据卷与健康检查，保证了服务可观测性与数据持久化。支付与图片上传把"外部依赖"带进了部署边界（公网回调地址、对象存储/本地盘、Nginx 上传上限），AI 咨询则通过独立 compose + 宿主机进程的方式与主栈解耦。建议在生产环境中进一步引入安全加固、资源限制、日志收集与监控告警，以提升系统的稳定性与可维护性。
