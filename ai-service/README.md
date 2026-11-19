@@ -145,3 +145,5 @@ npx vitest run
 | `glm-5.3` 报模型未开通 | 改 `.env` 的 `ZHIPU_MODEL`（如 `glm-5.3-flash`）后重启 |
 | 回溯返回 409 | `InMemorySaver` 重启即失效，属预期行为 |
 | 网关 413/内存不足 | 确认网关 `spring.codec.max-in-memory-size: 16MB` 且已重启 |
+| 经网关访问 `/api/ai/**` 返回 500（响应体是 Spring 的 `timestamp/path/status`） | 8084 进程未监听：网关对下游连接拒绝默认返回 500 而非 503；先用 `GET http://localhost:8084/health` 自查再查网关 |
+| 列表接口 422 | 查询参数约定为 camelCase（`productId`），后端已用 `Query(alias="productId")` 兼容，若仍 422 检查是否用了其他写法 |
