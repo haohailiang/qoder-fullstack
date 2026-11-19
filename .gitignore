@@ -13,10 +13,16 @@
 # 本地兜底图片存储（未配置 OSS 时的上传目录）
 backend/ecommerce-product/uploads/
 
-# 根目录调试截图
+# 调试与验证截图（仅本地留档，不入库）
+# 根目录：验证码与登录修复的验证过程截图
+/captcha_*.png
+/bugfix_*.png
+/verify_*.png
+# 根目录：首屏与会话追踪截图
 /page_initial.png
-/tracker_console_output.png
-/tracker_final_verification.png
+/tracker_*.png
+# E2E 用例落地的角色分流与互踢校验截图（frontend/e2e/）
+frontend/e2e/verify_*.png
 
 # 本地凭据（VM_PASS 等环境变量文件不得入库）
 .env
