@@ -1,0 +1,70 @@
+version: '3.8'
+
+# ============================================================
+# Milvus 单机版（etcd + minio + milvus-standalone）
+# 部署位置：VM 192.168.178.100，使用 scripts/deploy-milvus.ps1 执行
+#   docker compose -f docker-compose.milvus.yml up -d
+# 本地 ai-service 通过 MILVUS_URI=http://192.168.178.100:19530 连接
+# 数据目录挂载到 /opt/milvus，删除容器不会丢向量
+# ============================================================
+
+services:
+  etcd:
+    container_name: milvus-etcd
+    # quay.io 在本机网络只有 IPv6 记录且不可达，改用 Docker Hub 上的同版本 etcd 3.5.5
+    image: bitnamilegacy/etcd:3.5.5
+    restart: always
+    user: root
+    entrypoint: ["/opt/bitnami/etcd/bin/etcd"]
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - /opt/milvus/etcd:/etcd
+    command:
+      - --advertise-client-urls=http://127.0.0.1:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --data-dir=/etcd
+    healthcheck:
+      test: ["CMD", "/opt/bitnami/etcd/bin/etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    # minio/minio 在本机镜像源拉不到，改用 bitnami 构建的 MinIO 服务端（同一 S3 协议）
+    image: bitnamilegacy/minio:latest
+    restart: always
+    user: root
+    entrypoint: ["/opt/bitnami/minio/bin/minio"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - /opt/milvus/minio:/minio_data
+    command: ["server", "/minio_data"]
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.4.15
+    restart: always
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - /opt/milvus/data:/var/lib/milvus
+    ports:
+      # 仅向局域网暴露 gRPC 端口，Windows 侧 ai-service 直连
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      etcd:
+        condition: service_started
+      minio:
+        condition: service_started
