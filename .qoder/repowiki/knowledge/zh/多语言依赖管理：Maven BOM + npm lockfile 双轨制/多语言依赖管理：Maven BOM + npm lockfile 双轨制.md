@@ -14,13 +14,16 @@ source_files:
     - frontend/base-app/package.json
     - frontend/product-app/package.json
     - frontend/order-app/package.json
+    - ai-service/requirements.txt
+    - ai-service/pytest.ini
 ---
 
 ## 1. 使用的系统/工具
 
-仓库采用**双轨依赖管理**：
+仓库采用**双轨依赖管理**（Java 与 npm），另有一个 Python 单轨：
 - 后端 Java 微服务使用 **Maven**（Spring Boot 3.3.5，通过 `spring-boot-starter-parent` 继承），配合 Maven Wrapper（`.mvn/wrapper/maven-wrapper.properties` 锁定 maven 3.8.8、wrapper 3.3.4）。
 - 前端微前端应用使用 **npm**（Node.js），每个子应用独立 `package.json` + `package-lock.json`。
+- AI 服务 `ai-service` 使用 **pip + venv**（`requirements.txt`，Python 3.11+，推荐 3.12；依赖 FastAPI、LangGraph、pymilvus、SQLAlchemy 等）。
 - 根目录仅有一个极小的 `package.json`（仅含 `ssh2` devDependency，供 `vm-ssh.js` 部署脚本使用）。
 
 未发现私有仓库配置（无 `.m2/settings.xml`、无 npm `.npmrc`、无 GOPRIVATE 等）。所有第三方包均从公共仓库拉取。
@@ -51,6 +54,11 @@ source_files:
 - 每个子应用都生成并提交对应的 `package-lock.json`（lockfileVersion 3），用于冻结安装树。
 - 根 `package.json` 仅包含部署辅助工具 `ssh2`，不参与业务构建。
 
+### AI 服务（pip / venv）
+- 依赖声明在 `ai-service/requirements.txt`，按用途分组注释（Web 框架 / 数据库 / LangChain-LangGraph / 向量库与解析）。
+- 版本均为向下限约束（如 `fastapi>=0.115.0`、`pymilvus>=2.5.0,<3.0.0`），**无 lock 文件**，因此重装环境可能拿到不同小版本；生产部署建议导出一份冻结清单。
+- 本地运行使用 `ai-service/.venv` 虚拟环境，由 `ai-service/run.ps1` 直接调用解释器启动 uvicorn（不依赖全局 Python）。
+
 ## 4. 约定与约束
 
 - **Java 依赖版本必须通过父 POM 的 `<properties>` 或 `<dependencyManagement>` 统一管理**：子模块 POM 中未出现任何硬编码的 Spring / Spring Cloud / Spring Cloud Alibaba 版本号，全部由父 POM 的 BOM 和属性提供（依据各子模块 POM 的实际内容）。
@@ -58,5 +66,6 @@ source_files:
 - **Lombok 不参与运行时打包**：在所有子模块 POM 中声明为 `<optional>true</optional>`，且 `spring-boot-maven-plugin` 显式 exclude（依据 `ecommerce-user/pom.xml` 的 build 配置，其他模块遵循相同模式）。
 - **Maven 工具链不可随意升级**：通过 Maven Wrapper 锁定 `apache-maven 3.8.8` 与 `maven-wrapper 3.3.4`，下载地址指向 Maven Central（依据 `.mvn/wrapper/maven-wrapper.properties`）。
 - **前端依赖变更需同步更新 lockfile**：每个子应用均有 `package-lock.json`，表明团队以 npm 锁文件作为可复现安装的契约。
+- **Python 依赖没有锁定文件**：`ai-service/requirements.txt` 只写下限，可复现性弱于 Maven/npm；排查“本地能跑、新环境报错”时优先比对已装版本（`pip freeze`）。
 - **未发现私有仓库或代理配置**：仓库内没有 `.m2/settings.xml`、`.npmrc`、`settings.gradle` 等私有源配置文件，所有依赖均来自公共仓库（Maven Central、npm registry）。
 - **未发现 vendoring 策略**：Java 依赖通过 Maven 远程解析，前端依赖通过 node_modules 安装，无 vendor 目录或源码级 vendoring。

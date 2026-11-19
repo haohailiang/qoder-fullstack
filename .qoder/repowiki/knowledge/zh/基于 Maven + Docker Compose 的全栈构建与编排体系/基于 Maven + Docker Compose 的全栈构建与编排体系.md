@@ -14,6 +14,7 @@ source_files:
     - frontend/base-app/Dockerfile
     - docker-compose.yml
     - docker-compose-infra.yml
+    - docker-compose.milvus.yml
     - vm-ssh.js
     - init-sql/01-init-database.sql
 ---
@@ -24,6 +25,7 @@ source_files:
 - 后端（Spring Boot 微服务）使用 **Maven** 作为构建工具，通过 `backend/pom.xml` 父 POM 聚合 `ecommerce-common / user / gateway / product / order` 五个模块。
 - 前端（Vue3 + React + 原生 JS 子应用）使用 **Vite** 构建，每个子应用独立 `package.json`。
 - 统一编排通过根级 `docker-compose.yml` 拉起基础设施（MySQL/Redis/Nacos/RabbitMQ/Elasticsearch）+ 所有后端服务 + 三个前端 Nginx 容器。
+- 向量库 Milvus 单独放在 `docker-compose.milvus.yml`（etcd + MinIO + milvus v2.4.15），不在主 compose 中；Python 的 `ai-service` 没有 Dockerfile，以宿主机进程（8084）运行，靠 `run.ps1` 启动。
 - 本地 VM 部署辅助脚本 `vm-ssh.js` 基于 `ssh2` 提供 SSH 命令执行与 SFTP 上传能力。
 
 没有发现 CI/CD（GitHub Actions、Jenkinsfile 等）或 Makefile，因此本仓库的“发布流水线”以 `docker-compose up --build` 为核心入口。
@@ -38,6 +40,7 @@ source_files:
 | `frontend/base-app/Dockerfile` | 前端基础镜像：Node 20 构建 → Nginx 静态托管 |
 | `docker-compose.yml` | 全栈服务编排（基础设施 + 4 个后端 + 3 个前端） |
 | `docker-compose-infra.yml` | 仅基础设施（与主 compose 分离） |
+| `docker-compose.milvus.yml` | 向量库 Milvus + etcd + MinIO 独立编排（19530/9091） |
 | `vm-ssh.js` | Node.js SSH/SFTP 部署辅助脚本 |
 | `init-sql/01-init-database.sql` | MySQL 初始化数据，由 compose 挂载到 `/docker-entrypoint-initdb.d` |
 
@@ -63,6 +66,7 @@ source_files:
   - Redis/Nacos/RabbitMQ/Elasticsearch 使用 `service_started`。
 - 后端服务通过环境变量注入配置：`SPRING_PROFILES_ACTIVE=docker`、`SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848`、`SPRING_DATA_REDIS_HOST=redis` 等，覆盖 `application.yml` 中的默认值。
 - 前端三个子应用分别暴露端口 `80`（base）、`7100`（product）、`7200`（order）。
+- 异构服务不在 compose 内：网关到 ai-service 的路由写死为 `http://localhost:8084`，因此只有网关也在宿主机进程运行时才通；若网关容器化，需改为 `host.docker.internal:8084`。
 
 ### 3.4 VM 部署辅助
 - `vm-ssh.js` 曾硬编码 VM 地址 `192.168.178.100`、用户名 `root` 与 root 口令；现已改为从 `VM_HOST` / `VM_USER` / `VM_PASS` 环境变量读取，缺失 `VM_PASS` 时直接报错退出（原明文口令仍需在主机的层面完成轮换）。
@@ -78,4 +82,5 @@ source_files:
 - **MySQL 字符集**：compose 中显式设置 `LANG: C.UTF-8`、`LC_ALL: C.UTF-8` 以及 `--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci`，以避免官方镜像默认 locale 导致的中文乱码（注释中有明确说明）。
 - **前端构建产物**：每个子应用独立构建并独立 Nginx 容器，不存在统一的 CDN 或反向代理层（base-app 的 nginx.conf 仅用于静态资源分发）。
 - **无 CI/CD**：仓库未发现 GitHub Actions、Jenkinsfile、GitLab CI 等持续集成配置，也没有 Makefile 或 shell 构建脚本（除 `vm-ssh.js`）。本地构建入口为 `docker-compose up --build`。
+- **异构服务构建链缺失**：`ai-service` 没有 Dockerfile，也无 CI 步骤，只能靠 `requirements.txt` + `run.ps1` 手动部署；这是当前“一键拉起全栈”覆盖不到的部分，排障时需单独确认 8084 进程与 19530 端口。
 - **版本管理**：后端使用 Maven 快照版本 `1.0.0-SNAPSHOT`；前端 base-app 版本写死为 `0.1.0`，其余子应用未在顶层 package.json 中声明统一版本策略。

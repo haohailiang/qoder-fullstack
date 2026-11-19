@@ -3,7 +3,7 @@ schema_version: 1
 locale: zh-CN
 branch: main
 nodes_managed: true
-exported_at: "2026-11-10T00:31:33Z"
+exported_at: "2026-11-19T10:00:00Z"
 modules:
     "":
         dir_name: 电商前后端一体化编排根工程
@@ -13,6 +13,7 @@ modules:
             - .gitignore
             - docker-compose.yml
             - docker-compose-infra.yml
+            - docker-compose.milvus.yml
             - package.json
             - package-lock.json
             - vm-ssh.js
@@ -21,6 +22,7 @@ modules:
         children:
             - backend
             - frontend
+            - ai-service
         depends_on: []
         related_to: []
     backend:
@@ -43,3 +45,14 @@ modules:
         depends_on: []
         related_to:
             - path: backend
+    ai-service:
+        dir_name: Python AI 问答微服务（ai-service）
+        title: Python AI 问答微服务（ai-service）
+        scope:
+            - ai-service/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: backend
+            - path: scripts
