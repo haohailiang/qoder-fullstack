@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: ecommerce-gateway
+  # PDF 上传（multipart）与 SSE 响应需要更大的编解码缓冲
+  codec:
+    max-in-memory-size: 16MB
   # Redis 会话：鉴权时比对 login:token:{uid}，使登出与单设备互踢生效（与用户服务同一实例）
   data:
     redis:
@@ -76,6 +79,16 @@ spring:
             - Path=/api/order/**
           filters:
             - StripPrefix=1
+
+        # ---- 保险咨询机器人（Python ai-service） ----
+        # StripPrefix=2：/api/ai/chat -> /chat，/api/ai/documents -> /documents
+        # 网关先校验 JWT，再注入 X-User-Id / X-User-Role 供 ai-service 做用户隔离
+        - id: ai-service
+          uri: http://localhost:8084
+          predicates:
+            - Path=/api/ai/**
+          filters:
+            - StripPrefix=2
 
         # ---- Swagger UI & API Docs 路由 ----
         # 用户服务 Swagger
